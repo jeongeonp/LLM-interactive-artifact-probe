@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Read & Code the Reviews</title>
+<style>
+  body{margin:0;font:15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#2a2725;background:#f7f6f2;padding:18px}
+  h1{font-size:19px;margin:0 0 2px;color:#b4622e}.sub{color:#8a857c;font-size:13px;margin:0 0 14px}
+  .wrap{display:flex;gap:16px;flex-wrap:wrap}
+  #reviews{flex:1;min-width:320px;max-height:64vh;overflow:auto}
+  .rev{background:#fff;border:1px solid #e4e1d8;border-radius:10px;padding:12px 14px;margin-bottom:10px;font-size:14px;user-select:text}
+  .rev .src{color:#b4622e;font-size:11px;font-weight:600;margin-bottom:4px}
+  mark{padding:1px 2px;border-radius:3px}mark.pos{background:#cfe6c2}mark.neg{background:#f2c9c0}mark.school{background:#cfe0f2}mark.walk{background:#ecd9b0}
+  #side{width:250px}
+  .tagbar{position:sticky;top:0;background:#f7f6f2;padding-bottom:8px}
+  .tagbar button{font:inherit;font-size:12px;margin:0 5px 5px 0;padding:5px 10px;border:1px solid #e4e1d8;border-radius:20px;background:#fff;cursor:pointer}
+  .tagbar button:hover{border-color:#b4622e}
+  .tally{background:#fff;border:1px solid #e4e1d8;border-radius:10px;padding:12px}
+  .row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}
+  .predict{background:#fff;border:1px solid #e4e1d8;border-radius:10px;padding:12px;margin-top:12px}
+  .predict input{width:100%}
+  .reveal{font-weight:700;color:#b4622e}
+  .foot{color:#b3ac9f;font-size:11px;margin-top:12px}
+</style></head><body>
+<h1>Read the parent reviews — then code them</h1>
+<p class="sub">Select any phrase and tag it. The tallies build from your reading. Then predict the average rating before you reveal it.</p>
+<div class="wrap">
+  <div id="reviews"></div>
+  <div id="side">
+    <div class="tagbar">
+      Tag selection as:
+      <div style="margin-top:6px">
+        <button data-t="pos">＋ Positive</button><button data-t="neg">－ Negative</button>
+        <button data-t="school">School support</button><button data-t="walk">Walkability</button>
+      </div>
+    </div>
+    <div class="tally" id="tally"></div>
+    <div class="predict">
+      <div style="font-size:13px;margin-bottom:6px">Before revealing — what's the average star rating?</div>
+      <input type="range" id="guess" min="1" max="5" step="0.1" value="3">
+      <div style="display:flex;justify-content:space-between"><span id="gval">3.0★</span>
+        <button id="revealBtn" style="font:inherit;font-size:12px;border:0;background:#b4622e;color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer">Reveal</button></div>
+      <div id="reveal" style="margin-top:8px;font-size:13px"></div>
+    </div>
+  </div>
+</div>
+<p class="foot">Illustrative reviews for a UI demo. Highlighting works by selecting text with your cursor, then clicking a tag.</p>
+<script>
+const REVIEWS=[
+ ["Parent · Minneapolis","The IEP team actually listened. Elena gets pull-out support twice a week and her teacher emails us weekly. Walkable to the school too.",5],
+ ["Parent · Philadelphia","Test scores are high but they had zero flexibility for a kid who fidgets. We fought for every accommodation.",2],
+ ["Parent · Baltimore","Small, diverse school. The 504 was set up fast. Not fancy, but people care.",4],
+ ["Parent · Chicago","Great magnet school — if you win the lottery. Ours is a 25-minute drive, which kills the walkability dream.",3],
+ ["Parent · Minneapolis","Winters are brutal but the neighborhood is tight-knit and the learning specialist is excellent.",5],
+ ["Parent · Philadelphia","Loved Fishtown's walkability. Rent ate the savings we hoped to keep, though.",3],
+];
+const rc=document.getElementById("reviews");
+REVIEWS.forEach(r=>{const d=document.createElement("div");d.className="rev";
+  d.innerHTML=`<div class="src">${r[0]} · ${r[2]}★</div>${r[1]}`;rc.appendChild(d);});
+const counts={pos:0,neg:0,school:0,walk:0};const tally=document.getElementById("tally");renderTally();
+document.querySelectorAll(".tagbar button").forEach(b=>b.onclick=()=>{
+  const sel=window.getSelection();if(!sel.rangeCount||sel.isCollapsed){flash("Select some text first");return;}
+  const t=b.dataset.t;try{const m=document.createElement("mark");m.className=t;sel.getRangeAt(0).surroundContents(m);
+    counts[t]++;renderTally();sel.removeAllRanges();}catch(e){flash("Select within one review");}
+});
+function renderTally(){tally.innerHTML="<b style='font-size:12px'>Coded so far</b>"+
+  [["pos","Positive"],["neg","Negative"],["school","School support"],["walk","Walkability"]]
+  .map(([k,l])=>`<div class="row"><span>${l}</span><b>${counts[k]}</b></div>`).join("");}
+let msg;function flash(t){clearTimeout(msg);tally.insertAdjacentHTML("afterbegin",`<div style="color:#c96a4b;font-size:12px" id="fl">${t}</div>`);msg=setTimeout(()=>{const f=document.getElementById("fl");if(f)f.remove();},1500);}
+const g=document.getElementById("guess"),gv=document.getElementById("gval");
+g.oninput=()=>gv.textContent=(+g.value).toFixed(1)+"★";
+document.getElementById("revealBtn").onclick=()=>{
+  const avg=REVIEWS.reduce((a,r)=>a+r[2],0)/REVIEWS.length;const diff=Math.abs(avg-g.value);
+  document.getElementById("reveal").innerHTML=`Actual average: <span class="reveal">${avg.toFixed(1)}★</span>. You guessed ${(+g.value).toFixed(1)}★ — ${diff<0.3?"nailed it.":diff<0.8?"close.":"the stories skewed your read."}`;
+};
+</script></body></html>

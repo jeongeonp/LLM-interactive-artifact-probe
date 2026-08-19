@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Probe (Landing Page)</title>
+<style>
+  :root { --bg:#f7f6f2; --panel:#fff; --line:#e4e1d8; --accent:#b4622e; --text:#2a2725; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; color:var(--text); background:var(--bg);
+         min-height:100vh; display:flex; align-items:center; justify-content:center; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:28px; width:420px; max-width:92vw; }
+  h1 { margin:0 0 4px; font-size:20px; color:var(--accent); }
+  p.sub { margin:0 0 20px; color:#8a857c; font-size:13px; }
+  label { display:block; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:#6f6a61; margin:14px 0 4px; }
+  input, select { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; }
+  .row { display:flex; gap:12px; }
+  .row > div { flex:1; }
+  button { font:inherit; border:0; border-radius:8px; cursor:pointer; }
+  .btn { padding:11px 16px; background:var(--accent); color:#fff; font-weight:600; width:100%; margin-top:22px; }
+  .links { margin-top:18px; text-align:center; font-size:13px; }
+  .links a { color:#8a857c; text-decoration:none; margin:0 8px; }
+  .links a:hover { color:var(--accent); }
+  .link-btn { display:inline-block; margin-top:8px; background:none; border:0; color:var(--accent); font-size:12px; cursor:pointer; padding:0; text-decoration:underline; width:auto; }
+  .overlay { position:fixed; inset:0; background:rgba(30,28,25,.45); display:none; align-items:center; justify-content:center; padding:20px; }
+  .overlay.open { display:flex; }
+  .modal { background:var(--panel); border-radius:14px; padding:22px 24px; width:560px; max-width:94vw; max-height:82vh; overflow:auto; }
+  .modal h2 { margin:0 0 10px; font-size:17px; color:var(--accent); }
+  .modal .body { white-space:pre-wrap; font-size:14px; }
+  .modal .close { margin-top:16px; padding:9px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; width:auto; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Start a session</h1>
+    <p class="sub">Enter the participant ID, pick the task and condition, then launch.</p>
+
+    <div class="row">
+      <div><label for="pid">Participant ID</label><input id="pid" placeholder="P01" autofocus /></div>
+      <div><label for="task">Task</label>
+        <select id="task">
+          <option value="practice">Practice</option>
+          <option value="sd">SD affordability</option>
+          <option value="relocation">Relocation</option>
+        </select>
+      </div>
+    </div>
+    <button type="button" class="link-btn" id="viewTask">ⓘ View task instruction</button>
+
+    <label for="cond">Condition</label>
+    <select id="cond">
+      <option value="interactive">Interactive artifacts</option>
+      <option value="static">Static artifacts</option>
+    </select>
+
+    <button class="btn" id="start">Start session →</button>
+
+    <div class="links">
+      <a href="/review.html">Review conversations</a> ·
+      <a href="/admin.html">Export data</a>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2 id="modalTitle">Task instruction</h2>
+      <div class="body" id="modalBody"></div>
+      <button class="close" id="modalClose">Close</button>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const overlay = $("overlay");
+
+// Show the selected task's detailed instruction in a modal (server = single source of truth).
+async function showTask() {
+  const sel = $("task");
+  const label = sel.options[sel.selectedIndex].text;
+  try {
+    const { text } = await (await fetch("/api/scenario?task=" + encodeURIComponent(sel.value))).json();
+    $("modalTitle").textContent = label;
+    $("modalBody").textContent = text || "(no instruction for this task)";
+    overlay.classList.add("open");
+  } catch (_) {}
+}
+$("task").addEventListener("change", showTask);   // opens when they select a task
+$("viewTask").addEventListener("click", showTask); // and via the link
+$("modalClose").addEventListener("click", () => overlay.classList.remove("open"));
+overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.remove("open"); });
+
+$("start").addEventListener("click", () => {
+  const pid = $("pid").value.trim() || "anon";
+  const task = $("task").value;
+  const cond = $("cond").value;
+  location.href = `/?pid=${encodeURIComponent(pid)}&task=${encodeURIComponent(task)}&cond=${encodeURIComponent(cond)}`;
+});
+$("pid").addEventListener("keydown", (e) => { if (e.key === "Enter") $("start").click(); });
+</script>
+</body>
+</html>

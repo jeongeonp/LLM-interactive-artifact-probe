@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Neighborhoods: Numbers & Voices</title>
+<style>
+  body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#2a2725;background:#f7f6f2;padding:18px}
+  h1{font-size:19px;margin:0 0 2px;color:#b4622e}.sub{color:#8a857c;font-size:13px;margin:0 0 12px}
+  .toggle{display:inline-flex;border:1px solid #e4e1d8;border-radius:20px;overflow:hidden;margin-bottom:14px}
+  .toggle button{font:inherit;font-size:12px;padding:5px 14px;border:0;background:#fff;cursor:pointer}.toggle button.on{background:#b4622e;color:#fff}
+  .wrap{display:flex;gap:16px;flex-wrap:wrap}
+  #map{display:grid;grid-template-columns:repeat(3,110px);gap:8px}
+  .hood{height:78px;border-radius:10px;padding:8px;color:#fff;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:flex-end;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
+  #info{flex:1;min-width:250px;background:#fff;border:1px solid #e4e1d8;border-radius:12px;padding:16px;align-self:flex-start}
+  #info h2{font-size:16px;margin:0 0 6px}.stat{font-size:22px;color:#b4622e;font-weight:700}
+  .q{border-left:3px solid #d8b48f;padding:6px 10px;margin-top:10px;background:#faf7f2;border-radius:0 8px 8px 0;font-size:13px}
+  .legend{font-size:11px;color:#8a857c;margin-top:8px}
+  .foot{color:#b3ac9f;font-size:11px;margin-top:12px}
+</style></head><body>
+<h1>Philadelphia neighborhoods — the stat <i>and</i> the story</h1>
+<p class="sub">Color = median 2BR rent. Hover a neighborhood for the number; the same place also carries a resident's voice. Toggle which layer leads.</p>
+<div class="toggle"><button class="on" data-l="rent">Rent layer</button><button data-l="voice">Voice layer</button></div>
+<div class="wrap">
+  <div id="map"></div>
+  <div id="info"><h2>Hover a neighborhood</h2><p class="legend">Darker = pricier. The point: two neighborhoods with the same rent can feel completely different.</p></div>
+</div>
+<p class="foot">Illustrative neighborhood data for a UI demo.</p>
+<script>
+const H=[
+ {n:"Fishtown",rent:1950,walk:88,q:"“Walkable and buzzing, but we're priced at the edge of our budget.”"},
+ {n:"West Philly",rent:1500,walk:79,q:"“Diverse, leafy, great for kids — the co-op is our anchor.”"},
+ {n:"South Philly",rent:1650,walk:82,q:"“Row-home community, everyone knows the corner store owner.”"},
+ {n:"Mt. Airy",rent:1550,walk:70,q:"“Feels like a small town; the school actually supported our 504.”"},
+ {n:"Fairmount",rent:1900,walk:84,q:"“Park access is unreal, but it's getting expensive fast.”"},
+ {n:"Kensington",rent:1250,walk:74,q:"“Cheap and improving, but block-by-block — do your homework.”"},
+];
+const map=document.getElementById("map"),info=document.getElementById("info");let layer="rent";
+const min=1250,max=1950;
+function col(r){const t=(r-min)/(max-min);const c1=[216,180,143],c2=[122,58,26];
+  return`rgb(${c1.map((a,i)=>Math.round(a+(c2[i]-a)*t)).join(",")})`;}
+H.forEach(h=>{const d=document.createElement("div");d.className="hood";d.style.background=col(h.rent);d.textContent=h.n;
+  d.onmouseenter=()=>info.innerHTML=`<h2>${h.n}</h2>`+
+    (layer==="rent"
+      ? `<div class="stat">$${h.rent}/mo</div><div class="legend">Walk Score ${h.walk}</div><div class="q">${h.q}</div>`
+      : `<div class="q" style="border-color:#b4622e;font-size:14px">${h.q}</div><div class="legend" style="margin-top:8px">Median 2BR ≈ $${h.rent} · Walk Score ${h.walk}</div>`);
+  map.appendChild(d);});
+document.querySelectorAll(".toggle button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".toggle button").forEach(x=>x.classList.remove("on"));b.classList.add("on");layer=b.dataset.l;});
+</script></body></html>

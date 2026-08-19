@@ -1,0 +1,53 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Rent Trend, Explained</title>
+<style>
+  body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#2a2725;background:#f7f6f2;padding:18px}
+  h1{font-size:19px;margin:0 0 2px;color:#b4622e}.sub{color:#8a857c;font-size:13px;margin:0 0 12px}
+  .tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  .tabs button{font:inherit;font-size:13px;padding:5px 12px;border:1px solid #e4e1d8;border-radius:20px;background:#fff;cursor:pointer}
+  .tabs button.on{background:#b4622e;color:#fff;border-color:#b4622e}
+  .wrap{display:flex;gap:16px;flex-wrap:wrap}
+  svg{background:#fff;border:1px solid #e4e1d8;border-radius:12px}
+  .dot{cursor:pointer}.dot:hover{r:7}
+  #note{flex:1;min-width:260px;background:#fff;border:1px solid #e4e1d8;border-radius:12px;padding:16px;align-self:flex-start}
+  #note h2{font-size:15px;margin:0 0 4px}#note .yr{color:#b4622e;font-weight:600;font-size:12px}
+  .foot{color:#b3ac9f;font-size:11px;margin-top:12px}
+</style></head><body>
+<h1>Rent went up — but <i>why</i>, and where?</h1>
+<p class="sub">The line is the number. Click a marked year to read what actually happened there.</p>
+<div class="tabs" id="tabs"></div>
+<div class="wrap">
+  <svg id="chart" width="440" height="240" viewBox="0 0 440 240"></svg>
+  <div id="note"><h2>Click a marked point</h2><p>Each marker ties the trend to a real event — a policy, an employer, a wave of newcomers.</p></div>
+</div>
+<p class="foot">Illustrative median-rent series for a UI demo.</p>
+<script>
+const CITIES={
+ Baltimore:{d:[1250,1300,1340,1400,1450,1520,1560,1600],e:{2018:["Under Armour campus stalls","A big planned employer hub downtown stalled — rent pressure eased in nearby rows."],2021:["Remote-work arrivals","Out-of-town remote workers discovered cheap rowhomes; bidding began."]}},
+ Philadelphia:{d:[1350,1420,1480,1540,1600,1680,1720,1760],e:{2019:["Fishtown boom","A wave of restaurants + transit access made once-cheap blocks hot."],2022:["Rent outpaces wages","Local wages flattened while rent kept climbing — affordability gap widened."]}},
+ Minneapolis:{d:[1200,1260,1300,1340,1360,1420,1520,1600],e:{2019:["2040 upzoning","City ended single-family-only zoning; more units, slower price growth for a while."],2023:["Light-rail extension","New line raised demand near stations."]}},
+ Chicago:{d:[1650,1700,1720,1780,1820,1900,1960,2000],e:{2020:["Downtown dip","Pandemic emptied the Loop; rents briefly softened."],2023:["Return + migration","Jobs returned and Sun-Belt refugees arrived; rents rebounded past pre-2020."]}},
+};
+const YRS=[2017,2018,2019,2020,2021,2022,2023,2024];
+const tabs=document.getElementById("tabs"),svg=document.getElementById("chart"),note=document.getElementById("note");
+Object.keys(CITIES).forEach((c,i)=>{const b=document.createElement("button");b.textContent=c;if(!i)b.classList.add("on");
+  b.onclick=()=>{[...tabs.children].forEach(x=>x.classList.remove("on"));b.classList.add("on");draw(c);};tabs.appendChild(b);});
+function draw(city){
+  const {d,e}=CITIES[city];const W=440,H=240,pad=36;
+  const min=1150,max=2050;const x=i=>pad+i*(W-pad-14)/(d.length-1);const y=v=>H-24-(v-min)/(max-min)*(H-56);
+  let path=d.map((v,i)=>(i?"L":"M")+x(i)+" "+y(v)).join(" ");
+  let g=`<line x1="${pad}" y1="${H-24}" x2="${W-8}" y2="${H-24}" stroke="#e4e1d8"/>`;
+  YRS.forEach((yr,i)=>{g+=`<text x="${x(i)}" y="${H-8}" font-size="10" fill="#8a857c" text-anchor="middle">${String(yr).slice(2)}</text>`;});
+  [1400,1700,2000].forEach(v=>{g+=`<text x="6" y="${y(v)+3}" font-size="9" fill="#b3ac9f">$${v}</text>`;});
+  g+=`<path d="${path}" fill="none" stroke="#b4622e" stroke-width="2.5"/>`;
+  d.forEach((v,i)=>{const yr=YRS[i];const hot=e[yr];
+    g+=`<circle class="dot" data-yr="${yr}" cx="${x(i)}" cy="${y(v)}" r="${hot?6:3.5}" fill="${hot?'#b4622e':'#d8b48f'}" stroke="#fff" stroke-width="1.5"/>`;});
+  svg.innerHTML=g;
+  svg.querySelectorAll(".dot").forEach(dot=>dot.onclick=()=>{
+    const yr=dot.dataset.yr,ev=e[yr];
+    note.innerHTML=ev?`<p class="yr">${yr} · ${city}</p><h2>${ev[0]}</h2><p>${ev[1]}</p>`
+      :`<p class="yr">${yr} · ${city}</p><p>Median rent ≈ $${CITIES[city].d[YRS.indexOf(+yr)]}. No standout event this year.</p>`;
+  });
+  note.innerHTML=`<h2>${city}</h2><p>Click the highlighted points (larger dots) to see what drove the change.</p>`;
+}
+draw("Baltimore");
+</script></body></html>

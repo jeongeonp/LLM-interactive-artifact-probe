@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Map the Causes</title>
+<style>
+  body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#2a2725;background:#f7f6f2;padding:18px}
+  h1{font-size:19px;margin:0 0 2px;color:#b4622e}.sub{color:#8a857c;font-size:13px;margin:0 0 10px}
+  .wrap{display:flex;gap:16px;flex-wrap:wrap}
+  #stage{position:relative;width:520px;height:380px;background:#fff;border:1px solid #e4e1d8;border-radius:12px;overflow:hidden;touch-action:none}
+  .node{position:absolute;transform:translate(-50%,-50%);padding:8px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:grab;user-select:none;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+  .node.quant{background:#e7eef4;color:#20415c}.node.qual{background:#f4e9df;color:#7a3a1a}
+  .node.sel{outline:3px solid #b4622e}
+  svg{position:absolute;inset:0;pointer-events:none}
+  #side{width:250px}
+  #ev{background:#fff;border:1px solid #e4e1d8;border-radius:10px;padding:14px;font-size:13px;min-height:120px}
+  #ev h2{font-size:14px;margin:0 0 6px}
+  .hint{font-size:12px;color:#8a857c;margin-bottom:8px}
+  .key span{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin-right:6px}
+  .foot{color:#b3ac9f;font-size:11px;margin-top:12px}
+  button.clr{font:inherit;font-size:12px;border:1px solid #e4e1d8;background:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;margin-top:10px}
+</style></head><body>
+<h1>Map what causes what</h1>
+<p class="sub">Drag the factors to arrange them. <b>Click one node then another</b> to draw a causal arrow. Click a single node to see its evidence.</p>
+<div class="key"><span class="node quant" style="position:static;box-shadow:none;border:0">quantitative</span>
+  <span class="node qual" style="position:static;box-shadow:none;border:0">qualitative</span></div>
+<div class="wrap" style="margin-top:8px">
+  <div id="stage"><svg id="lines"></svg></div>
+  <div id="side">
+    <div id="ev"><h2>Click a node</h2><p class="hint">Each factor carries its own evidence — some is a statistic, some is a resident's voice.</p></div>
+    <button class="clr" id="clr">Clear arrows</button>
+  </div>
+</div>
+<p class="foot">Illustrative causal factors for a UI demo — arrows are your hypotheses, not ground truth.</p>
+<script>
+const NODES=[
+ {id:"rent",t:"Lower rent",k:"quant",x:110,y:70,ev:["STAT","Median 2BR ranges ~$1,600 (Baltimore/Minneapolis) to ~$2,000 (Chicago)."]},
+ {id:"transit",t:"Transit access",k:"quant",x:340,y:70,ev:["STAT","Cities with rail (Chicago, Philly) put 3+ hospitals in car-free reach."]},
+ {id:"walk",t:"Feels walkable",k:"qual",x:230,y:170,ev:["RESIDENT","“We sold a car the month we moved — everything's a 10-minute walk.”"]},
+ {id:"school",t:"Real ADHD support",k:"qual",x:110,y:280,ev:["PARENT","“The IEP was collaborative, not a battle” vs. “two years and an advocate.”"]},
+ {id:"community",t:"Sense of community",k:"qual",x:340,y:280,ev:["RESIDENT","“Neighbors actually know each other; block parties, a tool library.”"]},
+ {id:"fit",t:"Good fit for Maya",k:"quant",x:230,y:340,ev:["GOAL","The outcome she's optimizing — where all the arrows should point."]},
+];
+const stage=document.getElementById("stage"),lines=document.getElementById("lines"),ev=document.getElementById("ev");
+let edges=[],sel=null,drag=null;
+NODES.forEach(n=>{const d=document.createElement("div");d.className="node "+n.k;d.style.left=n.x+"px";d.style.top=n.y+"px";d.textContent=n.t;d.dataset.id=n.id;n.el=d;
+  d.onpointerdown=e=>{drag={n,dx:e.offsetX-n.el.offsetWidth/2,moved:false};d.setPointerCapture(e.pointerId);};
+  d.onpointermove=e=>{if(!drag||drag.n!==n)return;const r=stage.getBoundingClientRect();n.x=e.clientX-r.left;n.y=e.clientY-r.top;d.style.left=n.x+"px";d.style.top=n.y+"px";drag.moved=true;redraw();};
+  d.onpointerup=e=>{if(drag&&!drag.moved)click(n);drag=null;};
+  stage.appendChild(d);});
+function click(n){
+  ev.innerHTML=`<h2>${n.t}</h2><div style="color:#b4622e;font-size:11px;font-weight:700">${n.ev[0]}</div><p>${n.ev[1]}</p>`;
+  if(sel&&sel!==n){edges.push([sel,n]);sel.el.classList.remove("sel");sel=null;redraw();}
+  else{if(sel)sel.el.classList.remove("sel");sel=n;n.el.classList.add("sel");}
+}
+function redraw(){
+  lines.innerHTML=`<defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6" fill="#b4622e"/></marker></defs>`+
+    edges.map(([a,b])=>`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#b4622e" stroke-width="2" marker-end="url(#a)" opacity=".8"/>`).join("");
+}
+document.getElementById("clr").onclick=()=>{edges=[];redraw();};
+</script></body></html>

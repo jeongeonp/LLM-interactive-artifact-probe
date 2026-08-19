@@ -1,0 +1,58 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Weigh the Claim</title>
+<style>
+  body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#2a2725;background:#f7f6f2;padding:18px}
+  h1{font-size:19px;margin:0 0 2px;color:#b4622e}.sub{color:#8a857c;font-size:13px;margin:0 0 12px}
+  select{font:inherit;padding:6px 8px;border:1px solid #e4e1d8;border-radius:8px;margin-bottom:12px;max-width:100%}
+  #meter{height:14px;border-radius:8px;background:linear-gradient(90deg,#c96a4b,#e4e1d8,#7ba05b);margin:0 0 4px;position:relative}
+  #needle{position:absolute;top:-4px;width:3px;height:22px;background:#2a2725;left:50%;transition:left .3s}
+  .mlab{display:flex;justify-content:space-between;color:#8a857c;font-size:11px;margin-bottom:14px}
+  #pool{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .item{border-radius:9px;padding:8px 11px;font-size:13px;max-width:250px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .item.stat{background:#e7eef4;border:1px solid #b9cfe0}.item.quote{background:#fff;border:1px solid #e4e1d8}
+  .tag{font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;opacity:.6}
+  .cols{display:flex;gap:12px}.col{flex:1;border:2px dashed #d8d2c6;border-radius:12px;padding:10px;min-height:170px}
+  .col.sup{background:#eef4ea}.col.con{background:#f6ece9}.col.over{border-color:#b4622e}
+  .col h2{font-size:13px;margin:0 0 8px}
+  .foot{color:#b3ac9f;font-size:11px;margin-top:12px}
+</style></head><body>
+<h1>Weigh the claim: does the evidence hold?</h1>
+<p class="sub">Pick a claim, then drag each piece of evidence — <b>numbers and quotes alike</b> — into Supports or Contradicts. The balance shifts as you go.</p>
+<select id="claim">
+  <option>Chicago is the best fit for Maya's family</option>
+  <option>Minneapolis best balances budget, walkability, and school support</option>
+  <option>Baltimore is the most affordable without sacrificing community</option>
+</select>
+<div id="meter"><div id="needle"></div></div>
+<div class="mlab"><span>Contradicts</span><span>Balanced</span><span>Supports</span></div>
+<div id="pool"></div>
+<div class="cols">
+  <div class="col con" data-s="-1"><h2>✕ Contradicts</h2></div>
+  <div class="col sup" data-s="1"><h2>✓ Supports</h2></div>
+</div>
+<p class="foot">Illustrative evidence for a UI demo — the point is reconciling a statistic against a lived-experience quote.</p>
+<script>
+const EV=[
+ ["stat","STAT","Median 2BR rent ≈ $2,000/mo — closest to the $2,200 ceiling of the four."],
+ ["quote","RESIDENT","“The L gets me to three hospitals without a car.”"],
+ ["stat","STAT","City Walk Score ≈ 77 — highest of the four cities."],
+ ["quote","PARENT","“It took two years and an advocate to get Elena's IEP honored.”"],
+ ["stat","STAT","Under-$2k neighborhoods near transit are scarce and competitive."],
+ ["quote","RESIDENT","“Genuinely diverse — income, background, all of it.”"],
+ ["stat","STAT","Several strong-support magnet schools, but admission is a lottery."],
+];
+const pool=document.getElementById("pool");
+EV.forEach((e,i)=>{const d=document.createElement("div");d.className="item "+e[0];d.id="e"+i;d.draggable=true;
+  d.innerHTML=`<span class="tag">${e[1]}</span><br>${e[2]}`;
+  d.ondragstart=ev=>ev.dataTransfer.setData("id",d.id);pool.appendChild(d);});
+document.querySelectorAll(".col").forEach(col=>{
+  col.ondragover=e=>{e.preventDefault();col.classList.add("over");};
+  col.ondragleave=()=>col.classList.remove("over");
+  col.ondrop=e=>{e.preventDefault();col.classList.remove("over");col.appendChild(document.getElementById(e.dataTransfer.getData("id")));score();};
+});
+function score(){
+  let s=0,n=0;
+  document.querySelectorAll(".col").forEach(c=>{const w=+c.dataset.s;const k=c.querySelectorAll(".item").length;s+=w*k;n+=k;});
+  const pct=n?((s/n)+1)/2*100:50;
+  document.getElementById("needle").style.left=pct+"%";
+}
+</script></body></html>

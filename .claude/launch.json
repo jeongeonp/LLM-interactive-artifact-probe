@@ -1,0 +1,4 @@
+{
+  "version": "0.0.1",
+  "configurations": [{ "name": "probe", "url": "http://localhost:3300", "port": 3300 }]
+}

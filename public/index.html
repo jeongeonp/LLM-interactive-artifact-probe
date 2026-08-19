@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Probe for Sensemaking</title>
+<style>
+  :root { --bg:#f7f6f2; --panel:#fff; --line:#e4e1d8; --accent:#b4622e; --text:#2a2725; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; color:var(--text); background:var(--bg); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; align-items:center; gap:12px; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line); font-size:13px; flex-wrap:wrap; }
+  header b { color:var(--accent); }
+  header .who { margin-left:auto; color:#8a857c; }
+  main { display:flex; flex:1; min-height:0; }
+  #chat { width:42%; min-width:340px; display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); }
+  #log { flex:1; overflow-y:auto; padding:16px; }
+  .msg { margin:0 0 14px; }
+  .msg .role { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#8a857c; margin-bottom:3px; }
+  .msg.user .bubble { background:#efe9df; }
+  .msg.assistant .bubble { background:#fff; border:1px solid var(--line); }
+  .bubble { padding:9px 12px; border-radius:10px; white-space:pre-wrap; }
+  #composer { display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); background:var(--panel); }
+  #composer textarea { flex:1; resize:none; height:56px; padding:9px; border:1px solid var(--line); border-radius:8px; font:inherit; }
+  #composer button { padding:0 18px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  #composer button:disabled { opacity:.5; cursor:default; }
+  #artifactPane { flex:1; min-height:0; display:flex; flex-direction:column; background:#eceae3; }
+  #artifactPane .bar { padding:6px 12px; font-size:12px; color:#8a857c; border-bottom:1px solid var(--line); background:var(--panel); }
+  #artifact { flex:1; width:100%; border:0; background:#fff; }
+  .empty { margin:auto; color:#b3ac9f; font-size:14px; text-align:center; padding:24px; }
+  .loading { display:inline-flex; align-items:center; gap:9px; color:#8a857c; }
+  .dots { display:inline-flex; gap:4px; }
+  .dots i { width:7px; height:7px; border-radius:50%; background:var(--accent); animation:blink 1.2s infinite ease-in-out; }
+  .dots i:nth-child(2){ animation-delay:.2s; }
+  .dots i:nth-child(3){ animation-delay:.4s; }
+  @keyframes blink { 0%,80%,100%{ opacity:.25; transform:translateY(0);} 40%{ opacity:1; transform:translateY(-3px);} }
+  .elapsed { font-variant-numeric:tabular-nums; font-size:13px; }
+  #artifactBar.working { color:var(--accent); }
+  #artifactPane.working { background:repeating-linear-gradient(45deg,#eceae3,#eceae3 12px,#e6e3db 12px,#e6e3db 24px); }
+  #tabs { display:flex; gap:5px; padding:6px 8px; overflow-x:auto; background:var(--panel); border-bottom:1px solid var(--line); }
+  #tabs:empty { display:none; }
+  .tab { flex:0 0 auto; padding:5px 11px; border:1px solid var(--line); border-radius:7px; background:#f2efe8; color:var(--text); font-size:12px; cursor:pointer; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+  .tab:hover { border-color:var(--accent); }
+  .tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #floaters { position:fixed; top:52px; right:16px; z-index:9; display:flex; flex-direction:column; gap:8px; align-items:flex-end; max-height:calc(100vh - 68px); overflow:auto; }
+  .floater { padding:9px 15px; border:1px solid var(--line); border-radius:999px; background:var(--panel); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.14); white-space:nowrap; max-width:230px; overflow:hidden; text-overflow:ellipsis; }
+  .floater:hover { border-color:var(--accent); color:var(--accent); }
+  .floater.ds { font-size:12px; background:#f2efe8; }
+  #dsList { display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+  #dsList.collapsed { display:none; }
+  .data-body { white-space:pre-wrap; font:12px/1.5 ui-monospace,Menlo,monospace; background:#faf7f2; border:1px solid var(--line); border-radius:8px; padding:12px; max-height:62vh; overflow:auto; margin:0; }
+  .overlay { position:fixed; inset:0; background:rgba(30,28,25,.5); display:none; align-items:center; justify-content:center; padding:20px; z-index:10; }
+  .overlay.open { display:flex; }
+  .task-modal { background:var(--panel); border-radius:14px; padding:24px 26px; width:600px; max-width:94vw; max-height:82vh; overflow:auto; }
+  .task-modal h2 { margin:0 0 10px; font-size:18px; color:var(--accent); }
+  .task-modal .body { white-space:pre-wrap; }
+  .task-modal button { margin-top:18px; padding:10px 18px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <b>Probe for Sensemaking</b>
+  <span class="who" id="who"></span>
+</header>
+<div id="floaters">
+  <button id="taskBtn" class="floater" style="display:none">📋 Task</button>
+  <button id="dsToggle" class="floater" style="display:none"></button>
+  <div id="dsList"></div>
+</div>
+<div class="overlay" id="taskOverlay">
+  <div class="task-modal">
+    <h2>Your task</h2>
+    <div class="body" id="taskBody"></div>
+    <button id="taskClose">Got it — begin</button>
+  </div>
+</div>
+<div class="overlay" id="dataOverlay">
+  <div class="task-modal">
+    <h2 id="dataTitle">Dataset</h2>
+    <pre class="data-body" id="dataBody"></pre>
+    <button id="dataClose">Close</button>
+  </div>
+</div>
+<main>
+  <section id="chat">
+    <div id="log"></div>
+    <div id="composer">
+      <textarea id="input" placeholder="Ask about the topic, or ask for an interactive artifact to explore it…"></textarea>
+      <button id="send">Send</button>
+    </div>
+  </section>
+  <section id="artifactPane">
+    <div class="bar" id="artifactBar">No artifact yet. Chat to create an interactive artifact.</div>
+    <div id="tabs"></div>
+    <iframe id="artifact" sandbox="allow-scripts" title="artifact"></iframe>
+  </section>
+</main>
+
+<script>
+// ---- Participant / condition (from URL: ?pid=P01&cond=probing) -----------
+const params = new URLSearchParams(location.search);
+const PID  = params.get("pid")  || "anon";
+const COND = params.get("cond") || "interactive";
+const TASK = params.get("task") || "";
+const DATASET = TASK; // dataset key is the task name
+document.getElementById("who").textContent = `pid: ${PID} · ${TASK || "—"} · ${COND}`;
+
+const logEl = document.getElementById("log");
+const inputEl = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+const iframe = document.getElementById("artifact");
+const artifactBar = document.getElementById("artifactBar");
+const tabsEl = document.getElementById("tabs");
+
+const messages = []; // {role, content}
+const artifacts = []; // {html, title} — every artifact created this session
+let activeArtifact = -1; // index of the tab currently shown
+
+function addBubble(role, text) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg " + role;
+  wrap.innerHTML = `<div class="role">${role}</div><div class="bubble"></div>`;
+  wrap.querySelector(".bubble").textContent = text;
+  logEl.appendChild(wrap);
+  logEl.scrollTop = logEl.scrollHeight;
+  return wrap.querySelector(".bubble");
+}
+
+// ---- Telemetry injected into every artifact ------------------------------
+const TELEMETRY = `<script>(function(){
+  function send(type, detail){ parent.postMessage({__telemetry:true, type:type, detail:detail||{}, t:Date.now()}, "*"); }
+  send("artifact_loaded", {url: location.href});
+  document.addEventListener("click", function(e){ var el=e.target;
+    send("click", {tag:el.tagName, id:el.id||null, cls:(el.className||"").toString().slice(0,40), text:(el.textContent||"").trim().slice(0,40)});
+  }, true);
+  document.addEventListener("input", function(e){ var el=e.target;
+    send("input", {tag:el.tagName, id:el.id||null, inputType:el.type||null, value:String(el.value).slice(0,80)});
+  }, true);
+  var lastScroll=0;
+  window.addEventListener("scroll", function(){ var n=Date.now(); if(n-lastScroll>500){lastScroll=n; send("scroll",{y:Math.round(window.scrollY)});} }, true);
+  document.addEventListener("visibilitychange", function(){ send("visibility",{hidden:document.hidden}); });
+  setInterval(function(){ if(!document.hidden) send("heartbeat",{}); }, 5000);
+})();<\/script>`;
+
+function postLog(event) {
+  fetch("/api/log", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pid: PID, cond: COND, task: TASK, event }),
+  });
+}
+
+// Telemetry from the active artifact iframe — tagged with which tab is showing.
+window.addEventListener("message", (e) => {
+  const d = e.data;
+  if (!d || d.__telemetry !== true) return;
+  postLog({ type: d.type, detail: d.detail, clientTs: d.t, artifact: activeArtifact >= 0 ? activeArtifact + 1 : null });
+});
+
+// ---- Tabs: one per created artifact; click to revisit ---------------------
+function tabTitle(html) {
+  const m = html.match(/<title[^>]*>([^<]+)<\/title>/i) || html.match(/<h1[^>]*>([^<]*)<\/h1>/i);
+  return m ? m[1].trim().slice(0, 22) : null;
+}
+
+function renderTabs() {
+  tabsEl.innerHTML = "";
+  artifacts.forEach((a, i) => {
+    const el = document.createElement("div");
+    el.className = "tab" + (i === activeArtifact ? " active" : "");
+    el.textContent = a.title ? `${i + 1} · ${a.title}` : `Artifact ${i + 1}`;
+    el.title = a.title || `Artifact ${i + 1}`;
+    el.addEventListener("click", () => showArtifact(i));
+    tabsEl.appendChild(el);
+  });
+}
+
+function showArtifact(i) {
+  if (i < 0 || i >= artifacts.length) return;
+  activeArtifact = i;
+  iframe.srcdoc = artifacts[i].html + TELEMETRY;
+  artifactBar.textContent = `Artifact ${i + 1} of ${artifacts.length} — interactions are being logged.`;
+  artifactBar.classList.remove("working");
+  document.getElementById("artifactPane").classList.remove("working");
+  renderTabs();
+  postLog({ type: "artifact_switch", detail: { index: i + 1 }, clientTs: Date.now() });
+}
+
+// Add a new artifact as its own tab and switch to it.
+function renderArtifact(text) {
+  const matches = [...text.matchAll(/```html\s*([\s\S]*?)```/gi)];
+  if (!matches.length) return false;
+  const html = matches[matches.length - 1][1];
+  artifacts.push({ html, title: tabTitle(html) });
+  showArtifact(artifacts.length - 1);
+  return true;
+}
+
+// On load, restore any artifacts this participant already created (survives a page reload).
+async function restoreArtifacts() {
+  try {
+    const list = await (await fetch("/api/artifacts?pid=" + encodeURIComponent(PID) + "&cond=" + encodeURIComponent(COND) + "&task=" + encodeURIComponent(TASK))).json();
+    for (const a of list) {
+      const html = await (await fetch(a.file)).text();
+      artifacts.push({ html, title: tabTitle(html) });
+    }
+    if (artifacts.length) showArtifact(artifacts.length - 1);
+  } catch (_) {}
+}
+
+// On load, replay this participant's prior conversation (bubbles + context) so a reload resumes the session.
+async function restoreHistory() {
+  try {
+    const turns = await (await fetch("/api/history?pid=" + encodeURIComponent(PID) + "&cond=" + encodeURIComponent(COND) + "&task=" + encodeURIComponent(TASK))).json();
+    for (const t of turns) {
+      if (t.user != null) {
+        addBubble("user", typeof t.user === "string" ? t.user : JSON.stringify(t.user));
+        messages.push({ role: "user", content: t.user });
+      }
+      const prose = (t.assistant || "").replace(/```html[\s\S]*?```/gi, "").trim();
+      addBubble("assistant", prose || "(built an artifact →)");
+      messages.push({ role: "assistant", content: t.assistant });
+    }
+  } catch (_) {}
+}
+
+// ---- Chat turn -----------------------------------------------------------
+let currentAbort = null; // set while a reply is generating; the Send button becomes Stop
+
+async function send() {
+  const content = inputEl.value.trim();
+  if (!content) return;
+  inputEl.value = "";
+  const userBubble = addBubble("user", content);
+  messages.push({ role: "user", content });
+
+  sendBtn.textContent = "⏹ Stop"; // acts as a cancel button while generating
+  const artifactPane = document.getElementById("artifactPane");
+
+  // Animated loading indicator + running timer (real elapsed seconds) while we wait.
+  const pending = addBubble("assistant", "");
+  pending.innerHTML =
+    '<span class="loading"><span class="dots"><i></i><i></i><i></i></span>' +
+    '<span class="elapsed">thinking… 0s</span></span>';
+  const startT = Date.now();
+  const timer = setInterval(() => {
+    const el = pending.querySelector(".elapsed");
+    if (el) el.textContent = "thinking… " + Math.floor((Date.now() - startT) / 1000) + "s";
+  }, 250);
+  artifactBar.textContent = "⏳ Building… the artifact will appear here.";
+  artifactBar.classList.add("working");
+  artifactPane.classList.add("working");
+
+  const controller = new AbortController();
+  currentAbort = controller;
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages, pid: PID, cond: COND, task: TASK }),
+      signal: controller.signal,
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    messages.push({ role: "assistant", content: data.text });
+    // Show prose (strip the html code fence from the chat view) and render the artifact.
+    const prose = data.text.replace(/```html[\s\S]*?```/gi, "").trim();
+    pending.textContent = prose || "(built an artifact →)";
+    if (!renderArtifact(data.text)) {
+      const truncated = /```html/i.test(data.text); // opening fence but no complete block = cut off
+      artifactBar.textContent = truncated
+        ? "⚠️ The artifact was cut off (reply too long). Ask to continue, or resend."
+        : "No artifact in this reply — ask Claude to build one.";
+      artifactBar.classList.remove("working");
+      artifactPane.classList.remove("working");
+      if (truncated) pending.textContent = (pending.textContent || "") + "\n\n⚠️ (artifact cut off mid-code — resend or ask to continue)";
+    }
+  } catch (err) {
+    artifactBar.classList.remove("working");
+    artifactPane.classList.remove("working");
+    if (err.name === "AbortError") {
+      // Cancelled by the participant — revert the turn cleanly so they can edit/resend.
+      messages.pop();
+      pending.parentElement.remove();
+      userBubble.parentElement.remove();
+      inputEl.value = content;
+      artifactBar.textContent = "No artifact yet. Chat to create an artifact.";
+      postLog({ type: "chat_cancelled", detail: { after_s: Math.floor((Date.now() - startT) / 1000) } });
+    } else {
+      pending.textContent = "⚠️ " + err.message;
+      artifactBar.textContent = "No artifact yet — ask Claude to build one.";
+    }
+  } finally {
+    clearInterval(timer);
+    currentAbort = null;
+    sendBtn.textContent = "Send";
+    inputEl.focus();
+  }
+}
+
+// One button: Send when idle, Stop (cancel) while a reply is generating.
+sendBtn.addEventListener("click", () => { if (currentAbort) currentAbort.abort(); else send(); });
+inputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!currentAbort) send(); }
+});
+
+// Task/scenario shown to the participant (set from the launcher).
+async function loadScenario() {
+  try {
+    const { text } = await (await fetch("/api/scenario?task=" + encodeURIComponent(TASK))).json();
+    if (!text) return;
+    document.getElementById("taskBody").textContent = text;
+    const ov = document.getElementById("taskOverlay");
+    document.getElementById("taskBtn").style.display = "";
+    const open = () => ov.classList.add("open");
+    document.getElementById("taskBtn").addEventListener("click", open);
+    document.getElementById("taskClose").addEventListener("click", () => ov.classList.remove("open"));
+    ov.addEventListener("click", (e) => { if (e.target === ov) ov.classList.remove("open"); });
+    open();
+    postLog({ type: "scenario_shown", detail: { chars: text.length } });
+  } catch (_) {}
+}
+
+// Dataset overview — a floating button per file feeding this session.
+async function loadDatasets() {
+  if (!DATASET) return;
+  try {
+    const files = await (await fetch("/api/dataset?dataset=" + encodeURIComponent(DATASET))).json();
+    if (!files.length) return;
+    const dsList = document.getElementById("dsList");
+    const toggle = document.getElementById("dsToggle");
+    const ov = document.getElementById("dataOverlay");
+    files.forEach((f) => {
+      const b = document.createElement("button");
+      b.className = "floater ds";
+      b.textContent = "📄 " + (f.label || f.name);
+      b.title = f.name; // raw filename on hover
+      b.addEventListener("click", () => {
+        document.getElementById("dataTitle").textContent = f.label || f.name;
+        document.getElementById("dataBody").textContent = f.content;
+        ov.classList.add("open");
+        postLog({ type: "dataset_viewed", detail: { file: f.name } });
+      });
+      dsList.appendChild(b);
+    });
+    toggle.style.display = "";
+    const setLabel = () => { toggle.textContent = `📊 Datasets (${files.length}) ${dsList.classList.contains("collapsed") ? "▸" : "▾"}`; };
+    setLabel();
+    toggle.addEventListener("click", () => { dsList.classList.toggle("collapsed"); setLabel(); });
+    document.getElementById("dataClose").addEventListener("click", () => ov.classList.remove("open"));
+    ov.addEventListener("click", (e) => { if (e.target === ov) ov.classList.remove("open"); });
+  } catch (_) {}
+}
+
+postLog({ type: "session_start", detail: { ua: navigator.userAgent } });
+loadScenario();
+loadDatasets();
+restoreHistory();
+restoreArtifacts();
+</script>
+</body>
+</html>

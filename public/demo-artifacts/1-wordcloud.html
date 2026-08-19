@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"><title>What Residents Talk About</title>
+<style>
+  body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#2a2725;background:#f7f6f2;padding:20px}
+  h1{font-size:19px;margin:0 0 2px;color:#b4622e}.sub{color:#8a857c;font-size:13px;margin:0 0 16px}
+  .wrap{display:flex;gap:20px;flex-wrap:wrap}
+  #cloud{flex:1;min-width:320px;display:flex;flex-wrap:wrap;gap:6px 14px;align-content:flex-start;padding:16px;background:#fff;border:1px solid #e4e1d8;border-radius:12px}
+  .w{cursor:pointer;line-height:1;color:#4a4640;transition:color .15s}.w:hover{color:#b4622e}.w.on{color:#b4622e;font-weight:700}
+  #panel{width:330px;background:#fff;border:1px solid #e4e1d8;border-radius:12px;padding:16px;max-height:70vh;overflow:auto}
+  #panel h2{font-size:15px;margin:0 0 4px}.cnt{color:#8a857c;font-size:12px;margin:0 0 12px}
+  .q{border-left:3px solid #d8b48f;padding:6px 10px;margin:0 0 10px;background:#faf7f2;border-radius:0 8px 8px 0;font-size:13px}
+  .q .city{display:block;color:#b4622e;font-size:11px;font-weight:600;margin-top:3px}
+  .foot{color:#b3ac9f;font-size:11px;margin-top:14px}
+</style></head><body>
+<h1>What residents actually talk about</h1>
+<p class="sub">Size = how often the theme comes up across resident & parent comments. Click a word to read the verbatim quotes behind it.</p>
+<div class="wrap">
+  <div id="cloud"></div>
+  <div id="panel"><h2>Click a word</h2><p class="cnt">Its frequency and the real quotes will appear here.</p></div>
+</div>
+<p class="foot">Illustrative corpus for a UI demo — quotes are synthetic stand-ins for a real review/forum dataset.</p>
+<script>
+const DATA=[
+ {w:"walkable",n:41,q:[["We sold one car the month we moved to Fishtown.","Philadelphia"],["Everything Elena needs is a 10-min walk — school, library, the co-op.","Minneapolis"]]},
+ {w:"IEP",n:18,q:[["The IEP meeting was collaborative, not a fight. Rare.","Minneapolis"],["Took two years and an advocate to get the IEP honored.","Chicago"]]},
+ {w:"504 plan",n:15,q:[["They set up a 504 for our son in three weeks.","Baltimore"],["504 accommodations existed on paper but not in the classroom.","Philadelphia"]]},
+ {w:"transit",n:33,q:[["The L gets me to three hospitals without a car.","Chicago"],["Light rail is fine but coverage is thin outside downtown.","Minneapolis"]]},
+ {w:"expensive",n:29,q:[["Great neighborhoods exist — you just can't touch them under $2k.","Chicago"],["Rent crept past what we budgeted within a year.","Philadelphia"]]},
+ {w:"diverse",n:24,q:[["Elena's class had kids from six countries. We wanted exactly that.","Baltimore"],["Feels genuinely mixed — income, background, all of it.","Philadelphia"]]},
+ {w:"community",n:37,q:[["Neighbors actually know each other here.","Minneapolis"],["Block parties, a tool library, a real front-porch culture.","Baltimore"]]},
+ {w:"safe",n:22,q:[["Safety varies block by block — averages hide a lot.","Baltimore"],["We walk home after Maya's night shift and feel fine.","Minneapolis"]]},
+ {w:"schools",n:39,q:[["The 'good schools' map and the 'good support' map are not the same map.","Chicago"],["High test scores, zero patience for a kid who learns differently.","Philadelphia"]]},
+ {w:"winter",n:16,q:[["Nobody warns you about January in Minneapolis. It's real.","Minneapolis"],["Winters are mild compared to the Midwest.","Baltimore"]]},
+ {w:"commute",n:20,q:[["12 minutes to the hospital changed our whole life.","Baltimore"],["Her 12-hour shifts + a 40-min drive was breaking us.","Chicago"]]},
+ {w:"parks",n:14,q:[["The chain of lakes is a daily thing for us.","Minneapolis"],["Green space you can actually reach on foot.","Philadelphia"]]},
+];
+const cloud=document.getElementById("cloud"),panel=document.getElementById("panel");
+const max=Math.max(...DATA.map(d=>d.n)),min=Math.min(...DATA.map(d=>d.n));
+DATA.sort(()=>Math.random()-.5).forEach(d=>{
+  const size=15+ (d.n-min)/(max-min)*30;
+  const s=document.createElement("span");s.className="w";s.style.fontSize=size+"px";s.textContent=d.w;
+  s.onclick=()=>{document.querySelectorAll(".w").forEach(x=>x.classList.remove("on"));s.classList.add("on");show(d);};
+  cloud.appendChild(s);
+});
+function show(d){
+  panel.innerHTML=`<h2>“${d.w}”</h2><p class="cnt">mentioned <b>${d.n}</b> times across the corpus</p>`+
+    d.q.map(([t,c])=>`<div class="q">${t}<span class="city">— ${c}</span></div>`).join("");
+}
+</script></body></html>

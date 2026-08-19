@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Cluster the Voices</title>
+<style>
+  body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#2a2725;background:#f7f6f2;padding:18px}
+  h1{font-size:19px;margin:0 0 2px;color:#b4622e}.sub{color:#8a857c;font-size:13px;margin:0 0 14px}
+  #pool{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;min-height:40px}
+  .card{background:#fff;border:1px solid #e4e1d8;border-radius:9px;padding:8px 11px;font-size:13px;max-width:230px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .card:active{cursor:grabbing}.card .city{color:#b4622e;font-size:11px;font-weight:600}
+  .cols{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1;min-width:150px;background:#efeae1;border:2px dashed #d8d2c6;border-radius:12px;padding:10px;min-height:150px}
+  .col.over{border-color:#b4622e;background:#f4e9df}
+  .col h2{font-size:13px;margin:0 0 8px;display:flex;justify-content:space-between}.col .n{background:#b4622e;color:#fff;border-radius:20px;padding:0 8px;font-size:12px}
+  .foot{color:#b3ac9f;font-size:11px;margin-top:12px}
+</style></head><body>
+<h1>Cluster the voices into themes</h1>
+<p class="sub">Drag each resident quote into the theme it speaks to. The counts build as you sort — that tally <i>is</i> your qualitative coding.</p>
+<div id="pool"></div>
+<div class="cols" id="cols"></div>
+<p class="foot">Illustrative quotes for a UI demo. Notice how the "count per theme" emerges from your interpretation, not from a spreadsheet.</p>
+<script>
+const QUOTES=[
+ ["The IEP process was collaborative, not a battle.","Minneapolis"],
+ ["We sold a car the month we moved here.","Philadelphia"],
+ ["Rent crept past our budget within a year.","Chicago"],
+ ["Elena's class had kids from six countries.","Baltimore"],
+ ["12 minutes to the hospital changed everything.","Baltimore"],
+ ["High test scores, no patience for a kid who learns differently.","Philadelphia"],
+ ["Neighbors actually know each other on our block.","Minneapolis"],
+ ["The good-schools map and the good-support map differ.","Chicago"],
+ ["Safety varies block to block — averages hide it.","Baltimore"],
+ ["Everything Elena needs is a 10-minute walk.","Minneapolis"],
+];
+const THEMES=["Schools & support","Cost","Walkability & commute","Community & diversity"];
+const pool=document.getElementById("pool"),cols=document.getElementById("cols");
+QUOTES.forEach((q,i)=>{const c=mk(q,i);pool.appendChild(c);});
+THEMES.forEach((t,i)=>{
+  const col=document.createElement("div");col.className="col";col.dataset.t=i;
+  col.innerHTML=`<h2>${t} <span class="n">0</span></h2>`;
+  col.ondragover=e=>{e.preventDefault();col.classList.add("over");};
+  col.ondragleave=()=>col.classList.remove("over");
+  col.ondrop=e=>{e.preventDefault();col.classList.remove("over");const id=e.dataTransfer.getData("id");col.appendChild(document.getElementById(id));recount();};
+  cols.appendChild(col);
+});
+function mk(q,i){const c=document.createElement("div");c.className="card";c.id="c"+i;c.draggable=true;
+  c.innerHTML=`${q[0]}<div class="city">— ${q[1]}</div>`;
+  c.ondragstart=e=>e.dataTransfer.setData("id",c.id);return c;}
+function recount(){document.querySelectorAll(".col").forEach(col=>col.querySelector(".n").textContent=col.querySelectorAll(".card").length);}
+</script></body></html>
