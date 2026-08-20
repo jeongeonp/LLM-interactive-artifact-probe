@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario } = await import(DB_BACKEND);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ART_DIR = path.join(__dirname, "data", "artifacts");
@@ -83,7 +83,7 @@ const systemFor = (cond) =>
 
 // Task → scenario shown to the participant (and the dataset key is the task name).
 const SCENARIOS = {
-  practice: `Practice round: get comfortable with the tool before the main tasks. Pick any everyday question you're genuinely curious about — for example, "what actually makes coffee taste bitter?" or "how does a bike stay upright?" — and explore it with the assistant.`,
+  practice: ``,
   sd: `Is San Diego still affordable for the people who grew up here?`,
   relocation: `Maya Torres is a 34-year-old ICU nurse married to Josh, a 34-year-old fully remote software engineer. They have one daughter, Elena, who is 7 and starting 2nd grade. The family currently rents in a car-dependent Bay Area suburb on a combined household income of $95,000. Maya has a standing offer to transfer within her hospital network to a partner hospital in any of the candidate cities. You need to help her decide where within each city they should choose to live in based on her following priorities:
 
@@ -263,7 +263,23 @@ app.post("/api/chat", async (req, res) => {
 });
 
 // Scenario shown to a participant — determined by the task.
-app.get("/api/scenario", (req, res) => res.json({ text: SCENARIOS[String(req.query.task || "")] ?? null }));
+// Returns the task instruction shown to participants: the researcher-saved text
+// if one exists, otherwise the built-in default. `custom` flags which is in use,
+// `default` carries the built-in so the editor can offer "reset to default".
+app.get("/api/scenario", async (req, res) => {
+  const task = String(req.query.task || "");
+  const saved = await getScenario(task);
+  const def = SCENARIOS[task] ?? null;
+  res.json({ text: saved ?? def, default: def, custom: saved != null });
+});
+
+// Save (or clear) the researcher-edited instruction for a task.
+app.post("/api/scenario/save", async (req, res) => {
+  const { task, text } = req.body || {};
+  if (!task) return res.status(400).json({ error: "task required" });
+  await setScenario(task, String(text ?? ""));
+  res.json({ ok: true });
+});
 app.get("/api/dataset", (req, res) => res.json(datasetFiles(req.query.dataset)));
 
 // Telemetry from the artifact iframe (clicks, inputs, scroll, heartbeats, ...).

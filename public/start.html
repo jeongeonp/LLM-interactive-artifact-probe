@@ -27,7 +27,8 @@
   .modal { background:var(--panel); border-radius:14px; padding:22px 24px; width:560px; max-width:94vw; max-height:82vh; overflow:auto; }
   .modal h2 { margin:0 0 10px; font-size:17px; color:var(--accent); }
   .modal .body { white-space:pre-wrap; font-size:14px; }
-  .modal .close { margin-top:16px; padding:9px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; width:auto; }
+  .modal textarea { width:100%; padding:11px; border:1px solid var(--line); border-radius:8px; font:inherit; font-size:14px; line-height:1.5; background:#fff; resize:vertical; }
+  .modal .close { padding:9px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; width:auto; }
 </style>
 </head>
 <body>
@@ -65,8 +66,14 @@
   <div class="overlay" id="overlay">
     <div class="modal">
       <h2 id="modalTitle">Task instruction</h2>
-      <div class="body" id="modalBody"></div>
-      <button class="close" id="modalClose">Close</button>
+      <p class="sub" style="margin:-4px 0 10px">Edit the instruction participants will see for this task, then Save. This is stored and used for every new session.</p>
+      <textarea id="modalText" rows="10"></textarea>
+      <div style="display:flex; align-items:center; gap:10px; margin-top:14px">
+        <button class="close" id="modalSave">Save</button>
+        <button class="link-btn" id="modalReset" style="margin-top:0">Reset to default</button>
+        <span class="muted" id="modalStatus" style="font-size:12px; color:#8a857c"></span>
+        <button class="link-btn" id="modalClose" style="margin:0 0 0 auto">Close</button>
+      </div>
     </div>
   </div>
 
@@ -74,19 +81,36 @@
 const $ = (id) => document.getElementById(id);
 const overlay = $("overlay");
 
-// Show the selected task's detailed instruction in a modal (server = single source of truth).
+// Open the editor for the selected task's instruction (server = source of truth).
+let modalDefault = "";
 async function showTask() {
   const sel = $("task");
   const label = sel.options[sel.selectedIndex].text;
+  $("modalStatus").textContent = "";
   try {
-    const { text } = await (await fetch("/api/scenario?task=" + encodeURIComponent(sel.value))).json();
+    const r = await (await fetch("/api/scenario?task=" + encodeURIComponent(sel.value))).json();
+    modalDefault = r.default || "";
     $("modalTitle").textContent = label;
-    $("modalBody").textContent = text || "(no instruction for this task)";
+    $("modalText").value = r.text || "";
+    $("modalStatus").textContent = r.custom ? "showing your saved version" : "showing the default";
     overlay.classList.add("open");
   } catch (_) {}
 }
+async function saveTask() {
+  const sel = $("task");
+  $("modalStatus").textContent = "saving…";
+  try {
+    await fetch("/api/scenario/save", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: sel.value, text: $("modalText").value }),
+    });
+    overlay.classList.remove("open"); // close on save
+  } catch (_) { $("modalStatus").textContent = "⚠️ save failed"; }
+}
 $("task").addEventListener("change", showTask);   // opens when they select a task
 $("viewTask").addEventListener("click", showTask); // and via the link
+$("modalSave").addEventListener("click", saveTask);
+$("modalReset").addEventListener("click", () => { $("modalText").value = modalDefault; $("modalStatus").textContent = "reverted to default — click Save to apply"; });
 $("modalClose").addEventListener("click", () => overlay.classList.remove("open"));
 overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.remove("open"); });
 

@@ -200,5 +200,21 @@ export async function countArtifacts(pid, cond, task) {
   }
 }
 
-// Unused now (scenarios are task-derived server-side) — kept for interface parity.
-export async function getScenario() { return null; }
+// Researcher-editable task instruction, stored in the shared DB so every machine
+// (and every participant session) sees the same edited text. One doc per task.
+const scenariosCol = db.collection("scenarios");
+export async function getScenario(task) {
+  try {
+    const d = await scenariosCol.doc(String(task ?? "")).get();
+    return d.exists ? d.data().text ?? null : null;
+  } catch (e) {
+    return onReadError(e, null);
+  }
+}
+export async function setScenario(task, text) {
+  try {
+    await scenariosCol.doc(String(task ?? "")).set({ text, updated: new Date().toISOString() });
+  } catch (e) {
+    console.error("setScenario (firestore) failed:", e?.message || e);
+  }
+}

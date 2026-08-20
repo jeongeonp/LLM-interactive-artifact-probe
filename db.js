@@ -22,6 +22,11 @@ db.exec(`
     data  TEXT             -- JSON blob
   );
   CREATE INDEX IF NOT EXISTS idx_events_pid ON events(pid);
+  CREATE TABLE IF NOT EXISTS scenarios (
+    task    TEXT PRIMARY KEY,  -- practice | sd | relocation
+    text    TEXT,              -- researcher-edited instruction shown to participants
+    updated TEXT
+  );
 `);
 try { db.exec("ALTER TABLE events ADD COLUMN task TEXT"); } catch { /* column already exists */ }
 
@@ -84,5 +89,14 @@ export function countArtifacts(pid, cond, task) {
     .get(pid ?? null, cond ?? null, task ?? null).n;
 }
 
-// Unused now (scenarios are task-derived server-side) — kept for interface parity.
-export function getScenario() { return null; }
+// Researcher-editable task instruction (overrides the built-in default when set).
+export function getScenario(task) {
+  const r = db.prepare("SELECT text FROM scenarios WHERE task = ?").get(String(task ?? ""));
+  return r ? r.text : null;
+}
+export function setScenario(task, text) {
+  db.prepare(
+    `INSERT INTO scenarios (task, text, updated) VALUES (?, ?, ?)
+     ON CONFLICT(task) DO UPDATE SET text = excluded.text, updated = excluded.updated`
+  ).run(String(task ?? ""), text, new Date().toISOString());
+}
