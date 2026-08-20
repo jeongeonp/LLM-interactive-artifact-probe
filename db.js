@@ -53,6 +53,10 @@ export function allEvents(pid, cond, task) {
   return db.prepare("SELECT * FROM events ORDER BY id").all();
 }
 
+export function countAllArtifacts() {
+  return db.prepare("SELECT COUNT(*) AS n FROM events WHERE kind = 'artifact'").get().n;
+}
+
 export function artifactEvents(pid, cond, task) {
   return allEvents(pid, cond, task).filter((r) => r.kind === "artifact");
 }

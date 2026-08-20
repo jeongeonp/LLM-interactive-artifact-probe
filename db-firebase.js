@@ -118,6 +118,18 @@ export async function allEvents(pid, cond, task) {
   }
 }
 
+// Just the COUNT of saved artifacts — a Firestore aggregation query, billed as
+// ~1 read no matter how many artifacts exist (it never fetches the docs). Lets
+// the admin page show the number without loading (or rendering) any artifact.
+export async function countAllArtifacts() {
+  try {
+    const snap = await events.where("kind", "==", "artifact").count().get();
+    return snap.data().count;
+  } catch (e) {
+    return onReadError(e, 0);
+  }
+}
+
 // Artifact events only. With a pid we reuse the cached per-pid docs; WITHOUT a
 // pid (the admin "all artifacts" table) we query kind=="artifact" directly so we
 // read only the handful of artifact docs, never the whole (heartbeat-heavy) set.

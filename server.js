@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, summary, countArtifacts, getScenario } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario } = await import(DB_BACKEND);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ART_DIR = path.join(__dirname, "data", "artifacts");
@@ -23,7 +23,31 @@ app.get("/", (req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, "public")));
-app.use("/artifacts", express.static(ART_DIR)); // lets you open saved artifacts in the browser
+
+// Serve saved artifacts. If the file is missing on THIS machine (e.g. a collaborator
+// reviewing from another computer), re-create it from the HTML stored in the DB and
+// cache it to disk, so /artifacts/... works everywhere without syncing files.
+app.get("/artifacts/:pid/:fname", async (req, res) => {
+  const clean = (s) => String(s || "").replace(/[^a-zA-Z0-9_.-]/g, "_");
+  const pid = clean(req.params.pid), fname = clean(req.params.fname);
+  const abs = path.join(ART_DIR, pid, fname);
+  if (fs.existsSync(abs)) return res.sendFile(abs);
+  try {
+    const rel = `/artifacts/${pid}/${fname}`;
+    const hit = (await artifactEvents(pid))
+      .map((r) => (typeof r.data === "string" ? JSON.parse(r.data || "{}") : r.data || {}))
+      .find((d) => d && d.file === rel);
+    if (hit && hit.html) {
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, hit.html); // materialize the folder locally, from the DB
+      return res.type("html").send(hit.html);
+    }
+  } catch (e) {
+    console.error("artifact self-heal failed:", e?.message || e);
+  }
+  return res.status(404).send("Artifact not found (no local file, and no HTML stored in the database for it).");
+});
+app.use("/artifacts", express.static(ART_DIR)); // fallback for any other artifact assets
 
 // ---- Study configuration -------------------------------------------------
 const MODEL = "claude-sonnet-5"; // fast + strong artifacts; swap for claude-haiku-4-5 or claude-opus-5
@@ -189,7 +213,11 @@ async function saveArtifacts(text, pid, cond, task) {
     const fname = `${String(seq).padStart(3, "0")}_${Date.now()}.html`;
     fs.writeFileSync(path.join(dir, fname), html);
     const rel = `/artifacts/${safePid(pid)}/${fname}`;
-    await logEvent({ pid, cond, task, kind: "artifact", type: "created", data: { seq, file: rel, chars: html.length } });
+    // Store the HTML in the event too (not just on disk) so any machine reading
+    // the DB can re-materialize the file locally. Guard the Firestore 1MB limit.
+    const data = { seq, file: rel, chars: html.length };
+    if (html.length <= 900000) data.html = html;
+    await logEvent({ pid, cond, task, kind: "artifact", type: "created", data });
   }
 }
 
@@ -271,6 +299,10 @@ app.get("/api/events", async (req, res) => {
   const rows = (await allEvents(req.query.pid, req.query.cond, req.query.task)).map((r) => ({ ...r, data: r.data ? JSON.parse(r.data) : null }));
   res.json(rows);
 });
+
+// Cheap count (aggregation query ≈ 1 read) — lets admin show the number without
+// loading any artifact docs. The full list is fetched from /api/artifacts on demand.
+app.get("/api/artifacts/count", async (req, res) => res.json({ count: await countAllArtifacts() }));
 
 app.get("/api/artifacts", async (req, res) => {
   const rows = (await artifactEvents(req.query.pid, req.query.cond, req.query.task))

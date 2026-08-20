@@ -43,11 +43,15 @@
 
   <h3 style="margin:28px 0 8px">Saved interactive artifacts</h3>
   <p class="muted">Each artifact a participant created, saved as a standalone file. "Open" launches the live, interactive artifact.</p>
-  <table id="arts">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px">
+    <button class="btn ghost" id="loadArts">Load artifact list</button>
+    <span class="muted" id="artsCount">…</span>
+  </div>
+  <table id="arts" style="display:none">
     <thead><tr>
       <th>Participant</th><th class="num">#</th><th>Created</th><th class="num">Size</th><th>Open</th>
     </tr></thead>
-    <tbody><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+    <tbody></tbody>
   </table>
 </main>
 <script>
@@ -71,18 +75,35 @@ async function loadSummary() {
   }).join("");
 }
 
-async function loadArtifacts() {
-  const rows = await (await fetch("/api/artifacts")).json();
-  const body = document.querySelector("#arts tbody");
-  if (!rows.length) { body.innerHTML = '<tr><td colspan="5" class="muted">No artifacts yet.</td></tr>'; return; }
-  body.innerHTML = rows.map(a => `<tr>
-      <td>${a.pid ?? "anon"}</td><td class="num">${a.seq ?? ""}</td>
-      <td class="muted">${fmt(a.ts)}</td><td class="num">${(a.chars ?? 0).toLocaleString()} ch</td>
-      <td><a href="${a.file}" target="_blank">Open ↗</a></td>
-    </tr>`).join("");
+// Cheap: aggregation count only — reads ~1 doc, renders nothing.
+async function loadArtifactCount() {
+  try {
+    const { count } = await (await fetch("/api/artifacts/count")).json();
+    document.getElementById("artsCount").textContent =
+      count === 1 ? "1 saved artifact" : `${count} saved artifacts`;
+  } catch { document.getElementById("artsCount").textContent = ""; }
 }
 
-function load() { loadSummary(); loadArtifacts(); }
+// On demand: actually fetch + render the artifact docs (dozens of reads).
+async function loadArtifacts() {
+  const btn = document.getElementById("loadArts");
+  btn.disabled = true; btn.textContent = "Loading…";
+  const rows = await (await fetch("/api/artifacts")).json();
+  const tbl = document.getElementById("arts");
+  const body = tbl.querySelector("tbody");
+  tbl.style.display = "";
+  body.innerHTML = rows.length
+    ? rows.map(a => `<tr>
+        <td>${a.pid ?? "anon"}</td><td class="num">${a.seq ?? ""}</td>
+        <td class="muted">${fmt(a.ts)}</td><td class="num">${(a.chars ?? 0).toLocaleString()} ch</td>
+        <td><a href="${a.file}" target="_blank">Open ↗</a></td>
+      </tr>`).join("")
+    : '<tr><td colspan="5" class="muted">No artifacts yet.</td></tr>';
+  btn.disabled = false; btn.textContent = "Reload artifact list";
+}
+
+function load() { loadSummary(); loadArtifactCount(); }
+document.getElementById("loadArts").addEventListener("click", loadArtifacts);
 document.getElementById("refresh").addEventListener("click", load);
 load();
 </script>
