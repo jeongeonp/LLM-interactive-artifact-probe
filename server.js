@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, summary, countArtifacts, getScenario } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, summary, countArtifacts, getScenario } = await import(DB_BACKEND);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ART_DIR = path.join(__dirname, "data", "artifacts");
@@ -50,7 +50,12 @@ Be creative and varied with artifact formats — match the format to the idea, a
 
 When you create an artifact, output it as a SINGLE, SELF-CONTAINED HTML document inside exactly ONE \`\`\`html code fence. It MUST NOT load any external scripts, styles, fonts, images, or data — inline all CSS and inline SVG. Give it a descriptive <title>. It MUST be STATIC and non-interactive: it must not respond to any user input — no clickable elements, buttons, sliders, inputs, hover effects, drag, tabs, or animations triggered by interaction. Prefer inline SVG and CSS for all visuals. If you use JavaScript at all, it may ONLY render the visual once on page load; it must never respond to user actions. Keep any prose reply outside the code fence brief.`;
 
-const systemFor = (cond) => BASE_PROMPT + (cond === "static" ? STATIC_TAIL : INTERACTIVE_TAIL);
+const TEXT_TAIL = `
+
+Answer entirely in the chat as text. Do NOT build any artifact, and do NOT emit HTML code fences or code blocks — no diagrams, charts, widgets, or standalone documents. Write a clear, well-organized prose answer (short paragraphs, and plain bulleted lists only where they genuinely help). Everything the student needs must live in your chat reply.`;
+
+const systemFor = (cond) =>
+  BASE_PROMPT + (cond === "text" ? TEXT_TAIL : cond === "static" ? STATIC_TAIL : INTERACTIVE_TAIL);
 
 // Task → scenario shown to the participant (and the dataset key is the task name).
 const SCENARIOS = {
@@ -263,13 +268,12 @@ app.get("/api/history", async (req, res) => {
 
 // All events for one participant (parsed) — feeds the review dashboard.
 app.get("/api/events", async (req, res) => {
-  const rows = (await allEvents(req.query.pid)).map((r) => ({ ...r, data: r.data ? JSON.parse(r.data) : null }));
+  const rows = (await allEvents(req.query.pid, req.query.cond, req.query.task)).map((r) => ({ ...r, data: r.data ? JSON.parse(r.data) : null }));
   res.json(rows);
 });
 
 app.get("/api/artifacts", async (req, res) => {
-  const rows = (await allEvents(req.query.pid, req.query.cond, req.query.task))
-    .filter((r) => r.kind === "artifact")
+  const rows = (await artifactEvents(req.query.pid, req.query.cond, req.query.task))
     .map((r) => {
       const d = JSON.parse(r.data || "{}");
       return { id: r.id, ts: r.ts, pid: r.pid, cond: r.cond, task: r.task, seq: d.seq, file: d.file, chars: d.chars };

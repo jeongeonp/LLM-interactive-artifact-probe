@@ -11,13 +11,16 @@
 // The `events` collection mirrors the old SQLite `events` table 1:1.
 
 import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { readFileSync } from "fs";
 
 const sa = JSON.parse(readFileSync(new URL("./serviceAccountKey.json", import.meta.url)));
 initializeApp({ credential: cert(sa) });
 const db = getFirestore();
 const events = db.collection("events");
+// Running per-session aggregates (pid|cond|task) so summary() reads a few dozen
+// docs instead of scanning the whole events collection. This is the main quota fix.
+const aggCol = db.collection("agg");
 
 // ---- Read cache: dedupe Firestore reads within a short window to conserve quota.
 // A page load calls scenario + history + artifacts (all one pid) → 1 read, not 3.
@@ -45,10 +48,40 @@ async function allDocs() {
   return docs;
 }
 
+// Firestore doc ids can't contain "/". Build a safe id for the aggregate doc.
+const aggId = (pid, cond, task) =>
+  [pid ?? "", cond ?? "", task ?? ""].map((s) => String(s).replace(/[/#]/g, "_")).join("__");
+const _aggInit = new Set(); // keys we've ensured first_ts for, this process
+
+async function bumpAgg({ pid, cond, task, kind, ts }) {
+  const id = aggId(pid, cond, task);
+  const ref = aggCol.doc(id);
+  const inc = {
+    pid: pid ?? null, cond: cond ?? null, task: task ?? null,
+    events: FieldValue.increment(1),
+    chat_turns: FieldValue.increment(kind === "chat" ? 1 : 0),
+    artifacts: FieldValue.increment(kind === "artifact" ? 1 : 0),
+    interactions: FieldValue.increment(kind === "telemetry" ? 1 : 0),
+    last_ts: ts,
+  };
+  // Set first_ts exactly once per session, guarded so we read at most once per
+  // key per process restart (a few reads total) rather than on every event.
+  if (!_aggInit.has(id)) {
+    _aggInit.add(id);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      tx.set(ref, snap.exists ? inc : { ...inc, first_ts: ts }, { merge: true });
+    });
+  } else {
+    await ref.set(inc, { merge: true });
+  }
+}
+
 export async function logEvent({ pid, cond, task, kind, type, data }) {
+  const ts = new Date().toISOString();
   try {
     await events.add({
-      ts: new Date().toISOString(),
+      ts,
       pid: pid ?? null,
       cond: cond ?? null,
       task: task ?? null,
@@ -57,6 +90,7 @@ export async function logEvent({ pid, cond, task, kind, type, data }) {
       data: data == null ? null : JSON.stringify(data), // JSON string, like SQLite
     });
     _cache.delete("pid:" + pid); // this participant's cached reads must reflect the write
+    await bumpAgg({ pid, cond, task, kind, ts });
   } catch (e) {
     console.error("logEvent (firestore) failed:", e?.message || e);
   }
@@ -84,24 +118,62 @@ export async function allEvents(pid, cond, task) {
   }
 }
 
-export async function summary() {
+// Artifact events only. With a pid we reuse the cached per-pid docs; WITHOUT a
+// pid (the admin "all artifacts" table) we query kind=="artifact" directly so we
+// read only the handful of artifact docs, never the whole (heartbeat-heavy) set.
+export async function artifactEvents(pid, cond, task) {
   try {
-    const m = new Map();
-    for (const e of await allDocs()) {
-      const key = (e.pid ?? "") + "|" + (e.cond ?? "") + "|" + (e.task ?? "");
-      if (!m.has(key)) m.set(key, { pid: e.pid, cond: e.cond, task: e.task, events: 0, chat_turns: 0, artifacts: 0, interactions: 0, first_ts: e.ts, last_ts: e.ts });
-      const r = m.get(key);
-      r.events++;
-      if (e.kind === "chat") r.chat_turns++;
-      if (e.kind === "artifact") r.artifacts++;
-      if (e.kind === "telemetry") r.interactions++;
-      if (e.ts < r.first_ts) r.first_ts = e.ts;
-      if (e.ts > r.last_ts) r.last_ts = e.ts;
+    let rows;
+    if (pid) {
+      rows = await pidDocs(pid);
+      if (cond != null && cond !== "") rows = rows.filter((e) => e.cond === cond);
+      if (task != null && task !== "") rows = rows.filter((e) => e.task === task);
+      rows = rows.filter((e) => e.kind === "artifact");
+    } else {
+      const snap = await events.where("kind", "==", "artifact").get();
+      rows = snap.docs.map((d) => d.data());
     }
-    return [...m.values()].sort((a, b) => String(a.pid).localeCompare(String(b.pid)));
+    return rows
+      .slice()
+      .sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0))
+      .map((e, i) => ({ id: i + 1, ...e }));
   } catch (e) {
     return onReadError(e, []);
   }
+}
+
+export async function summary() {
+  try {
+    // Fast path: read the pre-computed per-session aggregates (a few dozen docs),
+    // not the whole events collection. This is what keeps the dashboard cheap.
+    const snap = await aggCol.get();
+    if (!snap.empty) {
+      return snap.docs
+        .map((d) => d.data())
+        .sort((a, b) => String(a.pid).localeCompare(String(b.pid)));
+    }
+    // Fallback for data logged before aggregates existed: scan once and backfill.
+    return await summaryFromEvents();
+  } catch (e) {
+    return onReadError(e, []);
+  }
+}
+
+// One-time full scan, used only when the `agg` collection is empty (legacy data).
+async function summaryFromEvents() {
+  const m = new Map();
+  for (const e of await allDocs()) {
+    const key = (e.pid ?? "") + "|" + (e.cond ?? "") + "|" + (e.task ?? "");
+    if (!m.has(key)) m.set(key, { pid: e.pid, cond: e.cond, task: e.task, events: 0, chat_turns: 0, artifacts: 0, interactions: 0, first_ts: e.ts, last_ts: e.ts });
+    const r = m.get(key);
+    r.events++;
+    if (e.kind === "chat") r.chat_turns++;
+    if (e.kind === "artifact") r.artifacts++;
+    if (e.kind === "telemetry") r.interactions++;
+    if (e.ts < r.first_ts) r.first_ts = e.ts;
+    if (e.ts > r.last_ts) r.last_ts = e.ts;
+  }
+  return [...m.values()].sort((a, b) => String(a.pid).localeCompare(String(b.pid)));
 }
 
 export async function countArtifacts(pid, cond, task) {

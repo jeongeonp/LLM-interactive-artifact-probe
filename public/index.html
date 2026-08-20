@@ -102,7 +102,16 @@ const PID  = params.get("pid")  || "anon";
 const COND = params.get("cond") || "interactive";
 const TASK = params.get("task") || "";
 const DATASET = TASK; // dataset key is the task name
+const TEXT_MODE = COND === "text"; // no artifacts — plain chat only
 document.getElementById("who").textContent = `pid: ${PID} · ${TASK || "—"} · ${COND}`;
+if (TEXT_MODE) {
+  const ap = document.getElementById("artifactPane");
+  if (ap) ap.style.display = "none";
+  const chatEl = document.getElementById("chat");
+  if (chatEl) { chatEl.style.width = "100%"; chatEl.style.borderRight = "0"; }
+  const inp = document.getElementById("input");
+  if (inp) inp.placeholder = "Ask about the topic…";
+}
 
 const logEl = document.getElementById("log");
 const inputEl = document.getElementById("input");
@@ -138,7 +147,7 @@ const TELEMETRY = `<script>(function(){
   var lastScroll=0;
   window.addEventListener("scroll", function(){ var n=Date.now(); if(n-lastScroll>500){lastScroll=n; send("scroll",{y:Math.round(window.scrollY)});} }, true);
   document.addEventListener("visibilitychange", function(){ send("visibility",{hidden:document.hidden}); });
-  setInterval(function(){ if(!document.hidden) send("heartbeat",{}); }, 5000);
+  setInterval(function(){ if(!document.hidden) send("heartbeat",{}); }, 10000);
 })();<\/script>`;
 
 function postLog(event) {
@@ -245,9 +254,11 @@ async function send() {
     const el = pending.querySelector(".elapsed");
     if (el) el.textContent = "thinking… " + Math.floor((Date.now() - startT) / 1000) + "s";
   }, 250);
-  artifactBar.textContent = "⏳ Building… the artifact will appear here.";
-  artifactBar.classList.add("working");
-  artifactPane.classList.add("working");
+  if (!TEXT_MODE) {
+    artifactBar.textContent = "⏳ Building… the artifact will appear here.";
+    artifactBar.classList.add("working");
+    artifactPane.classList.add("working");
+  }
 
   const controller = new AbortController();
   currentAbort = controller;
@@ -262,8 +273,8 @@ async function send() {
     messages.push({ role: "assistant", content: data.text });
     // Show prose (strip the html code fence from the chat view) and render the artifact.
     const prose = data.text.replace(/```html[\s\S]*?```/gi, "").trim();
-    pending.textContent = prose || "(built an artifact →)";
-    if (!renderArtifact(data.text)) {
+    pending.textContent = prose || (TEXT_MODE ? data.text.trim() : "(built an artifact →)");
+    if (!TEXT_MODE && !renderArtifact(data.text)) {
       const truncated = /```html/i.test(data.text); // opening fence but no complete block = cut off
       artifactBar.textContent = truncated
         ? "⚠️ The artifact was cut off (reply too long). Ask to continue, or resend."
