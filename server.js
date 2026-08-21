@@ -84,6 +84,13 @@ const systemFor = (cond) =>
 // Task → scenario shown to the participant (and the dataset key is the task name).
 const SCENARIOS = {
   practice: ``,
+  studytool: `Jasmine is starting her freshman year in college this fall. She has ADHD, and in high school her note-taking results were pretty inconsistent. Some classes she kept up fine with a notebook, in others she felt scattered regardless of what she tried.
+
+She's read that people with attention difficulties sometimes do better taking notes on a tablet, since it's faster to reorganize and easier to keep pace with a fast-talking professor. But she's also read that people with ADHD are often more prone to getting pulled off task by the same kind of device (e.g. notifications, other apps, the temptation to switch tabs), which could just as easily cancel out any benefit.
+
+A tablet, pencil, and case would cost around $700, money Jasmine doesn't have to spare. She works 15 hours a week at a campus job to help cover rent and groceries and has no savings cushion if something unexpected comes up. A notebook would cost her almost nothing. She's not sure whether investing in a tablet would actually help her focus, and whether it's worth her hard-earned money to buy.
+
+Should Jasmine buy the tablet, or stick with traditional note-taking?`,
   sd: `Is San Diego still affordable for the people who grew up here?`,
   relocation: `Maya Torres is a 34-year-old ICU nurse married to Josh, a 34-year-old fully remote software engineer. They have one daughter, Elena, who is 7 and starting 2nd grade. The family currently rents in a car-dependent Bay Area suburb on a combined household income of $95,000. Maya has a standing offer to transfer within her hospital network to a partner hospital in any of the candidate cities. You need to help her decide where within each city they should choose to live in based on her following priorities:
 
