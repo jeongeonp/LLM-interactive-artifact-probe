@@ -17,7 +17,11 @@
   .pgroup { border-bottom:2px solid var(--line); }
   .phead { position:sticky; top:0; z-index:1; background:#efe9df; padding:7px 14px;
            font-weight:700; font-size:15px; display:flex; align-items:baseline; gap:8px;
-           border-bottom:1px solid var(--line); }
+           border-bottom:1px solid var(--line); cursor:pointer; user-select:none; }
+  .phead:hover { background:#e7e0d2; }
+  .phead .caret { font-size:10px; color:#8a857c; transition:transform .12s; display:inline-block; }
+  .pgroup.collapsed .phead .caret { transform:rotate(-90deg); }
+  .pgroup.collapsed .pitem { display:none; }
   .phead .n { font-weight:500; font-size:11px; color:#8a857c; margin-left:auto; }
   .pitem { padding:9px 14px 9px 16px; border-bottom:1px solid var(--line); cursor:pointer;
            border-left:3px solid transparent; }
@@ -117,11 +121,16 @@ async function loadSide() {
         <div class="stat"><b>${r.chat_turns ?? 0}</b> turns · <b>${r.artifacts ?? 0}</b> artifacts</div>
       </div>`;
     }).join("");
-    return `<div class="pgroup">
-      <div class="phead">${key}<span class="n">${sess.length} session${sess.length > 1 ? "s" : ""}</span></div>
+    // Keep the active participants (P6–P9) expanded; collapse everything else by default.
+    const openByDefault = /^p[6-9]$/i.test(key);
+    return `<div class="pgroup${openByDefault ? "" : " collapsed"}">
+      <div class="phead"><span class="caret">▼</span>${key}<span class="n">${sess.length} session${sess.length > 1 ? "s" : ""}</span></div>
       ${items}
     </div>`;
   }).join("");
+  // Click a participant header to collapse/expand its sessions.
+  side.querySelectorAll(".phead").forEach(h =>
+    h.addEventListener("click", () => h.parentElement.classList.toggle("collapsed")));
   side.querySelectorAll(".pitem").forEach(el =>
     el.addEventListener("click", () => selectPid(
       decodeURIComponent(el.dataset.pid),
