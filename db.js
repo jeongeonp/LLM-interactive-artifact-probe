@@ -82,6 +82,22 @@ export function summary() {
     .all();
 }
 
+// Delete every session (pid+cond+task) that has no chat turns and no artifacts.
+export function deleteEmptySessions() {
+  const empties = db
+    .prepare(
+      `SELECT pid, cond, task
+       FROM events
+       GROUP BY pid, cond, task
+       HAVING SUM(kind = 'chat') = 0 AND SUM(kind = 'artifact') = 0`
+    )
+    .all();
+  const del = db.prepare("DELETE FROM events WHERE pid IS ? AND cond IS ? AND task IS ?");
+  let evts = 0;
+  for (const s of empties) evts += del.run(s.pid, s.cond, s.task).changes;
+  return { sessions: empties.length, events: evts };
+}
+
 // Next per-session (pid+cond+task) artifact number (1-based).
 export function countArtifacts(pid, cond, task) {
   return db

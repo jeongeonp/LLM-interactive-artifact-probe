@@ -31,11 +31,13 @@
     <a class="btn" href="/api/export.csv">⭳ Export all (CSV)</a>
     <a class="btn ghost" href="/api/export.json">⭳ Export all (JSON)</a>
     <button class="btn ghost" id="refresh">↻ Refresh</button>
+    <button class="btn ghost" id="cleanup" style="margin-left:auto">🧹 Delete empty sessions</button>
   </div>
+  <p class="muted" id="cleanupNote" style="margin:-12px 0 20px">Empty = 0 chat turns and 0 artifacts (e.g. a page opened but never used). Deletes their events permanently.</p>
   <p class="muted">Per-participant counts. Chat turns = conversation exchanges; interactions = artifact clicks/inputs/scrolls/heartbeats.</p>
   <table id="tbl">
     <thead><tr>
-      <th>Participant</th><th>Task</th><th>Cond</th><th class="num">Events</th><th class="num">Chat turns</th>
+      <th>Participant</th><th>Cond</th><th>Task</th><th class="num">Events</th><th class="num">Chat turns</th>
       <th class="num">Artifacts</th><th class="num">Interactions</th><th>First</th><th>Last</th><th>Export</th>
     </tr></thead>
     <tbody><tr><td colspan="10" class="muted">Loading…</td></tr></tbody>
@@ -64,7 +66,7 @@ async function loadSummary() {
   body.innerHTML = rows.map(r => {
     const pid = r.pid ?? "anon";
     return `<tr>
-      <td>${pid}</td><td>${r.task ?? "—"}</td><td>${r.cond ?? ""}</td>
+      <td>${pid}</td><td>${r.cond ?? ""}</td><td>${r.task ?? "—"}</td>
       <td class="num">${r.events}</td><td class="num">${r.chat_turns ?? 0}</td>
       <td class="num">${r.artifacts ?? 0}</td><td class="num">${r.interactions ?? 0}</td>
       <td class="muted">${fmt(r.first_ts)}</td><td class="muted">${fmt(r.last_ts)}</td>
@@ -102,9 +104,25 @@ async function loadArtifacts() {
   btn.disabled = false; btn.textContent = "Reload artifact list";
 }
 
+async function cleanupEmpty() {
+  if (!confirm("Delete every session with 0 chat turns and 0 artifacts? This permanently removes their events and cannot be undone.")) return;
+  const btn = document.getElementById("cleanup");
+  btn.disabled = true; btn.textContent = "Cleaning…";
+  try {
+    const r = await (await fetch("/api/cleanup-empty", { method: "POST" })).json();
+    document.getElementById("cleanupNote").textContent =
+      r.error ? ("⚠️ " + r.error) : `Removed ${r.sessions} empty session(s) (${r.events} events).`;
+    load();
+  } catch (e) {
+    document.getElementById("cleanupNote").textContent = "⚠️ cleanup failed: " + e.message;
+  }
+  btn.disabled = false; btn.textContent = "🧹 Delete empty sessions";
+}
+
 function load() { loadSummary(); loadArtifactCount(); }
 document.getElementById("loadArts").addEventListener("click", loadArtifacts);
 document.getElementById("refresh").addEventListener("click", load);
+document.getElementById("cleanup").addEventListener("click", cleanupEmpty);
 load();
 </script>
 </body>

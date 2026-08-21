@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions } = await import(DB_BACKEND);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ART_DIR = path.join(__dirname, "data", "artifacts");
@@ -305,6 +305,9 @@ app.post("/api/log", (req, res) => {
 
 // ---- Researcher: summary + artifacts + export ---------------------------
 app.get("/api/summary", async (req, res) => res.json(await summary()));
+
+// Delete all sessions with 0 chat turns and 0 artifacts (empty/telemetry-only).
+app.post("/api/cleanup-empty", async (req, res) => res.json(await deleteEmptySessions()));
 
 // Chat history for a participant (to resume a session after a reload).
 app.get("/api/history", async (req, res) => {

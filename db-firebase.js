@@ -154,6 +154,43 @@ export async function artifactEvents(pid, cond, task) {
   }
 }
 
+// Delete every session (pid+cond+task) with no chat turns and no artifacts,
+// including its event docs and its aggregate doc. Occasional cleanup, so a full
+// scan is acceptable.
+export async function deleteEmptySessions() {
+  try {
+    const all = await allDocs();
+    const g = new Map();
+    for (const e of all) {
+      const key = (e.pid ?? "") + "|" + (e.cond ?? "") + "|" + (e.task ?? "");
+      if (!g.has(key)) g.set(key, { pid: e.pid ?? null, cond: e.cond ?? null, task: e.task ?? null, chat: 0, arts: 0 });
+      const r = g.get(key);
+      if (e.kind === "chat") r.chat++;
+      if (e.kind === "artifact") r.arts++;
+    }
+    const empties = [...g.values()].filter((s) => s.chat === 0 && s.arts === 0);
+    let deleted = 0;
+    for (const s of empties) {
+      const snap = await events.where("pid", "==", s.pid).get();
+      const refs = snap.docs
+        .filter((d) => { const x = d.data(); return (x.cond ?? null) === s.cond && (x.task ?? null) === s.task; })
+        .map((d) => d.ref);
+      deleted += refs.length;
+      refs.push(aggCol.doc(aggId(s.pid, s.cond, s.task))); // also drop the aggregate
+      for (let i = 0; i < refs.length; i += 400) {
+        const batch = db.batch();
+        refs.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+        await batch.commit();
+      }
+    }
+    _cache.clear();
+    return { sessions: empties.length, events: deleted };
+  } catch (e) {
+    console.error("deleteEmptySessions (firestore) failed:", e?.message || e);
+    return { sessions: 0, events: 0, error: String(e?.message || e) };
+  }
+}
+
 export async function summary() {
   try {
     // Fast path: read the pre-computed per-session aggregates (a few dozen docs),
