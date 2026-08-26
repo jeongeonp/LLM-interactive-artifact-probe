@@ -10,12 +10,18 @@
 // composite Firestore indexes are required. Fine for study-scale data.
 // The `events` collection mirrors the old SQLite `events` table 1:1.
 
-import { initializeApp, cert } from "firebase-admin/app";
+import { initializeApp, cert, applicationDefault } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 
-const sa = JSON.parse(readFileSync(new URL("./serviceAccountKey.json", import.meta.url)));
-initializeApp({ credential: cert(sa) });
+// Locally we read serviceAccountKey.json; on Cloud Run (same GCP project) the file
+// isn't deployed, so fall back to Application Default Credentials automatically.
+const keyPath = new URL("./serviceAccountKey.json", import.meta.url);
+if (existsSync(keyPath)) {
+  initializeApp({ credential: cert(JSON.parse(readFileSync(keyPath))) });
+} else {
+  initializeApp({ credential: applicationDefault() });
+}
 const db = getFirestore();
 const events = db.collection("events");
 // Running per-session aggregates (pid|cond|task) so summary() reads a few dozen

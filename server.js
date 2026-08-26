@@ -53,18 +53,28 @@ app.use("/artifacts", express.static(ART_DIR)); // fallback for any other artifa
 const MODEL = "claude-sonnet-5"; // fast + strong artifacts; swap for claude-haiku-4-5 or claude-opus-5
 const MAX_TOKENS = 48000; // headroom so token-heavy interactive artifacts aren't truncated mid-code (caps thinking + output)
 const DATASETS_ENABLED = false; // set true to re-enable dataset injection + overview buttons
+const WEB_SEARCH_ENABLED = true; // lets Claude pull real qualitative sources (Reddit, blogs, reviews)
+// NOTE: after web_search, Claude sometimes (100% in one small observed sample) skips writing the artifact
+// fence despite claiming it did. Mitigated below with a silent one-shot retry (search disabled on the retry
+// call) for interactive/static turns that searched but produced no artifact — see the retry block in /api/chat.
 
 const BASE_PROMPT = `You are a research assistant for a college student looking into a topic to give a brief verbal overview to their professor and classmates in a week.
 
-Answer the student's actual question directly and substantively. Lead with the answer — the key facts, findings, and main perspectives — and keep it concise. Do NOT assume they want to be taught or coached into figuring it out themselves: skip Socratic questioning, "what do you already know?" openers, research plans, "here's how to investigate this rigorously" trackers, self-tests, and long step-by-step checklists. Don't pad with caveats, meta-commentary, or process talk — just tell them what they asked.`;
+Answer the student's actual question directly and substantively. Lead with the answer — the key facts, findings, and main perspectives — and keep it concise. Do NOT assume they want to be taught or coached into figuring it out themselves: skip Socratic questioning, "what do you already know?" openers, research plans, "here's how to investigate this rigorously" trackers, self-tests, and long step-by-step checklists. Don't pad with caveats, meta-commentary, or process talk — just tell them what they asked.
+
+The artifact always comes first — that rule below is not optional.
+
+Present everything — in the chat and inside artifacts — as confident, settled information. Do NOT add verification badges, "unconfirmed," "verify directly," confidence/source icons, or any other meta-commentary about how certain you are. If you can't confirm a specific detail, simply leave it out rather than flagging the gap — never surface your own uncertainty to the student.`;
 
 const INTERACTIVE_TAIL = `
 
-Put depth into interactive artifacts, not into long chat messages. Keep the chat reply short — a direct answer plus a one-line pointer to the artifact — and let the artifact carry the detail and exploration. Proactively build an interactive artifact whenever it would let the student see, compare, or manipulate the answer, so the work lives in the artifacts rather than in the chat.
+Build an interactive artifact for every substantive question, no exceptions — this includes qualitative questions ("what do people say about X"), comparisons ("compare X vs Y"), opinion/sentiment questions, and anything else that might tempt you to just answer in prose. A comparison is exactly the kind of question that should become an artifact (a comparison tool), not a text table in the chat. Answer in chat text ALONE only if the student is asking something trivially small (e.g. "what year did X happen") where an artifact would be pointless. When in doubt, build the artifact. Keep the chat reply short — a direct answer plus a one-line pointer to the artifact — and let the artifact carry the detail and exploration.
 
-Be creative and varied with artifact formats — match the format to the idea, and do NOT default to tables, sliders, and bullet lists. Prefer richer interactions where they fit: canvas/SVG visualizations and mini-simulations, drag-and-drop (concept maps, card sorts, ranking, arranging steps), clickable annotated diagrams with reveal-on-click hotspots, animated step-throughs (play/pause), before/after comparison wipes, predict-then-reveal (the student sketches or guesses first, then compares), branching "choose your own" explorers, and drag-to-match / quiz self-tests. Use tables or sliders only when they are genuinely the best fit.
+Aim to surprise, not to play it safe — a forgettable dashboard of tabs and cards is a failure even if it's technically interactive. Before settling on a format, picture the single most unexpected, delightful way to explore this specific idea, and build that instead of the generic default. Never reuse the exact structure of your last artifact in this conversation. Reach for canvas/SVG visualizations and mini-simulations, drag-and-drop (concept maps, card sorts, ranking, arranging steps), clickable annotated diagrams with reveal-on-click hotspots, animated step-throughs (play/pause), before/after comparison wipes, predict-then-reveal (the student guesses first, then compares), branching "choose your own" explorers, word/tag clouds with click-to-reveal detail, and drag-to-match / quiz self-tests. Tables, sliders, and tabs+cards are a last resort, not a starting point.
 
-When you create an interactive artifact, output it as a SINGLE, SELF-CONTAINED HTML document inside exactly ONE \`\`\`html code fence. It MUST NOT load any external scripts, styles, fonts, images, or data — inline all CSS and JavaScript, vanilla HTML/CSS/JS only (canvas and inline SVG are encouraged). Give it a descriptive <title>. Make it genuinely interactive so the student can play with it. Keep any prose reply outside the code fence brief.`;
+When you create an interactive artifact, output it as a SINGLE, SELF-CONTAINED HTML document inside exactly ONE \`\`\`html code fence. It MUST NOT load any external scripts, styles, fonts, images, or data — inline all CSS and JavaScript, vanilla HTML/CSS/JS only (canvas and inline SVG are encouraged). Give it a descriptive <title>. Make it genuinely interactive so the student can play with it. Keep any prose reply outside the code fence brief.
+
+Hard rule: NEVER refer to an artifact you have not actually written in this same reply — no "play with the simulator below," "explore the case file below," "the tool above lets you...", or similar, unless the \`\`\`html code fence for it is genuinely present in this message. If web search (or anything else) has used up your attention and you're tempted to wrap up with only a description, stop and actually write the code fence instead — a real artifact always outranks a longer or more thorough-sounding text summary.`;
 
 const STATIC_TAIL = `
 
@@ -233,6 +243,34 @@ app.post("/api/chat", async (req, res) => {
   const { messages, pid, cond, task } = req.body || {};
   const ac = new AbortController();
   res.on("close", () => { if (!res.writableEnded) ac.abort(); }); // participant hit Stop / disconnected
+
+  // Stream small phase updates ("searching…", "writing…") to the client as newline-
+  // delimited JSON, so the loading indicator can show real progress instead of a
+  // generic timer. The final line always carries the complete { text } (or { error }),
+  // same shape the client relied on when this was a single JSON response.
+  res.setHeader("Content-Type", "application/x-ndjson");
+  res.setHeader("Cache-Control", "no-cache");
+  const sendChunk = (obj) => { if (!res.writableEnded) res.write(JSON.stringify(obj) + "\n"); };
+
+  // Wire phase-detection listeners onto one message stream: a "searching" phase when a
+  // web_search tool block starts, "writing" when text starts, "artifact" the first time
+  // the accumulating text contains an opening ```html fence.
+  const wirePhaseEvents = (stream) => {
+    let sawArtifactPhase = false;
+    stream.on("streamEvent", (event) => {
+      const b = event?.content_block;
+      if (event?.type !== "content_block_start" || !b) return;
+      if (b.type === "server_tool_use" && b.name === "web_search") sendChunk({ phase: "searching" });
+      else if (b.type === "text") sendChunk({ phase: "writing" });
+    });
+    stream.on("text", (_delta, snapshot) => {
+      if (!sawArtifactPhase && snapshot.includes("```html")) {
+        sawArtifactPhase = true;
+        sendChunk({ phase: "artifact" });
+      }
+    });
+  };
+
   try {
     const system = [{ type: "text", text: systemFor(cond), cache_control: { type: "ephemeral" } }];
     const datasetText = loadDataset(task);
@@ -243,14 +281,62 @@ app.post("/api/chat", async (req, res) => {
         text: `# DATASET FOR THIS TASK\nBase every factual claim and every artifact you build on the data below. If the data does not cover something the student asks about, say so plainly rather than inventing numbers or quotes.\n${datasetText}`,
       });
     }
-    const msg = await client.messages
-      .stream({ model: MODEL, max_tokens: MAX_TOKENS, system, messages }, { signal: ac.signal })
-      .finalMessage();
+    const tools = WEB_SEARCH_ENABLED
+      ? [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }]
+      : undefined;
 
-    const text = msg.content
+    console.log(`\n─── /api/chat → ${pid} · ${cond} · ${task} ${"─".repeat(20)}`);
+    console.log(`[system prompt] (${system.map((s) => s.text.length).join(" + ")} chars)\n` + system.map((s) => s.text).join("\n---\n"));
+    console.log(`[tools]`, tools ? tools.map((t) => t.name).join(", ") : "(none)");
+    console.log(`[messages] (${messages?.length ?? 0} turns)`);
+    for (const m of messages ?? []) console.log(`  ${m.role}: ${String(m.content).slice(0, 200)}${String(m.content).length > 200 ? "…" : ""}`);
+
+    const stream = client.messages.stream({ model: MODEL, max_tokens: MAX_TOKENS, system, messages, tools }, { signal: ac.signal });
+    wirePhaseEvents(stream);
+    const msg = await stream.finalMessage();
+
+    let text = msg.content
       .filter((b) => b.type === "text")
       .map((b) => b.text)
       .join("");
+
+    const searches = msg.content.filter((b) => b.type === "server_tool_use" && b.name === "web_search");
+    console.log(`[response] ${text.length} chars · usage: ${JSON.stringify(msg.usage)}`);
+    if (searches.length) console.log(`[web searches] ${searches.map((s) => JSON.stringify(s.input)).join(", ")}`);
+
+    // Self-heal: if it searched but skipped the artifact it's expected to build, silently
+    // ask it to finish — the participant never sees the failed first attempt. Retried at
+    // most once, with a stricter search cap so it can't repeat the same failure loop.
+    let retried = false;
+    const expectsArtifact = cond === "interactive" || cond === "static";
+    if (expectsArtifact && searches.length > 0 && extractArtifacts(text).length === 0) {
+      retried = true;
+      console.log(`[retry] searched but no artifact fence — retrying once (max_uses: 1)`);
+      sendChunk({ phase: "retrying" });
+      const retryTools = WEB_SEARCH_ENABLED
+        ? [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }]
+        : undefined;
+      const retryStream = client.messages.stream(
+        {
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          system,
+          messages: [
+            ...messages,
+            { role: "assistant", content: text },
+            { role: "user", content: "Continue — you searched but never wrote the ```html artifact. Write the complete artifact now. Output only the code fence (plus a brief one-line pointer to it), nothing else." },
+          ],
+          tools: retryTools,
+        },
+        { signal: ac.signal }
+      );
+      wirePhaseEvents(retryStream);
+      const retryMsg = await retryStream.finalMessage();
+      const retryText = retryMsg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+      console.log(`[retry response] ${retryText.length} chars · usage: ${JSON.stringify(retryMsg.usage)}`);
+      text = text + "\n\n" + retryText;
+    }
+    console.log(`${"─".repeat(60)}\n`);
 
     logEvent({
       pid,
@@ -258,14 +344,16 @@ app.post("/api/chat", async (req, res) => {
       task,
       kind: "chat",
       type: "turn",
-      data: { user: messages?.[messages.length - 1]?.content ?? null, assistant: text, usage: msg.usage },
+      data: { user: messages?.[messages.length - 1]?.content ?? null, assistant: text, usage: msg.usage, retried_after_search: retried || undefined },
     });
     await saveArtifacts(text, pid, cond, task);
-    res.json({ text });
+    sendChunk({ done: true, text });
+    res.end();
   } catch (e) {
-    if (ac.signal.aborted) return; // cancelled by the participant — nothing logged, connection closed
+    if (ac.signal.aborted) { if (!res.writableEnded) res.end(); return; } // cancelled by the participant
     console.error(e);
-    if (!res.writableEnded) res.status(500).json({ error: String(e?.message || e) });
+    sendChunk({ error: String(e?.message || e) });
+    if (!res.writableEnded) res.end();
   }
 });
 

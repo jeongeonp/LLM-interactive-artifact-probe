@@ -1,0 +1,22 @@
+# Files NOT uploaded to Cloud Build / Cloud Run.
+# Secrets: never ship these — the deployed server uses env vars + built-in credentials.
+serviceAccountKey.json
+.env
+
+# Rebuilt on the server / ephemeral:
+node_modules/
+data/
+
+# Local dev + repo cruft:
+.git/
+.gitignore
+*.log
+/private/
+scratchpad/
+
+# One-off maintenance scripts (run locally, not needed in the container):
+backfill-agg.mjs
+backfill-artifact-html.mjs
+diag.mjs
+migrate-p03.mjs
+seed-demo.mjs

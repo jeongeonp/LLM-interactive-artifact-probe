@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Minimal research probe: sensemaking with an LLM that builds interactive artifacts, with interaction logging.",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server.js"
   },

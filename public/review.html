@@ -49,6 +49,8 @@
   .bubble { padding:9px 12px; border-radius:10px; white-space:pre-wrap; }
   .msg.user .bubble { background:#efe9df; }
   .msg.assistant .bubble { background:var(--panel); border:1px solid var(--line); }
+  .fullview .msg { max-width:820px; }
+  .full-artifact-frame { width:100%; max-width:820px; height:480px; border:1px solid var(--line); border-radius:10px; background:#fff; margin:0 0 16px; display:block; }
   .artmark { margin:10px 0; color:var(--accent); font-size:13px; font-weight:600; }
   .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:14px; overflow:hidden; }
   .card .hd { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); font-size:13px; }
@@ -155,6 +157,7 @@ async function selectPid(pid, task, cond, el) {
 
   const views = {
     transcript: () => renderTranscript(events),
+    full: () => renderFull(events),
     artifacts: () => renderArtifacts(arts),
     activity: () => renderActivity(tele, arts),
   };
@@ -164,6 +167,7 @@ async function selectPid(pid, task, cond, el) {
       ${cond || "—"} · ${task || "—"} · ${chats.length} turns · ${arts.length} artifacts · ${tele.length} interactions</span></h2>
     <div class="tabs">
       <button data-v="transcript" class="active">Transcript</button>
+      <button data-v="full">Full view (as shown)</button>
       <button data-v="artifacts">Artifacts (${arts.length})</button>
       <button data-v="activity">Activity</button>
       <a href="/api/export.json?pid=${encodeURIComponent(pid)}" style="margin-left:auto; align-self:center; font-size:13px">⭳ JSON</a>
@@ -194,6 +198,42 @@ function renderTranscript(events) {
       box.appendChild(a.firstChild);
     } else if (e.kind === "artifact") {
       box.appendChild(el(`<div class="artmark">🌐 created artifact #${e.data?.seq ?? ""} · ${fmt(e.ts)} · ${(e.data?.chars ?? 0).toLocaleString()} chars</div>`).firstChild);
+    }
+  }
+  if (!box.children.length) box.innerHTML = '<p class="muted">No conversation.</p>';
+  return box;
+}
+
+// Reconstructs the conversation the way the participant actually saw it: chat bubbles
+// with each artifact rendered inline, live, right where it was created — no separate
+// fetches, no /api/log calls, purely from the events already loaded for this session.
+function renderFull(events) {
+  const box = document.createElement("div");
+  box.className = "fullview";
+  const fenceRe = /```html\s*([\s\S]*?)```/gi;
+  for (const e of events) {
+    if (e.kind !== "chat") continue;
+    const u = e.data?.user;
+    if (u != null) {
+      const ub = el(`<div class="msg user"><div class="role">user · ${fmt(e.ts)}</div><div class="bubble"></div></div>`).firstChild;
+      ub.querySelector(".bubble").textContent = typeof u === "string" ? u : JSON.stringify(u);
+      box.appendChild(ub);
+    }
+    const raw = e.data?.assistant || "";
+    const prose = raw.replace(fenceRe, "").trim();
+    const ab = el(`<div class="msg assistant"><div class="role">assistant</div><div class="bubble"></div></div>`).firstChild;
+    ab.querySelector(".bubble").textContent = prose;
+    box.appendChild(ab);
+    fenceRe.lastIndex = 0;
+    let m;
+    while ((m = fenceRe.exec(raw))) {
+      const html = m[1].trim();
+      if (!html) continue;
+      const frame = document.createElement("iframe");
+      frame.sandbox = "allow-scripts"; // read-only replay — no telemetry script injected
+      frame.className = "full-artifact-frame";
+      frame.srcdoc = html;
+      box.appendChild(frame);
     }
   }
   if (!box.children.length) box.innerHTML = '<p class="muted">No conversation.</p>';
