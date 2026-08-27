@@ -66,7 +66,11 @@
 
   /* -- Persistent task bar (structured-flow) — a full-width colored strip, always visible,
      pairing the task button with a plain-language description of the current step. -- */
+  /* z-index:15 sits ABOVE the reflection/debrief overlays (z-index:10) so the bar stays fully
+     visible during those — but BELOW #taskOverlay (z-index:20), which dims it like everything
+     else on the page, same dark backdrop, no special-cased styling. */
   #taskBar { display:none; align-items:center; gap:12px; padding:10px 16px; background:#e8bd94; position:relative; z-index:15; }
+  #taskOverlay { z-index:20; }
   #taskBarBtn { padding:6px 14px; border:1px solid rgba(0,0,0,.12); border-radius:8px; background:rgba(255,255,255,.55); color:#5c3a1e; font-size:13px; font-weight:600; cursor:pointer; flex:0 0 auto; }
   #taskBarBtn:hover { background:#fff; }
   #stepBadge { font-size:14px; font-weight:700; color:#4a2c10; }
@@ -133,11 +137,11 @@
   <div class="refl-modal" id="reflCard">
     <h2>Quick reflection</h2>
     <div class="sub">Your artifact is generating in the background — talk through these with the researcher while you wait.</div>
+    <p class="refl-q-text" id="reflEngagementQ"><span class="qlabel">Q1</span>How did you engage with the artifact(s) you just explored? (e.g., only glimpsed through the bar chart but looked deeply into the topic X)</p>
     <div class="refl-q">
       <label class="qtitle">Your query:</label>
       <div class="your-query" id="reflYourQuery"></div>
     </div>
-    <p class="refl-q-text" id="reflEngagementQ"><span class="qlabel">Q1</span>How did you engage with the artifact you just explored? (glimpse / read closely / dug into "why" / asked a follow-up / switched between artifacts)</p>
     <p class="refl-q-text"><span class="qlabel">Q2</span>How did you come up with the question you just asked?</p>
     <p class="refl-q-text"><span class="qlabel">Q3</span>What are you expecting to see from this new prompt?</p>
     <button type="button" id="reflContinue">Continue</button>
@@ -149,10 +153,10 @@
 <div class="overlay" id="debriefOverlay">
   <div class="refl-modal" id="debriefCard">
     <h2>It's time to debrief</h2>
-    <div class="sub">You're going to debrief to Maya! Talk through these with the researcher.</div>
-    <p class="refl-q-text"><span class="qlabel">Q1</span>How did you end up choosing what to focus on?</p>
-    <p class="refl-q-text"><span class="qlabel">Q2</span>Why did you choose that over the others?</p>
-    <p class="refl-q-text"><span class="qlabel">Q3</span>Why are you interested in learning more about this?</p>
+    <div class="sub" id="debriefSub"></div>
+    <p class="refl-q-text"><span class="qlabel">Q1</span><span id="debriefQ1"></span></p>
+    <p class="refl-q-text"><span class="qlabel">Q2</span><span id="debriefQ2"></span></p>
+    <p class="refl-q-text"><span class="qlabel">Q3</span><span id="debriefQ3"></span></p>
     <button type="button" id="debriefDone">Done</button>
   </div>
 </div>
@@ -342,9 +346,9 @@ let roundNum = 0;
 // Plain-language step description next to the task button — which phase of the loop the
 // participant is currently in. Separate concept from the task itself.
 const STEP_TEXT = {
-  1: "Step 1: Ask a question and explore the artifact that is generated!",
+  1: "Step 1: Ask about the topic and explore the artifact that is generated!",
   2: "Step 2: Let's reflect on the previous steps",
-  3: "Step 3: Time to debrief with Maya!",
+  3: "Step 3: End of the task - time to debrief!",
 };
 function setStep(n) {
   document.getElementById("stepBadge").textContent = STEP_TEXT[n];
@@ -375,6 +379,28 @@ function showReflection(prevArtifactIndex, queryText) {
   });
 }
 
+// Debrief intro + questions are scenario-specific — "debrief to Maya" only makes sense for
+// the relocation task. Falls back to generic wording for every other task until it's given
+// its own entry here.
+const DEBRIEF_TEXT = {
+  relocation: {
+    sub: "You're going to debrief to Maya! Talk through these with the researcher.",
+    q: [
+      "How did you end up choosing what to focus on?",
+      "Why did you choose that over the others?",
+      "Why are you interested in learning more about this?",
+    ],
+  },
+};
+const DEFAULT_DEBRIEF = {
+  sub: "It's time to debrief. Talk through these with the researcher.",
+  q: [
+    "How did you end up choosing what to focus on?",
+    "Why did you choose that over the others?",
+    "Why are you interested in learning more about this?",
+  ],
+};
+
 // "End task" — small, deliberately low-emphasis text link (not a loud button) that opens the
 // debrief modal at any point. All 3 questions shown together on one screen — no paging.
 function initDebrief() {
@@ -382,6 +408,12 @@ function initDebrief() {
   const link = document.getElementById("debriefLink");
   link.style.display = "";
   const ov = document.getElementById("debriefOverlay");
+
+  const dt = DEBRIEF_TEXT[TASK] || DEFAULT_DEBRIEF;
+  document.getElementById("debriefSub").textContent = dt.sub;
+  document.getElementById("debriefQ1").textContent = dt.q[0];
+  document.getElementById("debriefQ2").textContent = dt.q[1];
+  document.getElementById("debriefQ3").textContent = dt.q[2];
 
   link.addEventListener("click", () => {
     setStep(3);
@@ -533,6 +565,9 @@ async function loadScenario() {
     if (!text) return;
     document.getElementById("taskBody").textContent = text;
     const ov = document.getElementById("taskOverlay");
+    // #taskOverlay's z-index sits above the task bar, so its dark backdrop dims the bar the
+    // same way it dims everything else — first landing or a later re-open via 📋 Task, no
+    // special-cased bar styling needed.
     const openFull = () => ov.classList.add("open");
     const closeFull = () => ov.classList.remove("open");
     ov.addEventListener("click", (e) => { if (e.target === ov) closeFull(); });
