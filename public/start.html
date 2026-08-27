@@ -44,6 +44,8 @@
           <option value="studytool">Study tool</option>
           <option value="sd">SD affordability</option>
           <option value="relocation">Relocation</option>
+          <option value="userchoice">User choice</option>
+          <option value="demo">Demo (classic flow)</option>
         </select>
       </div>
     </div>
@@ -82,16 +84,29 @@
 const $ = (id) => document.getElementById(id);
 const overlay = $("overlay");
 
+// "userchoice" is per-participant — its saved text is keyed by pid, not shared globally
+// like the other tasks, so it needs a pid entered before it can be viewed or saved.
+function isPerParticipant() { return $("task").value === "userchoice"; }
+
 // Open the editor for the selected task's instruction (server = source of truth).
 let modalDefault = "";
 async function showTask() {
   const sel = $("task");
   const label = sel.options[sel.selectedIndex].text;
   $("modalStatus").textContent = "";
-  try {
-    const r = await (await fetch("/api/scenario?task=" + encodeURIComponent(sel.value))).json();
-    modalDefault = r.default || "";
+  const pid = $("pid").value.trim();
+  if (isPerParticipant() && !pid) {
+    $("modalStatus").textContent = "⚠️ enter a participant ID first — this task is saved per participant";
+    overlay.classList.add("open");
     $("modalTitle").textContent = label;
+    $("modalText").value = "";
+    return;
+  }
+  try {
+    const url = "/api/scenario?task=" + encodeURIComponent(sel.value) + (isPerParticipant() ? "&pid=" + encodeURIComponent(pid) : "");
+    const r = await (await fetch(url)).json();
+    modalDefault = r.default || "";
+    $("modalTitle").textContent = isPerParticipant() ? `${label} — ${pid}` : label;
     $("modalText").value = r.text || "";
     $("modalStatus").textContent = r.custom ? "showing your saved version" : "showing the default";
     overlay.classList.add("open");
@@ -99,11 +114,13 @@ async function showTask() {
 }
 async function saveTask() {
   const sel = $("task");
+  const pid = $("pid").value.trim();
+  if (isPerParticipant() && !pid) { $("modalStatus").textContent = "⚠️ enter a participant ID first"; return; }
   $("modalStatus").textContent = "saving…";
   try {
     await fetch("/api/scenario/save", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task: sel.value, text: $("modalText").value }),
+      body: JSON.stringify({ task: sel.value, text: $("modalText").value, pid: isPerParticipant() ? pid : undefined }),
     });
     overlay.classList.remove("open"); // close on save
   } catch (_) { $("modalStatus").textContent = "⚠️ save failed"; }

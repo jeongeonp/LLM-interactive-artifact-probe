@@ -55,6 +55,39 @@
   .task-modal h2 { margin:0 0 10px; font-size:18px; color:var(--accent); }
   .task-modal .body { white-space:pre-wrap; }
   .task-modal button { margin-top:18px; padding:10px 18px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  .task-modal button.secondary { background:#efe9df; color:var(--text); margin-left:8px; }
+  .refl-modal { background:var(--panel); border-radius:14px; padding:24px 26px; width:480px; max-width:94vw; max-height:86vh; overflow:auto; }
+  .refl-modal h2 { margin:0 0 4px; font-size:16px; color:var(--accent); }
+  .refl-modal .sub { color:#8a857c; font-size:12px; margin-bottom:14px; }
+  .refl-q { margin:0 0 14px; }
+  .refl-q label.qtitle { display:block; font-weight:600; font-size:13px; }
+  .refl-q .your-query { background:#faf5ee; border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:13px; white-space:pre-wrap; color:#5c5750; max-height:220px; overflow-y:auto; }
+  .refl-modal button { padding:9px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+
+  /* -- Persistent task bar (structured-flow) — a full-width colored strip, always visible,
+     pairing the task button with a plain-language description of the current step. -- */
+  #taskBar { display:none; align-items:center; gap:12px; padding:10px 16px; background:#e8bd94; position:relative; z-index:15; }
+  #taskBarBtn { padding:6px 14px; border:1px solid rgba(0,0,0,.12); border-radius:8px; background:rgba(255,255,255,.55); color:#5c3a1e; font-size:13px; font-weight:600; cursor:pointer; flex:0 0 auto; }
+  #taskBarBtn:hover { background:#fff; }
+  #stepBadge { font-size:14px; font-weight:700; color:#4a2c10; }
+
+  /* -- Reflection: a dark backdrop like the debrief modal, but centered within the ARTIFACT
+     side specifically (not the whole screen) — dims the chat side too, since the artifact
+     pane behind the panel is what's meant to hold attention here. Answered verbally, no
+     typed input beyond reading the question and moving on. -- */
+  .overlay.right-side { left:42%; } /* matches #chat's width, so this centers over #artifactPane */
+  .refl-q-text { font-size:15px; margin:0 0 14px; line-height:1.5; }
+  .refl-q-text .qlabel { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#8a857c; margin-bottom:3px; }
+
+  /* Minimal placeholder trigger for the researcher to move to debrief — provisional until
+     there's a real end-of-task mechanism (the old "End task" button was removed). */
+  #debriefLink { font-size:11px; color:#b3ac9f; text-decoration:underline; cursor:pointer; margin-left:auto; }
+
+  /* -- Full-page conclusion screen (step 3), replaces the small inline "done" text -- */
+  #concludePage { display:none; flex:1; align-items:center; justify-content:center; text-align:center; padding:40px; }
+  #concludePage.open { display:flex; }
+  #concludePage h2 { color:var(--accent); font-size:22px; margin:0 0 10px; }
+  #concludePage p { color:#8a857c; max-width:440px; }
 </style>
 </head>
 <body>
@@ -62,6 +95,15 @@
   <b>Probe for Sensemaking</b>
   <span class="who" id="who"></span>
 </header>
+<!-- Persistent task bar (structured-flow) — the task/scenario itself never changes within a
+     session; the button opens the full text. The bold text next to it is a plain-language
+     description of the current step (ask -> explore -> reflect loop) — separate concept
+     from the task itself, updated as the participant moves through the flow. -->
+<div id="taskBar">
+  <button id="taskBarBtn" type="button">📋 Task</button>
+  <span id="stepBadge"></span>
+  <span id="debriefLink">End task</span>
+</div>
 <div id="floaters">
   <button id="taskBtn" class="floater" style="display:none">📋 Task</button>
   <button id="dsToggle" class="floater" style="display:none"></button>
@@ -81,7 +123,40 @@
     <button id="dataClose">Close</button>
   </div>
 </div>
-<main>
+<!-- Experimental structured-flow step: shown while the next artifact is generating, so the
+     wait is spent reflecting on the round just finished instead of watching a spinner.
+     Answered VERBALLY to the researcher — no inputs here, just the questions to read and a
+     Continue button. Centered within the artifact side specifically (not the whole screen),
+     with the rest dimmed, so attention lands on the artifact-plus-reflection pairing.
+     See STRUCTURED_FLOW below. -->
+<div class="overlay right-side" id="reflOverlay">
+  <div class="refl-modal" id="reflCard">
+    <h2>Quick reflection</h2>
+    <div class="sub">Your artifact is generating in the background — talk through these with the researcher while you wait.</div>
+    <div class="refl-q">
+      <label class="qtitle">Your query:</label>
+      <div class="your-query" id="reflYourQuery"></div>
+    </div>
+    <p class="refl-q-text" id="reflEngagementQ"><span class="qlabel">Q1</span>How did you engage with the artifact you just explored? (glimpse / read closely / dug into "why" / asked a follow-up / switched between artifacts)</p>
+    <p class="refl-q-text"><span class="qlabel">Q2</span>How did you come up with the question you just asked?</p>
+    <p class="refl-q-text"><span class="qlabel">Q3</span>What are you expecting to see from this new prompt?</p>
+    <button type="button" id="reflContinue">Continue</button>
+  </div>
+</div>
+<!-- Debrief is the concluding step (not part of the repeating ask/reflect loop), so unlike
+     reflCard above it's shown as a centered modal with a backdrop — matches the wireframe's
+     "2.2" frame. No inputs here either — still answered verbally. -->
+<div class="overlay" id="debriefOverlay">
+  <div class="refl-modal" id="debriefCard">
+    <h2>It's time to debrief</h2>
+    <div class="sub">You're going to debrief to Maya! Talk through these with the researcher.</div>
+    <p class="refl-q-text"><span class="qlabel">Q1</span>How did you end up choosing what to focus on?</p>
+    <p class="refl-q-text"><span class="qlabel">Q2</span>Why did you choose that over the others?</p>
+    <p class="refl-q-text"><span class="qlabel">Q3</span>Why are you interested in learning more about this?</p>
+    <button type="button" id="debriefDone">Done</button>
+  </div>
+</div>
+<main id="mainArea">
   <section id="chat">
     <div id="log"></div>
     <div id="composer">
@@ -94,6 +169,12 @@
     <div id="tabs"></div>
     <iframe id="artifact" sandbox="allow-scripts" title="artifact"></iframe>
   </section>
+  <section id="concludePage">
+    <div>
+      <h2>You're all done</h2>
+      <p>Thanks for your time — your session and debrief have been recorded. You can close this tab now.</p>
+    </div>
+  </section>
 </main>
 
 <script>
@@ -104,6 +185,10 @@ const COND = params.get("cond") || "interactive";
 const TASK = params.get("task") || "";
 const DATASET = TASK; // dataset key is the task name
 const TEXT_MODE = COND === "text"; // no artifacts — plain chat only
+// Structured flow (ask -> explore -> reflect -> debrief) is the default for every task
+// except "demo", which always stays on the classic flow (still gets the section-tagging
+// prompt rule, since that lives server-side and applies to every task regardless).
+const STRUCTURED_FLOW = TASK !== "demo";
 document.getElementById("who").textContent = `pid: ${PID} · ${TASK || "—"} · ${COND}`;
 if (TEXT_MODE) {
   const ap = document.getElementById("artifactPane");
@@ -242,6 +327,79 @@ async function restoreHistory() {
   } catch (_) {}
 }
 
+// ---- Structured-flow reflection + debrief (experimental, feature-flagged) -----------------
+function postReflect(type, data) {
+  fetch("/api/reflect", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pid: PID, cond: COND, task: TASK, type, data }),
+  });
+}
+
+// Round counter for the ask -> explore -> reflect loop — distinct from TASK (the scenario,
+// which never changes within a session). Logged with each reflection.
+let roundNum = 0;
+
+// Plain-language step description next to the task button — which phase of the loop the
+// participant is currently in. Separate concept from the task itself.
+const STEP_TEXT = {
+  1: "Step 1: Ask a question and explore the artifact that is generated!",
+  2: "Step 2: Let's reflect on the previous steps",
+  3: "Step 3: Time to debrief with Maya!",
+};
+function setStep(n) {
+  document.getElementById("stepBadge").textContent = STEP_TEXT[n];
+}
+setStep(1);
+
+// Shows the reflection card and resolves once the participant clicks Continue. Meant to run
+// concurrently with the /api/chat fetch for the NEXT artifact, so the wait isn't dead time.
+// No inputs — these are answered out loud to the researcher, not typed in.
+function showReflection(prevArtifactIndex, queryText) {
+  return new Promise((resolve) => {
+    const ov = document.getElementById("reflOverlay");
+    document.getElementById("reflYourQuery").textContent = queryText || "";
+    // First round has no prior artifact to reflect on — hide that question.
+    document.getElementById("reflEngagementQ").style.display = prevArtifactIndex >= 0 ? "" : "none";
+    roundNum += 1;
+    setStep(2);
+    ov.classList.add("open");
+    const onContinue = () => {
+      const data = { round: roundNum, artifactIndex: prevArtifactIndex >= 0 ? prevArtifactIndex + 1 : null };
+      postReflect("artifact_reflection_shown", data); // answered verbally — logs that it was shown, not an answer
+      document.getElementById("reflContinue").removeEventListener("click", onContinue);
+      ov.classList.remove("open");
+      setStep(1);
+      resolve(data);
+    };
+    document.getElementById("reflContinue").addEventListener("click", onContinue);
+  });
+}
+
+// "End task" — small, deliberately low-emphasis text link (not a loud button) that opens the
+// debrief modal at any point. All 3 questions shown together on one screen — no paging.
+function initDebrief() {
+  if (!STRUCTURED_FLOW) return;
+  const link = document.getElementById("debriefLink");
+  link.style.display = "";
+  const ov = document.getElementById("debriefOverlay");
+
+  link.addEventListener("click", () => {
+    setStep(3);
+    ov.classList.add("open");
+  });
+
+  document.getElementById("debriefDone").addEventListener("click", () => {
+    postReflect("task_debrief_shown", { round: roundNum }); // answered verbally — no typed data
+    ov.classList.remove("open");
+    // Full-page conclusion, replacing chat + artifact panes entirely rather than a small
+    // inline message — matches the "concluding page" step in the wireframe.
+    document.getElementById("chat").style.display = "none";
+    document.getElementById("artifactPane").style.display = "none";
+    document.getElementById("concludePage").classList.add("open");
+    if (currentAbort) currentAbort.abort();
+  });
+}
+
 // ---- Chat turn -----------------------------------------------------------
 let currentAbort = null; // set while a reply is generating; the Send button becomes Stop
 
@@ -277,7 +435,11 @@ async function send() {
 
   const controller = new AbortController();
   currentAbort = controller;
-  try {
+  // Captured before this round's artifact (if any) arrives — the reflection question below
+  // is about the round the participant just finished, not the one currently generating.
+  const prevArtifactIdx = artifacts.length - 1;
+
+  async function runFetch() {
     const r = await fetch("/api/chat", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages, pid: PID, cond: COND, task: TASK }),
@@ -307,6 +469,15 @@ async function send() {
     }
     if (!data) throw new Error("No response received");
     if (data.error) throw new Error(data.error);
+    return data;
+  }
+
+  try {
+    // Fire the request now; if this is the structured-flow condition and there's a
+    // previous artifact, show the reflection form at the same time so generation isn't dead time.
+    const fetchPromise = runFetch();
+    if (STRUCTURED_FLOW && !TEXT_MODE) await showReflection(prevArtifactIdx, content);
+    const data = await fetchPromise;
     messages.push({ role: "assistant", content: data.text });
     // Show prose (strip the html code fence from the chat view) and render the artifact.
     const prose = data.text.replace(/```html[\s\S]*?```/gi, "").trim();
@@ -358,16 +529,29 @@ inputEl.addEventListener("keydown", (e) => {
 // Task/scenario shown to the participant (set from the launcher).
 async function loadScenario() {
   try {
-    const { text } = await (await fetch("/api/scenario?task=" + encodeURIComponent(TASK))).json();
+    const { text } = await (await fetch("/api/scenario?task=" + encodeURIComponent(TASK) + "&pid=" + encodeURIComponent(PID))).json();
     if (!text) return;
     document.getElementById("taskBody").textContent = text;
     const ov = document.getElementById("taskOverlay");
-    document.getElementById("taskBtn").style.display = "";
-    const open = () => ov.classList.add("open");
-    document.getElementById("taskBtn").addEventListener("click", open);
-    document.getElementById("taskClose").addEventListener("click", () => ov.classList.remove("open"));
-    ov.addEventListener("click", (e) => { if (e.target === ov) ov.classList.remove("open"); });
-    open();
+    const openFull = () => ov.classList.add("open");
+    const closeFull = () => ov.classList.remove("open");
+    ov.addEventListener("click", (e) => { if (e.target === ov) closeFull(); });
+
+    if (STRUCTURED_FLOW) {
+      // Same "Your task" modal as the default flow uses for first landing (white card,
+      // dark backdrop, "Got it — begin" button). The persistent task bar is already showing
+      // underneath before the modal opens, so dismissing it doesn't pop in new UI — the
+      // background stays consistent the whole time, just uncovered.
+      document.getElementById("taskBarBtn").addEventListener("click", openFull);
+      document.getElementById("taskBar").style.display = "flex";
+      document.getElementById("taskClose").addEventListener("click", closeFull);
+      openFull();
+    } else {
+      document.getElementById("taskClose").addEventListener("click", closeFull);
+      document.getElementById("taskBtn").style.display = "";
+      document.getElementById("taskBtn").addEventListener("click", openFull);
+      openFull();
+    }
     postLog({ type: "scenario_shown", detail: { chars: text.length } });
   } catch (_) {}
 }
@@ -403,11 +587,12 @@ async function loadDatasets() {
   } catch (_) {}
 }
 
-postLog({ type: "session_start", detail: { ua: navigator.userAgent } });
+postLog({ type: "session_start", detail: { ua: navigator.userAgent, flow: STRUCTURED_FLOW ? "structured" : "default" } });
 loadScenario();
 loadDatasets();
 restoreHistory();
 restoreArtifacts();
+initDebrief();
 </script>
 </body>
 </html>

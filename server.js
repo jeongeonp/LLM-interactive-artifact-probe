@@ -74,7 +74,9 @@ Aim to surprise, not to play it safe — a forgettable dashboard of tabs and car
 
 When you create an interactive artifact, output it as a SINGLE, SELF-CONTAINED HTML document inside exactly ONE \`\`\`html code fence. It MUST NOT load any external scripts, styles, fonts, images, or data — inline all CSS and JavaScript, vanilla HTML/CSS/JS only (canvas and inline SVG are encouraged). Give it a descriptive <title>. Make it genuinely interactive so the student can play with it. Keep any prose reply outside the code fence brief.
 
-Hard rule: NEVER refer to an artifact you have not actually written in this same reply — no "play with the simulator below," "explore the case file below," "the tool above lets you...", or similar, unless the \`\`\`html code fence for it is genuinely present in this message. If web search (or anything else) has used up your attention and you're tempted to wrap up with only a description, stop and actually write the code fence instead — a real artifact always outranks a longer or more thorough-sounding text summary.`;
+Hard rule: NEVER refer to an artifact you have not actually written in this same reply — no "play with the simulator below," "explore the case file below," "the tool above lets you...", or similar, unless the \`\`\`html code fence for it is genuinely present in this message. If web search (or anything else) has used up your attention and you're tempted to wrap up with only a description, stop and actually write the code fence instead — a real artifact always outranks a longer or more thorough-sounding text summary.
+
+Minor bookkeeping, does not affect design: if the artifact you'd naturally build ends up with multiple distinct content sections (e.g. separate topics, comparison groups, or steps), wrap each one in \`<section data-sm-section="Short Label">...</section>\` using whatever labels fit. Skip this entirely for single-view artifacts (a simulation, a single diagram, a canvas scene) that don't have separate parts.`;
 
 const STATIC_TAIL = `
 
@@ -82,7 +84,9 @@ Put depth into visual artifacts, not into long chat messages. Keep the chat repl
 
 Be creative and varied with artifact formats — match the format to the idea, and do NOT default to plain tables and bullet lists. Prefer rich STATIC visuals: annotated diagrams, infographics, labeled charts and figures, comparison layouts, timelines, maps, and illustrations. The student reads and looks at the artifact — they do NOT manipulate it.
 
-When you create an artifact, output it as a SINGLE, SELF-CONTAINED HTML document inside exactly ONE \`\`\`html code fence. It MUST NOT load any external scripts, styles, fonts, images, or data — inline all CSS and inline SVG. Give it a descriptive <title>. It MUST be STATIC and non-interactive: it must not respond to any user input — no clickable elements, buttons, sliders, inputs, hover effects, drag, tabs, or animations triggered by interaction. Prefer inline SVG and CSS for all visuals. If you use JavaScript at all, it may ONLY render the visual once on page load; it must never respond to user actions. Keep any prose reply outside the code fence brief.`;
+When you create an artifact, output it as a SINGLE, SELF-CONTAINED HTML document inside exactly ONE \`\`\`html code fence. It MUST NOT load any external scripts, styles, fonts, images, or data — inline all CSS and inline SVG. Give it a descriptive <title>. It MUST be STATIC and non-interactive: it must not respond to any user input — no clickable elements, buttons, sliders, inputs, hover effects, drag, tabs, or animations triggered by interaction. Prefer inline SVG and CSS for all visuals. If you use JavaScript at all, it may ONLY render the visual once on page load; it must never respond to user actions. Keep any prose reply outside the code fence brief.
+
+Minor bookkeeping, does not affect design: if the artifact ends up with multiple distinct content sections (e.g. separate topics, comparison groups, or steps), wrap each one in \`<section data-sm-section="Short Label">...</section>\` using whatever labels fit. Skip this entirely for a single unified visual with no separate parts.`;
 
 const TEXT_TAIL = `
 
@@ -94,6 +98,8 @@ const systemFor = (cond) =>
 // Task → scenario shown to the participant (and the dataset key is the task name).
 const SCENARIOS = {
   practice: ``,
+  userchoice: ``, // per-participant task — researcher fills this in per pid via start.html, not shared globally
+  demo: ``, // always uses the classic (non-structured) flow — see STRUCTURED_FLOW in index.html
   studytool: `Jasmine is starting her freshman year in college this fall. She has ADHD, and in high school her note-taking results were pretty inconsistent. Some classes she kept up fine with a notebook, in others she felt scattered regardless of what she tried.
 
 She's read that people with attention difficulties sometimes do better taking notes on a tablet, since it's faster to reorganize and easier to keep pace with a fast-talking professor. But she's also read that people with ADHD are often more prone to getting pulled off task by the same kind of device (e.g. notifications, other apps, the temptation to switch tabs), which could just as easily cancel out any benefit.
@@ -357,22 +363,28 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// Scenario shown to a participant — determined by the task.
+// "userchoice" is a per-participant task: each pid gets their own researcher-entered
+// scenario text rather than one shared across all sessions, so it's stored under a
+// pid-scoped key instead of the plain task name. Every other task is unaffected.
+const scenarioKey = (task, pid) => (task === "userchoice" && pid ? `userchoice:${pid}` : task);
+
+// Scenario shown to a participant — determined by the task (and, for "userchoice", the pid).
 // Returns the task instruction shown to participants: the researcher-saved text
 // if one exists, otherwise the built-in default. `custom` flags which is in use,
 // `default` carries the built-in so the editor can offer "reset to default".
 app.get("/api/scenario", async (req, res) => {
   const task = String(req.query.task || "");
-  const saved = await getScenario(task);
+  const pid = req.query.pid ? String(req.query.pid) : null;
+  const saved = await getScenario(scenarioKey(task, pid));
   const def = SCENARIOS[task] ?? null;
   res.json({ text: saved ?? def, default: def, custom: saved != null });
 });
 
-// Save (or clear) the researcher-edited instruction for a task.
+// Save (or clear) the researcher-edited instruction for a task (or a task+pid, for "userchoice").
 app.post("/api/scenario/save", async (req, res) => {
-  const { task, text } = req.body || {};
+  const { task, text, pid } = req.body || {};
   if (!task) return res.status(400).json({ error: "task required" });
-  await setScenario(task, String(text ?? ""));
+  await setScenario(scenarioKey(task, pid), String(text ?? ""));
   res.json({ ok: true });
 });
 app.get("/api/dataset", (req, res) => res.json(datasetFiles(req.query.dataset)));
@@ -388,6 +400,15 @@ app.post("/api/log", (req, res) => {
     type: event?.type ?? null,
     data: { detail: event?.detail ?? null, artifact: event?.artifact ?? null, clientTs: event?.clientTs ?? null },
   });
+  res.json({ ok: true });
+});
+
+// Structured reflection / debrief data from the reworked step-by-step flow (experimental —
+// see the `structured-flow` branch). Kept as its own `kind` so it's easy to pull apart from
+// chat turns and raw telemetry in review.html.
+app.post("/api/reflect", (req, res) => {
+  const { pid, cond, task, type, data } = req.body || {};
+  logEvent({ pid, cond, task, kind: "reflection", type: type ?? null, data: data ?? null });
   res.json({ ok: true });
 });
 
