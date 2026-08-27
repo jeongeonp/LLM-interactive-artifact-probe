@@ -64,7 +64,9 @@ Answer the student's actual question directly and substantively. Lead with the a
 
 The artifact always comes first — that rule below is not optional.
 
-Present everything — in the chat and inside artifacts — as confident, settled information. Do NOT add verification badges, "unconfirmed," "verify directly," confidence/source icons, or any other meta-commentary about how certain you are. If you can't confirm a specific detail, simply leave it out rather than flagging the gap — never surface your own uncertainty to the student.`;
+Present everything — in the chat and inside artifacts — as confident, settled information. Do NOT add verification badges, "unconfirmed," "verify directly," confidence/source icons, or any other meta-commentary about how certain you are. If you can't confirm a specific detail, simply leave it out rather than flagging the gap — never surface your own uncertainty to the student.
+
+Only reach for web search when the question genuinely calls for it — real people's opinions, sentiment, personal experiences, or anything time-sensitive that your own knowledge could be stale or thin on (e.g. "what do people say about X," "how do reviewers feel about Y"). For questions you can answer well from what you already know — how something works, established facts, history, definitions, straightforward comparisons of well-known things — just answer directly and skip the search. Searching when it isn't needed only slows down getting the student their artifact.`;
 
 const INTERACTIVE_TAIL = `
 
@@ -227,6 +229,25 @@ const safePid = (pid) => String(pid || "anon").replace(/[^a-zA-Z0-9_-]/g, "_");
 const extractArtifacts = (text) =>
   [...text.matchAll(/```html\s*([\s\S]*?)```/gi)].map((m) => m[1].trim()).filter(Boolean);
 
+// Validate the JS inside a generated artifact by attempting to compile (not execute) each
+// inline <script> block. Catches the recurring "stray escaped quote" class of bug — the
+// artifact is well-formed HTML end to end (not truncated), but a single bad escape (e.g.
+// \\' instead of \') breaks the ENTIRE script silently, with nothing clickable and no error
+// visible to the participant. This is also invisible to the js_error telemetry in
+// index.html, since that's a RUNTIME listener injected after the artifact's own script —
+// a parse-time SyntaxError fires before that listener even exists to catch it.
+function findArtifactJsError(html) {
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const [, code] of scripts) {
+    try {
+      new Function(code);
+    } catch (e) {
+      return e.message;
+    }
+  }
+  return null;
+}
+
 // Save each interactive artifact as a standalone, re-openable .html file + a DB record.
 async function saveArtifacts(text, pid, cond, task) {
   for (const html of extractArtifacts(text)) {
@@ -342,6 +363,42 @@ app.post("/api/chat", async (req, res) => {
       console.log(`[retry response] ${retryText.length} chars · usage: ${JSON.stringify(retryMsg.usage)}`);
       text = text + "\n\n" + retryText;
     }
+
+    // Self-heal #2: the artifact fence is present, but its JS doesn't even parse (the
+    // recurring stray-escape bug) — silently ask for a corrected version rather than
+    // shipping a "looks fine, nothing works" artifact to the participant.
+    let jsFixed = false;
+    if (expectsArtifact) {
+      const arts = extractArtifacts(text);
+      const lastArt = arts[arts.length - 1];
+      const jsError = lastArt ? findArtifactJsError(lastArt) : null;
+      if (jsError) {
+        jsFixed = true;
+        console.log(`[retry] artifact JS fails to parse (${jsError}) — retrying once`);
+        sendChunk({ phase: "retrying" });
+        const fixStream = client.messages.stream(
+          {
+            model: MODEL,
+            max_tokens: MAX_TOKENS,
+            system,
+            messages: [
+              ...messages,
+              { role: "assistant", content: text },
+              {
+                role: "user",
+                content: `The artifact's JavaScript has a syntax error and won't run at all for the student: "${jsError}". Rewrite the complete, corrected artifact — check every string for stray or double-escaped quotes. Output only the fixed \`\`\`html code fence, nothing else.`,
+              },
+            ],
+          },
+          { signal: ac.signal }
+        );
+        wirePhaseEvents(fixStream);
+        const fixMsg = await fixStream.finalMessage();
+        const fixText = fixMsg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+        console.log(`[retry response] ${fixText.length} chars · usage: ${JSON.stringify(fixMsg.usage)}`);
+        text = text + "\n\n" + fixText;
+      }
+    }
     console.log(`${"─".repeat(60)}\n`);
 
     logEvent({
@@ -350,7 +407,7 @@ app.post("/api/chat", async (req, res) => {
       task,
       kind: "chat",
       type: "turn",
-      data: { user: messages?.[messages.length - 1]?.content ?? null, assistant: text, usage: msg.usage, retried_after_search: retried || undefined },
+      data: { user: messages?.[messages.length - 1]?.content ?? null, assistant: text, usage: msg.usage, retried_after_search: retried || undefined, js_fixed: jsFixed || undefined },
     });
     await saveArtifacts(text, pid, cond, task);
     sendChunk({ done: true, text });

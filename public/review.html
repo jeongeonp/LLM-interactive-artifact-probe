@@ -19,10 +19,16 @@
            font-weight:700; font-size:15px; display:flex; align-items:baseline; gap:8px;
            border-bottom:1px solid var(--line); cursor:pointer; user-select:none; }
   .phead:hover { background:#e7e0d2; }
+  /* Nested groups inside "Other sessions" get a slightly different, more muted tone so
+     they read as a distinct tier from the main study pids at a glance. */
+  .subgroups .phead { background:#e9e4f0; }
+  .subgroups .phead:hover { background:#ded6e8; }
   .phead .caret { font-size:10px; color:#8a857c; transition:transform .12s; display:inline-block; }
   .pgroup.collapsed .phead .caret { transform:rotate(-90deg); }
   .pgroup.collapsed .pitem { display:none; }
+  .pgroup.collapsed .subgroups { display:none; }
   .phead .n { font-weight:500; font-size:11px; color:#8a857c; margin-left:auto; }
+  .phead .pdate { font-weight:500; font-size:11px; color:#a39c8f; }
   .pitem { padding:9px 14px 9px 16px; border-bottom:1px solid var(--line); cursor:pointer;
            border-left:3px solid transparent; }
   .pitem:last-child { border-bottom:0; }
@@ -49,8 +55,17 @@
   .bubble { padding:9px 12px; border-radius:10px; white-space:pre-wrap; }
   .msg.user .bubble { background:#efe9df; }
   .msg.assistant .bubble { background:var(--panel); border:1px solid var(--line); }
-  .fullview .msg { max-width:820px; }
-  .full-artifact-frame { width:100%; max-width:820px; height:480px; border:1px solid var(--line); border-radius:10px; background:#fff; margin:0 0 16px; display:block; }
+  /* Full view: side-by-side like the live participant interface — chat on the left,
+     scrollable; a tabbed artifact pane on the right showing one artifact at a time. */
+  .fullview { display:flex; gap:14px; align-items:flex-start; height:74vh; }
+  .fv-chat { flex:0 0 42%; min-width:280px; height:100%; overflow-y:auto; padding-right:6px; }
+  .fv-art { flex:1; min-width:0; height:100%; display:flex; flex-direction:column; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel); }
+  .fv-tabs { display:flex; gap:5px; padding:6px 8px; overflow-x:auto; background:#faf7f2; border-bottom:1px solid var(--line); flex:none; }
+  .fv-tabs:empty { display:none; }
+  .fv-tab { flex:0 0 auto; padding:5px 11px; border:1px solid var(--line); border-radius:7px; background:#f2efe8; font-size:12px; cursor:pointer; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+  .fv-tab:hover { border-color:var(--accent); }
+  .fv-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .fv-frame { flex:1; width:100%; border:0; background:#fff; }
   .artmark { margin:10px 0; color:var(--accent); font-size:13px; font-weight:600; }
   .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:14px; overflow:hidden; }
   .card .hd { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); font-size:13px; }
@@ -89,6 +104,7 @@
 const side = document.getElementById("side");
 const detail = document.getElementById("detail");
 const fmt = t => t ? new Date(t).toLocaleString() : "";
+const mmdd = t => { if (!t) return ""; const d = new Date(t); return `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`; };
 let active = null;
 
 async function loadSide() {
@@ -109,7 +125,7 @@ async function loadSide() {
     // only a known set gets a specific color; anything else uses the generic pill
     return /^cond-(interactive|static|text|textonly|none)$/.test(k) ? k : "cond";
   };
-  side.innerHTML = [...groups.entries()].map(([key, sess]) => {
+  const renderGroup = ([key, sess]) => {
     const aggregated = sess.some(r => (r.pid ?? "anon") !== key); // test* holds many pids
     const items = sess.map(r => {
       const pid = r.pid ?? "anon";
@@ -126,13 +142,25 @@ async function loadSide() {
     // Keep the active participants (P6–P9) expanded; collapse everything else by default.
     const openByDefault = /^p[6-9]$/i.test(key);
     return `<div class="pgroup${openByDefault ? "" : " collapsed"}">
-      <div class="phead"><span class="caret">▼</span>${key}<span class="n">${sess.length} session${sess.length > 1 ? "s" : ""}</span></div>
+      <div class="phead"><span class="caret">▼</span>${key}<span class="pdate">${mmdd(sess[0]?.first_ts)}</span><span class="n">${sess.length} session${sess.length > 1 ? "s" : ""}</span></div>
       ${items}
     </div>`;
-  }).join("");
+  };
+  // Split into the current study's pids (I* / S* — interactive / static naming convention)
+  // and everything else (test*, older P# pids, ...). The "everything else" bucket is real
+  // data, still fully reachable — just nested one level deeper under its own collapsed
+  // section so it's out of the way instead of cluttering the main list.
+  const studyEntries = [], otherEntries = [];
+  for (const entry of groups.entries()) (/^[is]/i.test(entry[0]) ? studyEntries : otherEntries).push(entry);
+  const otherSection = otherEntries.length ? `
+    <div class="pgroup collapsed" id="otherSection">
+      <div class="phead"><span class="caret">▼</span>Other sessions<span class="n">${otherEntries.length} pid${otherEntries.length > 1 ? "s" : ""}</span></div>
+      <div class="subgroups">${otherEntries.map(renderGroup).join("")}</div>
+    </div>` : "";
+  side.innerHTML = studyEntries.map(renderGroup).join("") + otherSection;
   // Click a participant header to collapse/expand its sessions.
   side.querySelectorAll(".phead").forEach(h =>
-    h.addEventListener("click", () => h.parentElement.classList.toggle("collapsed")));
+    h.addEventListener("click", (e) => { e.stopPropagation(); h.parentElement.classList.toggle("collapsed"); }));
   side.querySelectorAll(".pitem").forEach(el =>
     el.addEventListener("click", () => selectPid(
       decodeURIComponent(el.dataset.pid),
@@ -204,40 +232,69 @@ function renderTranscript(events) {
   return box;
 }
 
-// Reconstructs the conversation the way the participant actually saw it: chat bubbles
-// with each artifact rendered inline, live, right where it was created — no separate
-// fetches, no /api/log calls, purely from the events already loaded for this session.
+// Reconstructs the conversation the way the participant actually saw it: chat transcript
+// on the left, a tabbed artifact pane on the right (one tab per artifact, in creation
+// order) — same side-by-side layout as the live interface, not a linear scroll. Purely
+// from the events already loaded for this session — no separate fetches, no /api/log calls.
 function renderFull(events) {
-  const box = document.createElement("div");
-  box.className = "fullview";
+  const wrap = document.createElement("div");
+  wrap.className = "fullview";
+  const chatCol = document.createElement("div");
+  chatCol.className = "fv-chat";
+  const artCol = document.createElement("div");
+  artCol.className = "fv-art";
+  const tabsEl = document.createElement("div");
+  tabsEl.className = "fv-tabs";
+  const frame = document.createElement("iframe");
+  frame.sandbox = "allow-scripts"; // read-only replay — no telemetry script injected
+  frame.className = "fv-frame";
+  artCol.append(tabsEl, frame);
+  wrap.append(chatCol, artCol);
+
   const fenceRe = /```html\s*([\s\S]*?)```/gi;
+  const artifacts = []; // { html, title }
+  const showArtifact = (i) => {
+    frame.srcdoc = artifacts[i].html;
+    tabsEl.querySelectorAll(".fv-tab").forEach((t, ti) => t.classList.toggle("active", ti === i));
+  };
+  const addTab = (i) => {
+    const tab = document.createElement("div");
+    tab.className = "fv-tab";
+    tab.textContent = artifacts[i].title || `Artifact ${i + 1}`;
+    tab.addEventListener("click", () => showArtifact(i));
+    tabsEl.appendChild(tab);
+  };
+  const titleOf = (html) => {
+    const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    return m ? m[1].trim().slice(0, 22) : null;
+  };
+
   for (const e of events) {
     if (e.kind !== "chat") continue;
     const u = e.data?.user;
     if (u != null) {
       const ub = el(`<div class="msg user"><div class="role">user · ${fmt(e.ts)}</div><div class="bubble"></div></div>`).firstChild;
       ub.querySelector(".bubble").textContent = typeof u === "string" ? u : JSON.stringify(u);
-      box.appendChild(ub);
+      chatCol.appendChild(ub);
     }
     const raw = e.data?.assistant || "";
     const prose = raw.replace(fenceRe, "").trim();
     const ab = el(`<div class="msg assistant"><div class="role">assistant</div><div class="bubble"></div></div>`).firstChild;
-    ab.querySelector(".bubble").textContent = prose;
-    box.appendChild(ab);
+    ab.querySelector(".bubble").textContent = prose || "(built an artifact →)";
+    chatCol.appendChild(ab);
     fenceRe.lastIndex = 0;
     let m;
     while ((m = fenceRe.exec(raw))) {
       const html = m[1].trim();
       if (!html) continue;
-      const frame = document.createElement("iframe");
-      frame.sandbox = "allow-scripts"; // read-only replay — no telemetry script injected
-      frame.className = "full-artifact-frame";
-      frame.srcdoc = html;
-      box.appendChild(frame);
+      artifacts.push({ html, title: titleOf(html) });
+      addTab(artifacts.length - 1);
     }
   }
-  if (!box.children.length) box.innerHTML = '<p class="muted">No conversation.</p>';
-  return box;
+  if (artifacts.length) showArtifact(artifacts.length - 1);
+  else artCol.innerHTML = '<p class="muted">No artifact in this session.</p>';
+  if (!chatCol.children.length) chatCol.innerHTML = '<p class="muted">No conversation.</p>';
+  return wrap;
 }
 
 function renderArtifacts(arts) {
