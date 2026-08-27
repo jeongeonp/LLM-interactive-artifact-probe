@@ -59,6 +59,11 @@
   .refl-modal { background:var(--panel); border-radius:14px; padding:24px 26px; width:480px; max-width:94vw; max-height:86vh; overflow:auto; }
   .refl-modal h2 { margin:0 0 4px; font-size:16px; color:var(--accent); }
   .refl-modal .sub { color:#8a857c; font-size:12px; margin-bottom:14px; }
+  /* Debrief: the intro prompt is the main thing — the numbered questions are just optional
+     help if the participant gets stuck, so they're styled smaller/lighter than in reflCard. */
+  #debriefCard .sub { color:var(--text); font-size:16px; line-height:1.5; margin-bottom:20px; white-space:pre-wrap; }
+  #debriefCard .refl-q-text { font-size:13px; color:#8a857c; margin:0 0 10px; }
+  #debriefCard .refl-q-text .qlabel { color:#b3ac9f; }
   .refl-q { margin:0 0 14px; }
   .refl-q label.qtitle { display:block; font-weight:600; font-size:13px; }
   .refl-q .your-query { background:#faf5ee; border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:13px; white-space:pre-wrap; color:#5c5750; max-height:220px; overflow-y:auto; }
@@ -81,7 +86,7 @@
      typed input beyond reading the question and moving on. -- */
   .overlay.right-side { left:42%; } /* matches #chat's width, so this centers over #artifactPane */
   .refl-q-text { font-size:15px; margin:0 0 14px; line-height:1.5; }
-  .refl-q-text .qlabel { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#8a857c; margin-bottom:3px; }
+  .refl-q-text .qlabel { display:inline; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#8a857c; margin-right:7px; }
 
   /* Minimal placeholder trigger for the researcher to move to debrief — provisional until
      there's a real end-of-task mechanism (the old "End task" button was removed). */
@@ -167,9 +172,11 @@
   <div class="refl-modal" id="debriefCard">
     <h2>It's time to debrief</h2>
     <div class="sub" id="debriefSub"></div>
-    <p class="refl-q-text"><span class="qlabel">Q1</span><span id="debriefQ1"></span></p>
-    <p class="refl-q-text"><span class="qlabel">Q2</span><span id="debriefQ2"></span></p>
-    <p class="refl-q-text"><span class="qlabel">Q3</span><span id="debriefQ3"></span></p>
+    <div id="debriefQs">
+      <p class="refl-q-text"><span class="qlabel">Q1</span><span id="debriefQ1"></span></p>
+      <p class="refl-q-text"><span class="qlabel">Q2</span><span id="debriefQ2"></span></p>
+      <p class="refl-q-text"><span class="qlabel">Q3</span><span id="debriefQ3"></span></p>
+    </div>
     <button type="button" id="debriefDone">Done</button>
   </div>
 </div>
@@ -392,26 +399,31 @@ function showReflection(prevArtifactIndex, queryText) {
   });
 }
 
-// Debrief intro + questions are scenario-specific — "debrief to Maya" only makes sense for
-// the relocation task. Falls back to generic wording for every other task until it's given
-// its own entry here.
+// Debrief intro + questions are scenario-specific — the intro is the main ask (debrief
+// freely to the scenario's character, or to the researchers), the numbered questions are
+// just optional help if the participant gets stuck, styled smaller/lighter for that reason.
+// Tasks with no `q` entries skip the questions block entirely.
 const DEBRIEF_TEXT = {
   relocation: {
-    sub: "You're going to debrief to Maya! Talk through these with the researcher.",
+    sub: "Now that you've done your research, you are going to tell Maya what you have found and your thoughts/suggestions.\n\nDebrief in your own words, and if you need, refer to the questions below.",
     q: [
-      "How did you end up choosing what to focus on?",
-      "Why did you choose that over the others?",
-      "Why are you interested in learning more about this?",
+      "Which city and town did you lean more towards, and why?",
+      "What are some things Maya should consider?",
+      "What other research would you have wanted to do but didn't have time to?",
+    ],
+  },
+  studytool: {
+    sub: "Now that you've done your research, you are going to tell Jasmine what you have found and your thoughts/suggestions.\n\nDebrief in your own words, and if you need, refer to the questions below.",
+    q: [
+      "Should Jasmine get a tablet or stick with paper and pen, and why?",
+      "What are some things Jasmine should consider?",
+      "What other research would you have wanted to do but didn't have time to?",
     ],
   },
 };
 const DEFAULT_DEBRIEF = {
-  sub: "It's time to debrief. Talk through these with the researcher.",
-  q: [
-    "How did you end up choosing what to focus on?",
-    "Why did you choose that over the others?",
-    "Why are you interested in learning more about this?",
-  ],
+  sub: 'Now that you’ve done your research, you are going to tell us (the researchers) what you have found and your thoughts/suggestions as if you are "presenting" in front of a class or your colleagues.',
+  q: [],
 };
 
 // "End task" — small, deliberately low-emphasis text link (not a loud button) that opens the
@@ -424,9 +436,10 @@ function initDebrief() {
 
   const dt = DEBRIEF_TEXT[TASK] || DEFAULT_DEBRIEF;
   document.getElementById("debriefSub").textContent = dt.sub;
-  document.getElementById("debriefQ1").textContent = dt.q[0];
-  document.getElementById("debriefQ2").textContent = dt.q[1];
-  document.getElementById("debriefQ3").textContent = dt.q[2];
+  document.getElementById("debriefQs").style.display = dt.q.length ? "" : "none";
+  document.getElementById("debriefQ1").textContent = dt.q[0] || "";
+  document.getElementById("debriefQ2").textContent = dt.q[1] || "";
+  document.getElementById("debriefQ3").textContent = dt.q[2] || "";
 
   link.addEventListener("click", () => {
     setStep(3);
