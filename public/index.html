@@ -120,6 +120,16 @@
     <button id="taskClose">Got it — begin</button>
   </div>
 </div>
+<!-- "userchoice" task, blank the first time this pid's link is opened: lets the researcher
+     type the participant's task directly on this page rather than needing start.html. -->
+<div class="overlay" id="userChoiceOverlay">
+  <div class="task-modal">
+    <h2>Enter this participant's task</h2>
+    <div class="body" style="margin-bottom:10px; color:#8a857c; font-size:13px;">This is a per-participant task — write what this pid should be asked to explore, then Save. Saved instantly, reusable if this link is reopened.</div>
+    <textarea id="userChoiceText" rows="8" style="width:100%; padding:11px; border:1px solid var(--line); border-radius:8px; font:inherit; font-size:14px; line-height:1.5; resize:vertical;"></textarea>
+    <button id="userChoiceSave">Save &amp; begin</button>
+  </div>
+</div>
 <div class="overlay" id="dataOverlay">
   <div class="task-modal">
     <h2 id="dataTitle">Dataset</h2>
@@ -561,10 +571,41 @@ inputEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!currentAbort) send(); }
 });
 
+// Shows the researcher-facing "type the task in live" editor for a blank "userchoice"
+// link and resolves once they Save. Doesn't touch session_start (already logged at page
+// load) — this only delays when the participant's own task-reading clock starts, same as
+// any researcher taking a moment before handing the device over for a normal task.
+function promptUserChoiceText() {
+  return new Promise((resolve) => {
+    const ov = document.getElementById("userChoiceOverlay");
+    const ta = document.getElementById("userChoiceText");
+    ov.classList.add("open");
+    ta.focus();
+    document.getElementById("userChoiceSave").addEventListener("click", async function onSave() {
+      const text = ta.value.trim();
+      if (!text) return;
+      await fetch("/api/scenario/save", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: TASK, text, pid: PID }),
+      });
+      postLog({ type: "userchoice_task_entered", detail: { chars: text.length } });
+      document.getElementById("userChoiceSave").removeEventListener("click", onSave);
+      ov.classList.remove("open");
+      resolve(text);
+    });
+  });
+}
+
 // Task/scenario shown to the participant (set from the launcher).
 async function loadScenario() {
   try {
-    const { text } = await (await fetch("/api/scenario?task=" + encodeURIComponent(TASK) + "&pid=" + encodeURIComponent(PID))).json();
+    const r = await (await fetch("/api/scenario?task=" + encodeURIComponent(TASK) + "&pid=" + encodeURIComponent(PID))).json();
+    let text = r.text;
+    let justEntered = false;
+    if (TASK === "userchoice" && !text) {
+      text = await promptUserChoiceText();
+      justEntered = true;
+    }
     if (!text) return;
     document.getElementById("taskBody").textContent = text;
     const ov = document.getElementById("taskOverlay");
@@ -583,12 +624,14 @@ async function loadScenario() {
       document.getElementById("taskBarBtn").addEventListener("click", openFull);
       document.getElementById("taskBar").style.display = "flex";
       document.getElementById("taskClose").addEventListener("click", closeFull);
-      openFull();
+      // Skip the extra recap modal right after they just typed it themselves — go straight
+      // into Step 1 instead of showing "Your task" a second time in a row.
+      if (!justEntered) openFull();
     } else {
       document.getElementById("taskClose").addEventListener("click", closeFull);
       document.getElementById("taskBtn").style.display = "";
       document.getElementById("taskBtn").addEventListener("click", openFull);
-      openFull();
+      if (!justEntered) openFull();
     }
     postLog({ type: "scenario_shown", detail: { chars: text.length } });
   } catch (_) {}
