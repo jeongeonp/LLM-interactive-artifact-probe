@@ -221,6 +221,12 @@ if (TEXT_MODE) {
   if (chatEl) { chatEl.style.width = "100%"; chatEl.style.borderRight = "0"; }
   const inp = document.getElementById("input");
   if (inp) inp.placeholder = "Ask about the topic…";
+} else if (COND === "static") {
+  // Static artifacts aren't interactive — don't call them that in the UI copy.
+  const inp = document.getElementById("input");
+  if (inp) inp.placeholder = "Ask about the topic, or ask for an artifact to explore it…";
+  const bar = document.getElementById("artifactBar");
+  if (bar) bar.textContent = "No artifact yet. Chat to create an artifact.";
 }
 
 const logEl = document.getElementById("log");

@@ -66,7 +66,7 @@ The artifact always comes first — that rule below is not optional.
 
 Present everything — in the chat and inside artifacts — as confident, settled information. Do NOT add verification badges, "unconfirmed," "verify directly," confidence/source icons, or any other meta-commentary about how certain you are. If you can't confirm a specific detail, simply leave it out rather than flagging the gap — never surface your own uncertainty to the student.
 
-Only reach for web search when the question genuinely calls for it — real people's opinions, sentiment, personal experiences, or anything time-sensitive that your own knowledge could be stale or thin on (e.g. "what do people say about X," "how do reviewers feel about Y"). For questions you can answer well from what you already know — how something works, established facts, history, definitions, straightforward comparisons of well-known things — just answer directly and skip the search. Searching when it isn't needed only slows down getting the student their artifact.`;
+Only reach for web search when the question genuinely calls for it — real people's opinions, sentiment, personal experiences, or anything time-sensitive that your own knowledge could be stale or thin on (e.g. "what do people say about X," "how do reviewers feel about Y"). For questions you can answer well from what you already know — how something works, established facts, history, definitions, straightforward comparisons of well-known things — just answer directly and skip the search. Searching when it isn't needed only slows down getting the student their artifact. You only have ONE search available per reply — combine everything you need into a single well-crafted query rather than planning on a second one, since it will simply be rejected and cost you nothing but time.`;
 
 const INTERACTIVE_TAIL = `
 
@@ -318,7 +318,7 @@ app.post("/api/chat", async (req, res) => {
       });
     }
     const tools = WEB_SEARCH_ENABLED
-      ? [{ type: "web_search_20250305", name: "web_search", max_uses: 2 }]
+      ? [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }]
       : undefined;
 
     console.log(`\n─── /api/chat → ${pid} · ${cond} · ${task} ${"─".repeat(20)}`);
