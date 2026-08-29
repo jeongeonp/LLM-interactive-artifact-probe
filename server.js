@@ -282,21 +282,30 @@ app.post("/api/chat", async (req, res) => {
   // Wire phase-detection listeners onto one message stream: a "searching" phase when a
   // web_search tool block starts, "writing" when text starts, "artifact" the first time
   // the accumulating text contains an opening ```html fence.
+  let lastPhase = "thinking";
   const wirePhaseEvents = (stream) => {
     let sawArtifactPhase = false;
     stream.on("streamEvent", (event) => {
       const b = event?.content_block;
       if (event?.type !== "content_block_start" || !b) return;
-      if (b.type === "server_tool_use" && b.name === "web_search") sendChunk({ phase: "searching" });
-      else if (b.type === "text") sendChunk({ phase: "writing" });
+      if (b.type === "server_tool_use" && b.name === "web_search") sendChunk({ phase: (lastPhase = "searching") });
+      else if (b.type === "text") sendChunk({ phase: (lastPhase = "writing") });
     });
     stream.on("text", (_delta, snapshot) => {
       if (!sawArtifactPhase && snapshot.includes("```html")) {
         sawArtifactPhase = true;
-        sendChunk({ phase: "artifact" });
+        sendChunk({ phase: (lastPhase = "artifact") });
       }
     });
   };
+
+  // Keep-alive: between phase transitions (e.g. a long web-search deliberation before any
+  // text starts), the NDJSON stream can otherwise sit silent for 60-90+ seconds. That's long
+  // enough for iOS Safari's own stream-idle handling (or an intermediate proxy) to decide the
+  // connection stalled and kill it — surfacing as "Load failed" / "No response received" for
+  // the participant with no server-side error at all. Re-sending the current phase every 12s
+  // keeps bytes flowing without changing anything the client does with them.
+  const heartbeat = setInterval(() => sendChunk({ phase: lastPhase }), 12000);
 
   try {
     const system = [{ type: "text", text: systemFor(cond), cache_control: { type: "ephemeral" } }];
@@ -417,6 +426,8 @@ app.post("/api/chat", async (req, res) => {
     console.error(e);
     sendChunk({ error: String(e?.message || e) });
     if (!res.writableEnded) res.end();
+  } finally {
+    clearInterval(heartbeat);
   }
 });
 
