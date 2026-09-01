@@ -153,16 +153,21 @@
   <div class="refl-modal" id="reflCard">
     <h2>Quick reflection</h2>
     <div class="sub">Your artifact is generating in the background — talk through these with the researcher while you wait.</div>
+    <div id="reflKnowledgeQ">
+      <p class="refl-q-text"><span class="qlabel">Q1</span>How much do you already know about this topic?</p>
+    </div>
     <div id="reflEngagementQ">
       <p class="refl-q-text"><span class="qlabel">Q1</span>How did you engage with the artifact? (e.g., only glimpsed through the bar chart but looked deeply into topic X)</p>
       <p class="refl-q-text"><span class="qlabel">Q2</span>Did the artifact confirm, add to, or reorganize what you knew?</p>
     </div>
-    <div class="refl-q">
-      <label class="qtitle">Your prompt:</label>
-      <div class="your-query" id="reflYourQuery"></div>
+    <div id="reflPromptSection">
+      <div class="refl-q">
+        <label class="qtitle">Your prompt:</label>
+        <div class="your-query" id="reflYourQuery"></div>
+      </div>
+      <p class="refl-q-text"><span class="qlabel">Q3</span>How did you come up with the question you just asked?</p>
+      <p class="refl-q-text"><span class="qlabel">Q4</span>What are you expecting to see from this new prompt?</p>
     </div>
-    <p class="refl-q-text"><span class="qlabel">Q3</span>How did you come up with the question you just asked?</p>
-    <p class="refl-q-text"><span class="qlabel">Q4</span>What are you expecting to see from this new prompt?</p>
     <button type="button" id="reflContinue">Continue</button>
   </div>
 </div>
@@ -390,18 +395,43 @@ function showReflection(prevArtifactIndex, queryText) {
   return new Promise((resolve) => {
     const ov = document.getElementById("reflOverlay");
     document.getElementById("reflYourQuery").textContent = queryText || "";
-    // First round has no prior artifact to reflect on — hide that question.
-    document.getElementById("reflEngagementQ").style.display = prevArtifactIndex >= 0 ? "" : "none";
+    document.getElementById("reflPromptSection").style.display = "";
+    // First round has no prior artifact to reflect on — ask about existing topic
+    // knowledge instead of engagement, since there's no artifact yet to engage with.
+    const hasPrev = prevArtifactIndex >= 0;
+    document.getElementById("reflKnowledgeQ").style.display = hasPrev ? "none" : "";
+    document.getElementById("reflEngagementQ").style.display = hasPrev ? "" : "none";
     roundNum += 1;
     setStep(2);
     ov.classList.add("open");
     const onContinue = () => {
-      const data = { round: roundNum, artifactIndex: prevArtifactIndex >= 0 ? prevArtifactIndex + 1 : null };
+      const data = { round: roundNum, artifactIndex: hasPrev ? prevArtifactIndex + 1 : null };
       postReflect("artifact_reflection_shown", data); // answered verbally — logs that it was shown, not an answer
       document.getElementById("reflContinue").removeEventListener("click", onContinue);
       ov.classList.remove("open");
       setStep(1);
       resolve(data);
+    };
+    document.getElementById("reflContinue").addEventListener("click", onContinue);
+  });
+}
+
+// Shown when "End task" is clicked, right before the debrief modal — just the engagement
+// questions (Q1/Q2) about whatever artifact they were last looking at. No prompt/Q3/Q4:
+// there's no next prompt at this point, the task is ending.
+function showEndTaskReflection(lastArtifactIndex) {
+  return new Promise((resolve) => {
+    if (lastArtifactIndex < 0) { resolve(); return; } // nothing was ever generated — skip
+    const ov = document.getElementById("reflOverlay");
+    document.getElementById("reflKnowledgeQ").style.display = "none";
+    document.getElementById("reflEngagementQ").style.display = "";
+    document.getElementById("reflPromptSection").style.display = "none";
+    ov.classList.add("open");
+    const onContinue = () => {
+      postReflect("artifact_reflection_shown", { round: roundNum, artifactIndex: lastArtifactIndex + 1, endTask: true });
+      document.getElementById("reflContinue").removeEventListener("click", onContinue);
+      ov.classList.remove("open");
+      resolve();
     };
     document.getElementById("reflContinue").addEventListener("click", onContinue);
   });
@@ -449,7 +479,11 @@ function initDebrief() {
   document.getElementById("debriefQ2").textContent = dt.q[1] || "";
   document.getElementById("debriefQ3").textContent = dt.q[2] || "";
 
-  link.addEventListener("click", () => {
+  link.addEventListener("click", async () => {
+    // Show the Q1/Q2 reflection on whatever artifact they were last looking at before
+    // moving into the debrief modal proper.
+    await showEndTaskReflection(artifacts.length - 1);
+
     // Only userchoice's task text is participant-authored and arbitrary — relocation/
     // studytool are fixed scenarios the researcher already knows, so skip the reference
     // box there rather than clutter the modal.
