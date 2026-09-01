@@ -62,6 +62,7 @@
   /* Debrief: the intro prompt is the main thing — the numbered questions are just optional
      help if the participant gets stuck, so they're styled smaller/lighter than in reflCard. */
   #debriefCard .sub { color:var(--text); font-size:16px; line-height:1.5; margin-bottom:20px; white-space:pre-wrap; }
+  #debriefTaskText { white-space:pre-wrap; font-size:13px; line-height:1.5; color:var(--text); background:#efe9df; border-radius:8px; padding:12px 14px; margin-bottom:18px; max-height:180px; overflow:auto; }
   #debriefCard .refl-q-text { font-size:13px; color:#8a857c; margin:0 0 10px; }
   #debriefCard .refl-q-text .qlabel { color:#b3ac9f; }
   .refl-q { margin:0 0 14px; }
@@ -171,6 +172,7 @@
 <div class="overlay" id="debriefOverlay">
   <div class="refl-modal" id="debriefCard">
     <h2>It's time to debrief</h2>
+    <div id="debriefTaskText"></div>
     <div class="sub" id="debriefSub"></div>
     <div id="debriefQs">
       <p class="refl-q-text"><span class="qlabel">Q1</span><span id="debriefQ1"></span></p>
@@ -448,6 +450,9 @@ function initDebrief() {
   document.getElementById("debriefQ3").textContent = dt.q[2] || "";
 
   link.addEventListener("click", () => {
+    // Populated here (not at init) since loadScenario's fetch may not have resolved yet
+    // when initDebrief runs.
+    document.getElementById("debriefTaskText").textContent = TASK_TEXT;
     setStep(3);
     ov.classList.add("open");
   });
@@ -615,7 +620,10 @@ function promptUserChoiceText() {
   });
 }
 
-// Task/scenario shown to the participant (set from the launcher).
+// Task/scenario shown to the participant (set from the launcher). Cached here so the debrief
+// modal can show it back for reference without a second fetch.
+let TASK_TEXT = "";
+
 async function loadScenario() {
   try {
     const r = await (await fetch("/api/scenario?task=" + encodeURIComponent(TASK) + "&pid=" + encodeURIComponent(PID))).json();
@@ -626,6 +634,7 @@ async function loadScenario() {
       justEntered = true;
     }
     if (!text) return;
+    TASK_TEXT = text;
     document.getElementById("taskBody").textContent = text;
     const ov = document.getElementById("taskOverlay");
     // #taskOverlay's z-index sits above the task bar, so its dark backdrop dims the bar the
