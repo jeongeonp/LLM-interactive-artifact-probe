@@ -450,9 +450,16 @@ function initDebrief() {
   document.getElementById("debriefQ3").textContent = dt.q[2] || "";
 
   link.addEventListener("click", () => {
-    // Populated here (not at init) since loadScenario's fetch may not have resolved yet
-    // when initDebrief runs.
-    document.getElementById("debriefTaskText").textContent = TASK_TEXT;
+    // Only userchoice's task text is participant-authored and arbitrary — relocation/
+    // studytool are fixed scenarios the researcher already knows, so skip the reference
+    // box there rather than clutter the modal.
+    const box = document.getElementById("debriefTaskText");
+    if (TASK === "userchoice") {
+      box.textContent = TASK_TEXT;
+      box.style.display = "";
+    } else {
+      box.style.display = "none";
+    }
     setStep(3);
     ov.classList.add("open");
   });
