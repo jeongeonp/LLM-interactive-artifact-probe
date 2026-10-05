@@ -152,13 +152,13 @@
 <div class="overlay right-side" id="reflOverlay">
   <div class="refl-modal" id="reflCard">
     <h2>Quick reflection</h2>
-    <div class="sub">Your artifact is generating in the background — talk through these with the researcher while you wait.</div>
+    <div class="sub" id="reflSub">Your artifact is generating in the background — talk through these with the researcher while you wait.</div>
     <div id="reflKnowledgeQ">
       <p class="refl-q-text"><span class="qlabel">Q1</span>How much do you already know about this topic?</p>
     </div>
     <div id="reflEngagementQ">
-      <p class="refl-q-text"><span class="qlabel">Q1</span>How did you engage with the artifact? (e.g., only glimpsed through the bar chart but looked deeply into topic X)</p>
-      <p class="refl-q-text"><span class="qlabel">Q2</span>Did the artifact confirm, add to, or reorganize what you knew?</p>
+      <p class="refl-q-text"><span class="qlabel">Q1</span><span id="reflEngQ1">How did you engage with the artifact? (e.g., only glimpsed through the bar chart but looked deeply into topic X)</span></p>
+      <p class="refl-q-text"><span class="qlabel">Q2</span><span id="reflEngQ2">Did the artifact confirm, add to, or reorganize what you knew?</span></p>
     </div>
     <div id="reflPromptSection">
       <div class="refl-q">
@@ -286,6 +286,26 @@ function postLog(event) {
   });
 }
 
+// ---- Timing events (all conditions). Each carries a client timestamp so the timeline
+// per turn is: prompt_started -> prompt_sent -> reply_received -> explore_started ->
+// explore_ended -> reflection_opened -> reflection_closed -> ... -> end-task / debrief.
+// "Explore" means reading/using the reply: the artifact for interactive/static, the
+// chat reply itself for text. Kept separate from artifact telemetry (no iframe needed).
+function logTiming(type, detail = {}) {
+  postLog({ type, detail, clientTs: Date.now() });
+}
+let promptStartT = null; // first keystroke in the input box for the current turn
+let exploreStartT = null; // when the current reply became available to explore
+function startExplore() {
+  exploreStartT = Date.now();
+  logTiming("explore_started", {});
+}
+function endExplore(how) {
+  if (exploreStartT == null) return;
+  logTiming("explore_ended", { how, duration_ms: Date.now() - exploreStartT });
+  exploreStartT = null;
+}
+
 // Telemetry from the active artifact iframe — tagged with which tab is showing.
 window.addEventListener("message", (e) => {
   const d = e.data;
@@ -404,8 +424,16 @@ function showReflection(prevArtifactIndex, queryText) {
     roundNum += 1;
     setStep(2);
     ov.classList.add("open");
+    const shownAt = Date.now(); // this event is logged at Continue-click, not here — capture
+    // the true open time so duration_ms below reflects actual time on screen.
+    logTiming("reflection_opened", { round: roundNum });
     const onContinue = () => {
-      const data = { round: roundNum, artifactIndex: hasPrev ? prevArtifactIndex + 1 : null };
+      const data = {
+        round: roundNum,
+        artifactIndex: hasPrev ? prevArtifactIndex + 1 : null,
+        duration_ms: Date.now() - shownAt,
+      };
+      logTiming("reflection_closed", { round: roundNum, duration_ms: data.duration_ms });
       postReflect("artifact_reflection_shown", data); // answered verbally — logs that it was shown, not an answer
       document.getElementById("reflContinue").removeEventListener("click", onContinue);
       ov.classList.remove("open");
@@ -427,8 +455,17 @@ function showEndTaskReflection(lastArtifactIndex) {
     document.getElementById("reflEngagementQ").style.display = "";
     document.getElementById("reflPromptSection").style.display = "none";
     ov.classList.add("open");
+    const shownAt = Date.now();
+    logTiming("reflection_opened", { round: roundNum, endTask: true });
     const onContinue = () => {
-      postReflect("artifact_reflection_shown", { round: roundNum, artifactIndex: lastArtifactIndex + 1, endTask: true });
+      const duration_ms = Date.now() - shownAt;
+      logTiming("reflection_closed", { round: roundNum, endTask: true, duration_ms });
+      postReflect("artifact_reflection_shown", {
+        round: roundNum,
+        artifactIndex: lastArtifactIndex + 1,
+        endTask: true,
+        duration_ms,
+      });
       document.getElementById("reflContinue").removeEventListener("click", onContinue);
       ov.classList.remove("open");
       resolve();
@@ -472,6 +509,8 @@ function initDebrief() {
   link.style.display = "";
   const ov = document.getElementById("debriefOverlay");
 
+  let debriefShownAt = null; // captured when the modal opens, used to log duration_ms on Done
+
   const dt = DEBRIEF_TEXT[TASK] || DEFAULT_DEBRIEF;
   document.getElementById("debriefSub").textContent = dt.sub;
   document.getElementById("debriefQs").style.display = dt.q.length ? "" : "none";
@@ -480,9 +519,11 @@ function initDebrief() {
   document.getElementById("debriefQ3").textContent = dt.q[2] || "";
 
   link.addEventListener("click", async () => {
-    // Show the Q1/Q2 reflection on whatever artifact they were last looking at before
-    // moving into the debrief modal proper.
-    await showEndTaskReflection(artifacts.length - 1);
+    logTiming("end_task_clicked", {});
+    endExplore("end_task");
+    // Show the Q1/Q2 reflection on whatever they were last looking at (artifact, or the
+    // last reply in the text condition) before moving into the debrief modal proper.
+    await showEndTaskReflection(TEXT_MODE ? messages.filter((m) => m.role === "assistant").length - 1 : artifacts.length - 1);
 
     // Only userchoice's task text is participant-authored and arbitrary — relocation/
     // studytool are fixed scenarios the researcher already knows, so skip the reference
@@ -496,10 +537,13 @@ function initDebrief() {
     }
     setStep(3);
     ov.classList.add("open");
+    debriefShownAt = Date.now();
+    logTiming("debrief_opened", {});
   });
 
   document.getElementById("debriefDone").addEventListener("click", () => {
-    postReflect("task_debrief_shown", { round: roundNum }); // answered verbally — no typed data
+    logTiming("debrief_closed", { duration_ms: debriefShownAt ? Date.now() - debriefShownAt : null });
+    postReflect("task_debrief_shown", { round: roundNum, duration_ms: debriefShownAt ? Date.now() - debriefShownAt : null }); // answered verbally — no typed data
     ov.classList.remove("open");
     // Full-page conclusion, replacing chat + artifact panes entirely rather than a small
     // inline message — matches the "concluding page" step in the wireframe.
@@ -516,6 +560,10 @@ let currentAbort = null; // set while a reply is generating; the Send button bec
 async function send() {
   const content = inputEl.value.trim();
   if (!content) return;
+  const sentAt = Date.now();
+  logTiming("prompt_sent", { chars: content.length, compose_ms: promptStartT != null ? sentAt - promptStartT : null });
+  promptStartT = null;
+  endExplore("next_prompt"); // leaving the previous reply/artifact
   inputEl.value = "";
   const userBubble = addBubble("user", content);
   messages.push({ role: "user", content });
@@ -547,7 +595,10 @@ async function send() {
   currentAbort = controller;
   // Captured before this round's artifact (if any) arrives — the reflection question below
   // is about the round the participant just finished, not the one currently generating.
-  const prevArtifactIdx = artifacts.length - 1;
+  // Text condition has no artifacts, so "previous item" is the previous assistant reply.
+  const prevArtifactIdx = TEXT_MODE
+    ? messages.filter((m) => m.role === "assistant").length - 1
+    : artifacts.length - 1;
 
   async function runFetch() {
     const r = await fetch("/api/chat", {
@@ -586,13 +637,17 @@ async function send() {
     // Fire the request now; if this is the structured-flow condition and there's a
     // previous artifact, show the reflection form at the same time so generation isn't dead time.
     const fetchPromise = runFetch();
-    if (STRUCTURED_FLOW && !TEXT_MODE) await showReflection(prevArtifactIdx, content);
+    if (STRUCTURED_FLOW) await showReflection(prevArtifactIdx, content);
     const data = await fetchPromise;
+    logTiming("reply_received", { latency_ms: Date.now() - sentAt });
     messages.push({ role: "assistant", content: data.text });
     // Show prose (strip the html code fence from the chat view) and render the artifact.
     const prose = data.text.replace(/```html[\s\S]*?```/gi, "").trim();
     pending.textContent = prose || (TEXT_MODE ? data.text.trim() : "(built an artifact →)");
-    if (!TEXT_MODE && !renderArtifact(data.text)) {
+    if (TEXT_MODE) startExplore(); // the reply itself is what they explore
+    const rendered = !TEXT_MODE && renderArtifact(data.text);
+    if (rendered) startExplore();
+    if (!TEXT_MODE && !rendered) {
       const truncated = /```html/i.test(data.text); // opening fence but no complete block = cut off
       // The model sometimes describes an artifact ("play with the simulator below") without
       // ever writing the code fence — different bug from truncation, so flag it distinctly.
@@ -632,6 +687,18 @@ async function send() {
 
 // One button: Send when idle, Stop (cancel) while a reply is generating.
 sendBtn.addEventListener("click", () => { if (currentAbort) currentAbort.abort(); else send(); });
+
+// prompt_started = first keystroke of the turn (compose time = prompt_sent - this).
+inputEl.addEventListener("input", () => {
+  if (promptStartT == null && inputEl.value.trim()) { promptStartT = Date.now(); logTiming("prompt_started", {}); }
+});
+
+// Text condition: the reflection copy should refer to the reply, not an artifact (between-subjects).
+if (TEXT_MODE) {
+  document.getElementById("reflSub").textContent = "Your reply is being written — talk through these with the researcher while you wait.";
+  document.getElementById("reflEngQ1").textContent = "How did you engage with the reply? (e.g., only skimmed the overview but looked deeply into topic X)";
+  document.getElementById("reflEngQ2").textContent = "Did the reply confirm, add to, or reorganize what you knew?";
+}
 inputEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!currentAbort) send(); }
 });
