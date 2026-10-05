@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, chatEvents, allScenarios, getCodes, setCode } = await import(DB_BACKEND);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ART_DIR = path.join(__dirname, "data", "artifacts");
@@ -21,6 +21,7 @@ app.get("/", (req, res, next) => {
   if (req.query.pid) return res.sendFile(path.join(__dirname, "public", "index.html"));
   res.redirect("/start.html");
 });
+app.get("/artifact-review", (req, res) => res.sendFile(path.join(__dirname, "public", "artifact-review.html")));
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -277,6 +278,7 @@ app.post("/api/chat", async (req, res) => {
   // same shape the client relied on when this was a single JSON response.
   res.setHeader("Content-Type", "application/x-ndjson");
   res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no"); // tell any proxy in front not to buffer the stream
   const sendChunk = (obj) => { if (!res.writableEnded) res.write(JSON.stringify(obj) + "\n"); };
 
   // Wire phase-detection listeners onto one message stream: a "searching" phase when a
@@ -303,9 +305,9 @@ app.post("/api/chat", async (req, res) => {
   // text starts), the NDJSON stream can otherwise sit silent for 60-90+ seconds. That's long
   // enough for iOS Safari's own stream-idle handling (or an intermediate proxy) to decide the
   // connection stalled and kill it — surfacing as "Load failed" / "No response received" for
-  // the participant with no server-side error at all. Re-sending the current phase every 12s
+  // the participant with no server-side error at all. Re-sending the current phase every 5s
   // keeps bytes flowing without changing anything the client does with them.
-  const heartbeat = setInterval(() => sendChunk({ phase: lastPhase }), 12000);
+  const heartbeat = setInterval(() => sendChunk({ phase: lastPhase }), 5000);
 
   try {
     const system = [{ type: "text", text: systemFor(cond), cache_control: { type: "ephemeral" } }];
@@ -514,6 +516,57 @@ app.get("/api/artifacts", async (req, res) => {
       return { id: r.id, ts: r.ts, pid: r.pid, cond: r.cond, task: r.task, seq: d.seq, file: d.file, chars: d.chars };
     });
   res.json(rows);
+});
+
+// ---- Researcher: cross-participant artifact gallery (/artifact-review) ------
+// One payload for the whole gallery: every study-task artifact (no HTML), the prompt that
+// produced it, per-pid userchoice scenarios, and researcher type codes. Reads only artifact
+// + chat + scenario docs (never telemetry), cached for a few minutes. Any artifact file not
+// on this machine's disk is materialized from the HTML we just read, so the gallery's many
+// thumbnails hit the static files instead of the per-pid self-heal path (a full pid scan each).
+const REVIEW_TASKS = new Set(["relocation", "studytool", "userchoice"]);
+const isStudyPid = (pid) => /^[IST]\d+$/i.test(String(pid || ""));
+let _reviewCache = null; // { t, v }
+app.get("/api/artifact-review", async (req, res) => {
+  if (_reviewCache && Date.now() - _reviewCache.t < 5 * 60 * 1000 && !req.query.fresh) return res.json(_reviewCache.v);
+  const parse = (r) => (typeof r.data === "string" ? JSON.parse(r.data || "{}") : r.data || {});
+  const keep = (r) => isStudyPid(r.pid) && REVIEW_TASKS.has(r.task);
+  const [arts, chats, scen] = await Promise.all([artifactEvents(), chatEvents(), allScenarios()]);
+  // Chat turns per session, oldest first — an artifact's prompt is the last turn logged before it.
+  const turns = new Map();
+  for (const c of chats.filter(keep)) {
+    const k = `${c.pid}|${c.cond}|${c.task}`;
+    if (!turns.has(k)) turns.set(k, []);
+    const u = parse(c).user;
+    turns.get(k).push({ ts: c.ts, user: typeof u === "string" ? u : u == null ? "" : JSON.stringify(u) });
+  }
+  for (const list of turns.values()) list.sort((a, b) => (a.ts < b.ts ? -1 : 1));
+  const artifacts = arts.filter(keep).map((r) => {
+    const d = parse(r);
+    if (d.html && d.file) {
+      const abs = path.join(__dirname, "data", d.file);
+      if (!fs.existsSync(abs)) {
+        fs.mkdirSync(path.dirname(abs), { recursive: true });
+        fs.writeFileSync(abs, d.html);
+      }
+    }
+    const title = ((d.html || "").match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1]?.trim() || null;
+    const prior = (turns.get(`${r.pid}|${r.cond}|${r.task}`) || []).filter((t) => t.ts <= r.ts);
+    return { pid: r.pid, cond: r.cond, task: r.task, seq: d.seq, file: d.file, chars: d.chars, ts: r.ts, title, prompt: prior.at(-1)?.user ?? null };
+  });
+  const scenarios = { relocation: scen.relocation ?? SCENARIOS.relocation, studytool: scen.studytool ?? SCENARIOS.studytool, userchoice: {} };
+  for (const [k, v] of Object.entries(scen)) if (k.startsWith("userchoice:")) scenarios.userchoice[k.slice(11)] = v;
+  const v = { artifacts, scenarios };
+  _reviewCache = { t: Date.now(), v };
+  res.json(v);
+});
+app.get("/api/artifact-codes", async (req, res) => res.json(await getCodes()));
+app.post("/api/artifact-codes", async (req, res) => {
+  const { key, tags, note } = req.body || {};
+  if (!key) return res.status(400).json({ error: "key required" });
+  const clean = [...new Set((Array.isArray(tags) ? tags : []).map((t) => String(t).trim().toLowerCase()).filter(Boolean))];
+  await setCode(key, { tags: clean, note: String(note ?? "") });
+  res.json({ ok: true, tags: clean });
 });
 
 app.get("/api/export.json", async (req, res) => {
