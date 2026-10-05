@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, chatEvents, allScenarios, getCodes, setCode } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode } = await import(DB_BACKEND);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ART_DIR = path.join(__dirname, "data", "artifacts");
@@ -62,6 +62,8 @@ const WEB_SEARCH_ENABLED = true; // lets Claude pull real qualitative sources (R
 const BASE_PROMPT = `You are a research assistant helping a college student with sensemaking about a topic they are looking into.
 
 Answer the student's actual question directly and substantively. Lead with the answer — the key facts, findings, and main perspectives — and keep it concise. Do NOT assume they want to be taught or coached into figuring it out themselves: skip Socratic questioning, "what do you already know?" openers, research plans, "here's how to investigate this rigorously" trackers, self-tests, and long step-by-step checklists. Don't pad with caveats, meta-commentary, or process talk — just tell them what they asked.
+
+End with the answer itself. Do not offer follow-up questions, suggest next prompts, or ask whether the student wants more — no "Would you like…", "Want me to…", or "Next, you could…" closers. The student will ask what they want next.
 
 The artifact always comes first — that rule below is not optional.
 
@@ -526,12 +528,15 @@ app.get("/api/artifacts", async (req, res) => {
 // thumbnails hit the static files instead of the per-pid self-heal path (a full pid scan each).
 const REVIEW_TASKS = new Set(["relocation", "studytool", "userchoice"]);
 const isStudyPid = (pid) => /^[IST]\d+$/i.test(String(pid || ""));
+// Firestore can't regex-match, so query the exact study pids (I1–I60, S1–S60, T1–T60);
+// raise the cap if the study grows past it. Unused pids cost nothing beyond the query.
+const STUDY_PIDS = ["I", "S", "T"].flatMap((p) => Array.from({ length: 60 }, (_, i) => p + (i + 1)));
 let _reviewCache = null; // { t, v }
 app.get("/api/artifact-review", async (req, res) => {
   if (_reviewCache && Date.now() - _reviewCache.t < 5 * 60 * 1000 && !req.query.fresh) return res.json(_reviewCache.v);
   const parse = (r) => (typeof r.data === "string" ? JSON.parse(r.data || "{}") : r.data || {});
   const keep = (r) => isStudyPid(r.pid) && REVIEW_TASKS.has(r.task);
-  const [arts, chats, scen] = await Promise.all([artifactEvents(), chatEvents(), allScenarios()]);
+  const [arts, chats, scen] = await Promise.all([eventsForPids("artifact", STUDY_PIDS, [...REVIEW_TASKS]), eventsForPids("chat", STUDY_PIDS, [...REVIEW_TASKS]), allScenarios()]);
   // Chat turns per session, oldest first — an artifact's prompt is the last turn logged before it.
   const turns = new Map();
   for (const c of chats.filter(keep)) {
