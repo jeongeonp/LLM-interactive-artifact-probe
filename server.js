@@ -59,7 +59,7 @@ const WEB_SEARCH_ENABLED = true; // lets Claude pull real qualitative sources (R
 // fence despite claiming it did. Mitigated below with a silent one-shot retry (search disabled on the retry
 // call) for interactive/static turns that searched but produced no artifact — see the retry block in /api/chat.
 
-const BASE_PROMPT = `You are a research assistant for a college student looking into a topic to give a brief verbal overview to their professor and classmates in a week.
+const BASE_PROMPT = `You are a research assistant helping a college student with sensemaking about a topic they are looking into.
 
 Answer the student's actual question directly and substantively. Lead with the answer — the key facts, findings, and main perspectives — and keep it concise. Do NOT assume they want to be taught or coached into figuring it out themselves: skip Socratic questioning, "what do you already know?" openers, research plans, "here's how to investigate this rigorously" trackers, self-tests, and long step-by-step checklists. Don't pad with caveats, meta-commentary, or process talk — just tell them what they asked.
 
