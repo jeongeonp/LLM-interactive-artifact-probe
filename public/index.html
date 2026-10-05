@@ -399,7 +399,9 @@ let roundNum = 0;
 // Plain-language step description next to the task button — which phase of the loop the
 // participant is currently in. Separate concept from the task itself.
 const STEP_TEXT = {
-  1: "Step 1: Ask about the topic and explore the artifact that is generated!",
+  1: TEXT_MODE
+    ? "Step 1: Ask about the topic and read the reply!"
+    : "Step 1: Ask about the topic and explore the artifact that is generated!",
   2: "Step 2: Let's reflect on the previous steps",
   3: "Step 3: End of the task - time to debrief!",
 };
