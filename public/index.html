@@ -695,6 +695,9 @@ inputEl.addEventListener("input", () => {
 
 // Text condition: the reflection copy should refer to the reply, not an artifact (between-subjects).
 if (TEXT_MODE) {
+  // No artifact pane in text mode, so the reflection overlay should cover the full width
+  // instead of being centered over a hidden right-hand pane.
+  document.getElementById("reflOverlay").classList.remove("right-side");
   document.getElementById("reflSub").textContent = "Your reply is being written — talk through these with the researcher while you wait.";
   document.getElementById("reflEngQ1").textContent = "How did you engage with the reply? (e.g., only skimmed the overview but looked deeply into topic X)";
   document.getElementById("reflEngQ2").textContent = "Did the reply confirm, add to, or reorganize what you knew?";
