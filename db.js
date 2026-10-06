@@ -116,3 +116,22 @@ export function setScenario(task, text) {
      ON CONFLICT(task) DO UPDATE SET text = excluded.text, updated = excluded.updated`
   ).run(String(task ?? ""), text, new Date().toISOString());
 }
+
+// ---- Artifact review page (/artifact-review) -----------------------------
+db.exec(`CREATE TABLE IF NOT EXISTS artifact_codes_v2 (id TEXT PRIMARY KEY, data TEXT);`);
+export function eventsForPids(kind, pids, tasks) {
+  const want = new Set(pids);
+  return db.prepare("SELECT * FROM events WHERE kind = ? ORDER BY id").all(kind)
+    .filter((r) => want.has(r.pid) && (!tasks?.length || tasks.includes(r.task)));
+}
+export function allScenarios() {
+  return Object.fromEntries(db.prepare("SELECT task, text FROM scenarios").all().map((r) => [r.task, r.text ?? ""]));
+}
+export function getCodes() {
+  return Object.fromEntries(db.prepare("SELECT * FROM artifact_codes_v2").all().map((r) => [r.id, JSON.parse(r.data || "{}")]));
+}
+export function setCode(id, data) {
+  db.prepare(
+    `INSERT INTO artifact_codes_v2 (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data`
+  ).run(String(id), JSON.stringify({ ...data, updated: new Date().toISOString() }));
+}

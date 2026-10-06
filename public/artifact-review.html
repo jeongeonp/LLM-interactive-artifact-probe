@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Artifact Review</title>
+<style>
+  :root { --bg:#f7f6f2; --panel:#fff; --line:#e4e1d8; --accent:#b4622e; --text:#2a2725; --muted:#8a857c;
+          --int:#356b35; --int-bg:#e3f0e3; --sta:#8a5a2b; --sta-bg:#f3e8dc; --thumb:300px; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system,Segoe UI,Roboto,sans-serif; color:var(--text); background:var(--bg); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; align-items:center; gap:14px; padding:9px 16px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header b { color:var(--accent); }
+  header label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  header input[type=text] { width:230px; padding:4px 8px; border:1px solid var(--line); border-radius:6px; font:12px ui-monospace,Menlo,monospace; }
+  header a, .linkbtn { color:#6f6a61; font-size:13px; text-decoration:none; background:none; border:0; cursor:pointer; padding:0; }
+  header a:hover, .linkbtn:hover { color:var(--accent); }
+  .muted { color:var(--muted); }
+  main { display:flex; flex:1; min-height:0; }
+
+  /* ---- sidebar: the scenario × condition matrix is the primary navigation ---- */
+  #side { width:280px; flex:none; overflow-y:auto; border-right:1px solid var(--line); background:var(--panel); padding:14px; }
+  #side h3 { margin:16px 0 6px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+  #side h3:first-child { margin-top:0; }
+  table.mx { border-collapse:collapse; width:100%; font-size:12px; }
+  .mx th, .mx td { border:1px solid var(--line); padding:6px 5px; text-align:center; }
+  .mx th { background:#faf7f2; font-weight:600; color:#6f6a61; font-size:11px; }
+  .mx th.row { text-align:left; }
+  .mx td { cursor:pointer; font-variant-numeric:tabular-nums; }
+  .mx td b { font-size:14px; display:block; }
+  .mx td span { font-size:10px; color:var(--muted); }
+  .mx td:hover, .mx th.row:hover, .mx th.col:hover { background:#f2efe8; cursor:pointer; }
+  .mx td.on, .mx th.on { background:#efe9df; box-shadow:inset 0 0 0 2px var(--accent); }
+  .mx td.zero { color:#c9c3b8; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { padding:2px 9px; border:1px solid var(--line); border-radius:11px; font-size:11px; background:#f6f3ed; cursor:pointer; user-select:none; }
+  .chip:hover { border-color:var(--accent); }
+  .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .chip .n { color:var(--muted); margin-left:3px; }
+  .chip.on .n { color:#f3e2d6; }
+  table.tagtab { width:100%; border-collapse:collapse; font-size:12px; }
+  .tagtab td { padding:3px 4px; border-bottom:1px solid #f0ede6; }
+  .tagtab tr.scheme td { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:700; padding-top:10px; cursor:default; background:none !important; }
+  .tagtab tr.grp td:first-child { font-weight:600; }
+  .tagtab tr.item td:first-child { padding-left:14px; color:#5a564e; }
+  .progress { font-size:12px; margin-bottom:8px; }
+  .progress .bar { height:5px; background:#eee9df; border-radius:3px; overflow:hidden; margin-top:4px; }
+  .progress .bar i { display:block; height:100%; background:var(--accent); }
+  .tagtab td.num { text-align:right; font-variant-numeric:tabular-nums; width:34px; }
+  .tagtab tr { cursor:pointer; }
+  .tagtab tr:hover td { background:#f6f3ed; }
+  .tagtab tr.on td { background:#efe9df; font-weight:600; }
+  .tagtab th { font-size:10px; color:var(--muted); font-weight:600; text-align:right; padding:2px 4px; }
+  .tagtab th:first-child { text-align:left; }
+  .hint { font-size:11px; color:var(--muted); margin-top:6px; }
+
+  /* ---- gallery ---- */
+  #gallery { flex:1; overflow-y:auto; padding:16px 20px 60px; }
+  .tasksec { margin-bottom:34px; }
+  .tasksec > h2 { margin:0 0 6px; font-size:18px; display:flex; align-items:baseline; gap:10px; }
+  .tasksec > h2 .muted { font-size:13px; font-weight:400; }
+  details.scen { margin:0 0 12px; font-size:12px; color:#5a564e; max-width:900px; }
+  details.scen summary { cursor:pointer; color:var(--muted); }
+  details.scen div { white-space:pre-wrap; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:6px; }
+  .cols { display:grid; gap:18px; grid-template-columns:repeat(var(--ncols,2), minmax(0,1fr)); align-items:start; }
+  .colhd { position:sticky; top:-16px; z-index:2; padding:6px 10px; border-radius:8px; font-weight:700; font-size:13px; margin-bottom:10px; display:flex; gap:8px; align-items:baseline; }
+  .colhd.interactive { background:var(--int-bg); color:var(--int); }
+  .colhd.static { background:var(--sta-bg); color:var(--sta); }
+  .colhd.text { background:#ece7f2; color:#5b4b82; }
+  .colhd .n { font-weight:500; font-size:11px; opacity:.8; }
+  .pblock { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:12px; }
+  .pblock .ph { display:flex; align-items:baseline; gap:8px; margin-bottom:8px; font-size:13px; }
+  .pblock .ph b { font-size:14px; }
+  .pblock .ph a { margin-left:auto; font-size:12px; color:var(--accent); text-decoration:none; }
+  .uc { font-size:12px; background:#fdf6e9; border-left:3px solid #e0b46a; padding:6px 9px; border-radius:0 6px 6px 0; margin:-2px 0 9px; white-space:pre-wrap; max-height:5.6em; overflow:hidden; cursor:pointer; }
+  .uc.open { max-height:none; }
+  .uc::before { content:"Topic: "; font-weight:700; color:#9a6b1d; }
+  .cards { display:grid; gap:10px; grid-template-columns:repeat(auto-fill, minmax(var(--thumb), 1fr)); }
+  .card { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; display:flex; flex-direction:column; cursor:pointer; transition:box-shadow .12s, border-color .12s; }
+  .card:hover { border-color:var(--accent); box-shadow:0 2px 10px rgba(0,0,0,.08); }
+  .thumb { position:relative; aspect-ratio:4/3; overflow:hidden; background:#f2efe8; }
+  .thumb iframe { position:absolute; top:0; left:0; width:1280px; height:960px; border:0; transform-origin:0 0; pointer-events:none; background:#fff; }
+  .thumb .ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#b3ac9f; font-size:12px; padding:10px; text-align:center; }
+  .thumb .seq { position:absolute; top:6px; left:6px; z-index:1; background:rgba(42,39,37,.78); color:#fff; font-size:11px; font-weight:700; padding:1px 7px; border-radius:9px; }
+  .cap { padding:7px 9px 8px; border-top:1px solid var(--line); font-size:12px; }
+  .cap .t { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cap .p { color:#6f6a61; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-top:2px; }
+  .cap .p::before { content:"↳ "; color:var(--muted); }
+  .tagrow { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+  .tag { font-size:10px; padding:1px 7px; border-radius:9px; background:#e7eef7; color:#3a5a80; font-weight:600; }
+  .tag.ix { background:#e3f0e3; color:#356b35; }
+  .tag.diff { background:#fff; border:1px dashed #c0392b; color:#a5321f; }
+  .tag.flag { background:#fde8e4; color:#b3261e; }
+  .badge { position:absolute; top:6px; right:6px; z-index:1; font-size:10px; font-weight:700; padding:1px 7px; border-radius:9px; }
+  .badge.done { background:#356b35; color:#fff; }
+  .badge.agree { background:#356b35; color:#fff; }
+  .badge.disagree { background:#b3261e; color:#fff; }
+  .badge.single { background:rgba(42,39,37,.55); color:#fff; }
+  .banner { background:#fdf6e9; border:1px solid #ecd3a3; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px; }
+  header input#coder { width:110px; }
+  header input#coder.missing { border-color:#b3261e; box-shadow:0 0 0 2px #fde8e4; }
+  .empty { color:var(--muted); font-size:13px; padding:10px; border:1px dashed var(--line); border-radius:8px; }
+
+  /* ---- focus overlay ---- */
+  #focus { position:fixed; inset:0; background:rgba(30,28,25,.55); display:none; z-index:20; padding:18px; }
+  #focus.open { display:flex; }
+  .fbox { flex:1; display:flex; background:var(--panel); border-radius:12px; overflow:hidden; min-width:0; }
+  .fstage { flex:1; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--line); }
+  .fbar { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); font-size:13px; }
+  .fbar .grow { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fbar button { padding:4px 11px; border:1px solid var(--line); border-radius:6px; background:#f2efe8; cursor:pointer; font-size:13px; }
+  .fbar button:hover { border-color:var(--accent); }
+  .fbar a { color:var(--accent); text-decoration:none; font-weight:600; white-space:nowrap; }
+  #fFrame { flex:1; width:100%; border:0; background:#fff; }
+  .fside { width:360px; flex:none; overflow-y:auto; padding:14px 16px; font-size:13px; }
+  .fside h4 { margin:14px 0 5px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+  .fside h4:first-child { margin-top:0; }
+  .fside .box { white-space:pre-wrap; background:#faf7f2; border:1px solid var(--line); border-radius:8px; padding:8px 10px; max-height:260px; overflow:auto; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:11px; font-size:11px; font-weight:600; }
+  .pill.interactive { background:var(--int-bg); color:var(--int); }
+  .pill.static { background:var(--sta-bg); color:var(--sta); }
+  .pill.task { background:#e7eef7; color:#3a5a80; }
+  .scheme { border:1px solid var(--line); border-radius:8px; padding:6px 10px 8px; margin-top:8px; }
+  .scheme > .sh { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:2px 0 4px; }
+  .scheme .g { margin-top:6px; }
+  .scheme .gl { font-weight:600; font-size:12px; }
+  .scheme .gl .muted { font-weight:400; font-size:11px; }
+  .scheme label { display:flex; align-items:center; gap:6px; font-size:12.5px; padding:1px 0 1px 10px; cursor:pointer; }
+  .scheme label.solo { padding-left:0; font-weight:600; }
+  .scheme input.othertxt { margin:2px 0 2px 32px; width:calc(100% - 32px); font:12px inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
+  .flagbtn { display:flex; align-items:center; gap:7px; width:100%; padding:7px 10px; margin-top:8px; border:1px solid var(--line); border-radius:8px; background:#faf7f2; cursor:pointer; font:inherit; font-size:13px; }
+  .flagbtn.on { background:#fde8e4; border-color:#e6a69b; color:#b3261e; font-weight:700; }
+  .others { border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:4px; background:#faf7f2; font-size:12px; }
+  .others .who { font-weight:700; margin-bottom:3px; }
+  .others + .others { margin-top:6px; }
+  .disabled-note { color:#b3261e; font-size:12px; margin-top:6px; }
+  textarea#fNote { width:100%; height:70px; border:1px solid var(--line); border-radius:8px; padding:7px; font:inherit; resize:vertical; }
+  #fSaved { font-size:11px; color:var(--muted); margin-left:6px; }
+  kbd { font:11px ui-monospace,Menlo,monospace; background:#f2efe8; border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <b>Artifact review</b>
+  <span class="muted" id="hdrCount" style="font-size:13px">loading…</span>
+  <label title="Which participants to include. Comma list; ranges like I3-I17 work.">PIDs
+    <input type="text" id="pids" spellcheck="false" /></label>
+  <label>Size <input type="range" id="size" min="180" max="560" step="20" /></label>
+  <label><input type="checkbox" id="live" checked /> live thumbnails</label>
+  <button class="linkbtn" id="refresh" title="Re-read from the database (otherwise cached ~5 min)">↻ refresh</button>
+  <label title="Your annotator name. Each coder's codes are stored separately; it's kept in the URL (?coder=…) so you can bookmark your own link.">Coder
+    <input type="text" id="coder" spellcheck="false" placeholder="your name" /></label>
+  <label title="Show every coder's codes together, with agreement badges and a disagreements filter."><input type="checkbox" id="compare" /> compare coders</label>
+  <button class="linkbtn" id="csv" title="Download all coders' codes for the artifacts in scope">⭳ codes CSV</button>
+  <a href="/review.html" style="margin-left:auto">Session review →</a>
+</header>
+<main>
+  <aside id="side">
+    <h3>Scenario × condition</h3>
+    <div id="matrix"></div>
+    <div class="hint">Click a cell, row or column to filter · click again to clear.</div>
+    <h3>Coding</h3>
+    <div id="tags"></div>
+    <h3>Participants</h3>
+    <div id="people" class="chips"></div>
+  </aside>
+  <section id="gallery"><p class="muted">Loading…</p></section>
+</main>
+
+<div id="focus">
+  <div class="fbox">
+    <div class="fstage">
+      <div class="fbar">
+        <button id="fPrev" title="Previous (←)">←</button>
+        <button id="fNext" title="Next (→)">→</button>
+        <span class="grow" id="fTitle"></span>
+        <a id="fCtx" target="_blank">Context in review ↗</a>
+        <a id="fOpen" target="_blank">Open ↗</a>
+        <button id="fClose" title="Close (Esc)">✕</button>
+      </div>
+      <iframe id="fFrame" sandbox="allow-scripts" title="artifact"></iframe>
+    </div>
+    <div class="fside">
+      <h4>Session</h4>
+      <div id="fMeta"></div>
+      <div id="fScenWrap"><h4>Topic</h4><div class="box" id="fScen"></div></div>
+      <h4>Prompt that produced it</h4>
+      <div class="box" id="fPrompt"></div>
+      <h4 id="fCodingHd">Codes <span id="fSaved"></span></h4>
+      <div id="fCoding"></div>
+      <div id="fOthers"></div>
+      <p class="hint"><kbd>←</kbd> <kbd>→</kbd> step through the current filter · <kbd>Esc</kbd> close. Saved automatically, per coder.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const TASKS = [["relocation", "Relocation"], ["studytool", "Study tools"], ["userchoice", "User choice"]];
+const CONDS = [["interactive", "Interactive"], ["static", "Static"]];
+const TASK_LABEL = Object.fromEntries(TASKS), COND_LABEL = Object.fromEntries(CONDS);
+// Default = the pids marked as taken in the study sheet (T* have no artifacts yet but are
+// included so they show up automatically once a text-condition artifact exists).
+const DEFAULT_PIDS = "I3-I17,S1-S14,S16,T1-T11";
+
+// Codebook agreed in discussion. Artifact components apply to every artifact; interactions
+// only to the interactive condition (I#). Ids are stored, so relabel freely but keep ids stable.
+const CODEBOOK = [
+  { id: "artifact", label: "Artifact components", groups: [
+    { id: "rep", label: "Representations", items: [["rep.diagram", "Diagram / map"], ["rep.chart", "Charts / graphs"], ["rep.table", "Tables"], ["rep.timeline", "Timelines, steps"], ["rep.other", "Other"]] },
+    { id: "rank", label: "Rankings / judgements", items: [["rank.score", "Numerical anchors / score"], ["rank.ordinal", "Ordinal rankings"], ["rank.tags", "Categorical tags"], ["rank.other", "Other"]] },
+    { id: "desc", label: "Descriptions / evidence", items: [["desc.dims", "Text descriptions of dimensions"], ["desc.source", "Source"], ["desc.cards", "Evidence cards"], ["desc.other", "Other"]] },
+  ] },
+  { id: "interaction", label: "Interactions", onlyCond: "interactive", groups: [
+    { id: "learn", label: "Learning / quizzes", items: [["learn.predict", "Predict then reveal"], ["learn.quiz", "Quizzes"]] },
+    { id: "hide", label: "Hide / reveal information", items: [["hide.reveal", "Click-to-reveal"], ["hide.expand", "Click-to-expand"]] },
+    { id: "org", label: "Organize information", items: [["org.sort", "Sorting"], ["org.filter", "Filtering"]] },
+    { id: "move", label: "Move through sections", items: [["move.toggle", "Toggle views"]] },
+    { id: "score", label: "Select criteria → score items", hint: "compresses information", items: [["score.1to1", "One dimension → one output"], ["score.1toN", "One dimension → multiple outputs"], ["score.Nto1", "Multiple dimensions → one output"], ["score.NtoN", "Multiple dimensions → multiple outputs"]] },
+    { id: "sim", label: "Simulations", items: [["sim", "Simulations"]] },
+    { id: "iother", label: "Other", items: [["iother", "Other"]] },
+  ] },
+];
+const CODE = {}; // id -> { label, short, group, scheme }
+for (const sc of CODEBOOK) for (const g of sc.groups) for (const [id, l] of g.items)
+  CODE[id] = { label: g.items.length === 1 && id === g.id ? l : `${g.label} › ${l}`, short: l === "Other" ? `${g.label.split(" ")[0]}: other` : l, group: g.id, scheme: sc.id };
+const GROUP_ITEMS = Object.fromEntries(CODEBOOK.flatMap((sc) => sc.groups.map((g) => [g.id, g.items.map(([id]) => id)])));
+const isOther = (id) => id.endsWith(".other") || id === "iother";
+
+const q = new URLSearchParams(location.search);
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const state = {
+  pids: q.get("pids") || DEFAULT_PIDS,
+  task: q.get("task") || "", cond: q.get("cond") || "", pid: q.get("pid") || "", code: q.get("code") || "",
+  coder: (q.get("coder") || lsGet("ar-coder") || "").replace(/[^A-Za-z0-9_-]/g, ""),
+  compare: q.get("compare") === "1",
+};
+// CODES: key (pid__cond__task__seq) -> { coderName -> { codes, other, flag, note } }
+let DATA = { artifacts: [], scenarios: {} }, CODES = {}, visible = [], focusIdx = -1, codesDirty = false;
+
+const keyOf = (a) => `${a.pid}__${a.cond}__${a.task}__${a.seq}`;
+const ctxUrl = (a) => `/review.html?pid=${encodeURIComponent(a.pid)}&task=${encodeURIComponent(a.task)}&cond=${encodeURIComponent(a.cond)}&tab=full&art=${a.seq}`;
+const pidNum = (p) => +String(p).replace(/\D/g, "") || 0;
+const byPid = (a, b) => a.pid[0].localeCompare(b.pid[0]) || pidNum(a.pid) - pidNum(b.pid) || a.seq - b.seq;
+
+function parsePids(spec) {
+  const out = new Set();
+  for (const part of spec.split(/[\s,]+/).filter(Boolean)) {
+    const m = part.match(/^([a-z]+)(\d+)-(?:[a-z]+)?(\d+)$/i);
+    if (m) for (let i = +m[2]; i <= +m[3]; i++) out.add((m[1] + i).toUpperCase());
+    else out.add(part.toUpperCase());
+  }
+  return out;
+}
+
+function syncUrl() {
+  const p = new URLSearchParams();
+  if (state.pids !== DEFAULT_PIDS) p.set("pids", state.pids);
+  for (const k of ["coder", "task", "cond", "pid", "code"]) if (state[k]) p.set(k, state[k]);
+  if (state.compare) p.set("compare", "1");
+  history.replaceState(null, "", location.pathname + (p.toString() ? "?" + p : ""));
+}
+
+async function load(fresh) {
+  $("gallery").innerHTML = '<p class="muted">Loading…</p>';
+  const getJson = async (url) => {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`${url} → HTTP ${r.status}`);
+    return r.json();
+  };
+  let d, c;
+  try {
+    [d, c] = await Promise.all([getJson("/api/artifact-review" + (fresh ? "?fresh=1" : "")), getJson("/api/artifact-codes")]);
+  } catch (e) {
+    $("hdrCount").textContent = "failed to load";
+    $("gallery").innerHTML = `<p style="color:#b3261e">Could not load artifacts: ${esc(e.message)}</p>` +
+      '<p class="muted">A 404 usually means the server process was started before this page was added. Restart it (<code>node server.js</code>).</p>';
+    return;
+  }
+  DATA = d;
+  CODES = {};
+  for (const x of Object.values(c)) if (x?.coder && x?.key) (CODES[x.key] ||= {})[x.coder] = x;
+  render();
+}
+
+// Everything in the included pid set — the base the matrix counts from.
+function inScope() {
+  const set = parsePids(state.pids);
+  return DATA.artifacts.filter((a) => set.has(String(a.pid).toUpperCase()));
+}
+const byCoder = (a) => CODES[keyOf(a)] || {};
+const mine = (a) => byCoder(a)[state.coder] || null;
+const codedBy = (a) => Object.entries(byCoder(a)).filter(([, x]) => x.codes?.length).map(([c]) => c);
+const isCoded = (x) => !!x?.codes?.length;
+const flagged = (a) => Object.values(byCoder(a)).some((x) => x.flag);
+// The codes a filter/count looks at: mine normally; anyone's in compare mode.
+const viewCodes = (a) => state.compare ? [...new Set(Object.values(byCoder(a)).flatMap((x) => x.codes || []))] : mine(a)?.codes || [];
+function agreement(a) {
+  const sets = Object.values(byCoder(a)).filter(isCoded).map((x) => [...x.codes].sort().join("|"));
+  if (sets.length < 2) return sets.length ? "single" : "none";
+  return sets.every((s) => s === sets[0]) ? "agree" : "disagree";
+}
+function matchesCode(a, f) {
+  if (f === "~flag") return flagged(a);
+  if (f === "~uncoded") return state.compare ? agreement(a) === "none" || agreement(a) === "single" : !isCoded(mine(a));
+  if (f === "~disagree") return agreement(a) === "disagree";
+  const ids = f.startsWith("g:") ? GROUP_ITEMS[f.slice(2)] || [] : [f];
+  const have = viewCodes(a);
+  return ids.some((id) => have.includes(id));
+}
+function passes(a, skip = {}) {
+  if (!skip.task && state.task && a.task !== state.task) return false;
+  if (!skip.cond && state.cond && a.cond !== state.cond) return false;
+  if (!skip.pid && state.pid && a.pid !== state.pid) return false;
+  if (!skip.code && state.code && !matchesCode(a, state.code)) return false;
+  return true;
+}
+
+function render() {
+  syncUrl();
+  const scope = inScope();
+  visible = scope.filter((a) => passes(a)).sort(byPid);
+  const people = new Set(visible.map((a) => a.pid));
+  $("hdrCount").textContent = `${visible.length} artifacts · ${people.size} participants` + (visible.length !== scope.length ? ` (of ${scope.length})` : "");
+  renderMatrix(scope);
+  renderTags(scope);
+  renderPeople(scope);
+  renderGallery();
+}
+
+function renderMatrix(scope) {
+  const base = scope.filter((a) => passes(a, { task: 1, cond: 1 }));
+  const cell = (task, cond) => {
+    const xs = base.filter((a) => (!task || a.task === task) && (!cond || a.cond === cond));
+    return { n: xs.length, p: new Set(xs.map((a) => a.pid)).size };
+  };
+  const td = (task, cond) => {
+    const { n, p } = cell(task, cond);
+    const on = state.task === task && state.cond === cond && (task || cond);
+    return `<td class="${on ? "on" : ""}${n ? "" : " zero"}" data-task="${task}" data-cond="${cond}"><b>${n}</b><span>${p} ppl</span></td>`;
+  };
+  let h = `<table class="mx"><tr><th></th>${CONDS.map(([c, l]) => `<th class="col${state.cond === c && !state.task ? " on" : ""}" data-cond="${c}">${l}</th>`).join("")}<th>All</th></tr>`;
+  for (const [t, l] of TASKS) h += `<tr><th class="row${state.task === t && !state.cond ? " on" : ""}" data-task="${t}">${l}</th>${CONDS.map(([c]) => td(t, c)).join("")}${td(t, "")}</tr>`;
+  h += `<tr><th class="row">All</th>${CONDS.map(([c]) => td("", c)).join("")}${td("", "")}</tr></table>`;
+  $("matrix").innerHTML = h;
+  $("matrix").querySelectorAll("td, th[data-task], th[data-cond]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const t = el.dataset.task || "", c = el.dataset.cond || "";
+      const same = state.task === t && state.cond === c;
+      state.task = same ? "" : t; state.cond = same ? "" : c; state.pid = "";
+      render(); $("gallery").scrollTop = 0;
+    }));
+}
+
+// Coding panel: progress, status filters, and the codebook counted per condition — the
+// typology-by-condition table at a glance. Click any row to filter the gallery to it.
+function renderTags(scope) {
+  const base = scope.filter((a) => passes(a, { code: 1, cond: 1 }));
+  const n = (f, cond) => base.filter((a) => (!cond || a.cond === cond) && matchesCode(a, f)).length;
+  let h = "";
+  if (state.coder && !state.compare) {
+    const done = base.filter((a) => isCoded(mine(a))).length;
+    h += `<div class="progress"><b>${esc(state.coder)}</b> coded ${done} / ${base.length}<div class="bar"><i style="width:${base.length ? (100 * done) / base.length : 0}%"></i></div></div>`;
+  } else if (state.compare) {
+    const coders = [...new Set(Object.values(CODES).flatMap((m) => Object.keys(m)))].sort();
+    const both = base.filter((a) => codedBy(a).length >= 2), agree = both.filter((a) => agreement(a) === "agree").length;
+    h += `<div class="progress">Coders: <b>${coders.map(esc).join(", ") || "—"}</b><br>${both.length} coded by 2+ · exact agreement ${both.length ? Math.round((100 * agree) / both.length) : 0}%</div>`;
+  }
+  const stat = [["~flag", "🚩 Needs discussion"], ["~uncoded", state.compare ? "Not coded by 2+ coders" : "Not coded by me"]];
+  if (state.compare) stat.push(["~disagree", "≠ Disagreements"]);
+  h += `<div class="chips" style="margin-bottom:6px">${stat.map(([f, l]) => `<span class="chip${state.code === f ? " on" : ""}" data-code="${f}">${l}<span class="n">${n(f)}</span></span>`).join("")}</div>`;
+  const row = (f, label, cls, showS) => `<tr class="${cls}${state.code === f ? " on" : ""}" data-code="${esc(f)}"><td>${esc(label)}</td><td class="num">${n(f, "interactive") || ""}</td><td class="num">${showS ? n(f, "static") || "" : ""}</td></tr>`;
+  h += `<table class="tagtab"><tr><th></th><th>I</th><th>S</th></tr>`;
+  for (const sc of CODEBOOK) {
+    const showS = sc.onlyCond !== "interactive";
+    h += `<tr class="scheme"><td colspan="3">${esc(sc.label)}${showS ? "" : " (I only)"}</td></tr>`;
+    for (const g of sc.groups) {
+      const solo = g.items.length === 1 && g.items[0][0] === g.id;
+      h += row(solo ? g.id : "g:" + g.id, g.label, "grp", showS);
+      if (!solo) for (const [id, l] of g.items) h += row(id, l, "item", showS);
+    }
+  }
+  h += "</table>";
+  $("tags").innerHTML = h;
+  $("tags").querySelectorAll("[data-code]").forEach((el) =>
+    el.addEventListener("click", () => { state.code = state.code === el.dataset.code ? "" : el.dataset.code; render(); }));
+}
+
+function renderPeople(scope) {
+  const base = scope.filter((a) => passes(a, { pid: 1 }));
+  const n = new Map();
+  for (const a of base) n.set(a.pid, (n.get(a.pid) || 0) + 1);
+  const pids = [...n.keys()].sort((a, b) => a[0].localeCompare(b[0]) || pidNum(a) - pidNum(b));
+  $("people").innerHTML = pids.map((p) => `<span class="chip${state.pid === p ? " on" : ""}" data-pid="${esc(p)}">${esc(p)}<span class="n">${n.get(p)}</span></span>`).join("") || '<span class="hint">none</span>';
+  $("people").querySelectorAll(".chip").forEach((el) =>
+    el.addEventListener("click", () => { state.pid = state.pid === el.dataset.pid ? "" : el.dataset.pid; render(); }));
+}
+
+// Gallery: one section per scenario; inside it, conditions side by side so the same
+// scenario can be compared across conditions; inside each, one block per participant
+// with their artifacts in creation order.
+function renderGallery() {
+  const g = $("gallery");
+  g.innerHTML = state.coder || state.compare ? "" :
+    '<div class="banner">Enter your <b>coder</b> name at the top to start annotating. Each annotator\'s codes are saved separately; bookmark the resulting link (it includes <code>?coder=…</code>).</div>';
+  const tasks = TASKS.filter(([t]) => !state.task || t === state.task);
+  const conds = CONDS.filter(([c]) => !state.cond || c === state.cond);
+  for (const [t, tl] of tasks) {
+    const xs = visible.filter((a) => a.task === t);
+    if (!xs.length && (state.pid || state.code)) continue;
+    const sec = document.createElement("div");
+    sec.className = "tasksec";
+    const scen = t === "userchoice" ? null : DATA.scenarios?.[t];
+    sec.innerHTML = `<h2>${tl} <span class="muted">${xs.length} artifacts · ${new Set(xs.map((a) => a.pid)).size} participants</span></h2>` +
+      (scen ? `<details class="scen"><summary>Scenario text</summary><div>${esc(scen)}</div></details>` : "") +
+      `<div class="cols" style="--ncols:${conds.length}"></div>`;
+    const cols = sec.querySelector(".cols");
+    for (const [c, cl] of conds) {
+      const col = document.createElement("div");
+      const ys = xs.filter((a) => a.cond === c);
+      col.innerHTML = `<div class="colhd ${c}">${cl}<span class="n">${ys.length} artifacts · ${new Set(ys.map((a) => a.pid)).size} ppl</span></div>`;
+      if (!ys.length) col.insertAdjacentHTML("beforeend", '<div class="empty">No artifacts.</div>');
+      const groups = new Map();
+      for (const a of ys) { if (!groups.has(a.pid)) groups.set(a.pid, []); groups.get(a.pid).push(a); }
+      for (const [pid, arts] of groups) col.appendChild(pblock(pid, t, c, arts));
+      cols.appendChild(col);
+    }
+    g.appendChild(sec);
+  }
+  if (!g.querySelector(".tasksec")) g.insertAdjacentHTML("beforeend", '<p class="muted">Nothing matches the current filter.</p>');
+  observeThumbs();
+}
+
+function pblock(pid, task, cond, arts) {
+  const b = document.createElement("div");
+  b.className = "pblock";
+  const uc = task === "userchoice" ? DATA.scenarios?.userchoice?.[pid] : null;
+  b.innerHTML = `<div class="ph"><b>${esc(pid)}</b><span class="muted">${arts.length} artifact${arts.length > 1 ? "s" : ""}</span>
+      <a href="${ctxUrl({ pid, task, cond, seq: 1 })}" target="_blank" title="Open this session in review">session ↗</a></div>` +
+    (task === "userchoice" ? `<div class="uc" title="click to expand">${uc ? esc(uc) : '<i class="muted">(no topic saved)</i>'}</div>` : "") +
+    `<div class="cards"></div>`;
+  b.querySelector(".uc")?.addEventListener("click", (e) => e.currentTarget.classList.toggle("open"));
+  const cards = b.querySelector(".cards");
+  for (const a of arts) cards.appendChild(card(a));
+  return b;
+}
+
+function card(a) {
+  const el = document.createElement("div");
+  el.className = "card";
+  let badge = "", chips = "";
+  if (state.compare) {
+    const ag = agreement(a), coded = codedBy(a);
+    if (ag !== "none") badge = `<span class="badge ${ag}" title="${esc(coded.join(", "))}">${ag === "agree" ? "✓ agree" : ag === "disagree" ? "≠ differ" : "1 coder"}</span>`;
+    const sets = Object.values(byCoder(a)).filter(isCoded).map((x) => x.codes);
+    const all = [...new Set(sets.flat())];
+    chips = all.map((id) => `<span class="tag${CODE[id]?.scheme === "interaction" ? " ix" : ""}${sets.every((s) => s.includes(id)) ? "" : " diff"}" title="${esc(CODE[id]?.label || id)}">${esc(CODE[id]?.short || id)}</span>`).join("");
+  } else {
+    const m = mine(a);
+    if (isCoded(m)) badge = '<span class="badge done">✓ coded</span>';
+    chips = (m?.codes || []).map((id) => `<span class="tag${CODE[id]?.scheme === "interaction" ? " ix" : ""}" title="${esc(CODE[id]?.label || id)}">${esc(CODE[id]?.short || id)}</span>`).join("");
+  }
+  if (flagged(a)) chips = '<span class="tag flag">🚩 discuss</span>' + chips;
+  el.innerHTML = `<div class="thumb" data-src="${esc(a.file)}"><span class="seq">#${a.seq}</span>${badge}<div class="ph">${esc(a.title || "untitled")}</div></div>
+    <div class="cap"><div class="t" title="${esc(a.title)}">${esc(a.title || "untitled")}</div>
+      ${a.prompt ? `<div class="p" title="${esc(a.prompt)}">${esc(a.prompt)}</div>` : ""}
+      ${chips ? `<div class="tagrow">${chips}</div>` : ""}</div>`;
+  el.addEventListener("click", () => openFocus(visible.indexOf(a)));
+  return el;
+}
+
+// Artifact HTML is fetched once and rendered via srcdoc (same as review.html's Full view).
+const htmlCache = new Map();
+const getHtml = (file) => {
+  if (!htmlCache.has(file)) htmlCache.set(file, fetch(file).then((r) => (r.ok ? r.text() : `<p style="font:14px sans-serif;color:#999;padding:20px">Could not load ${file}</p>`)));
+  return htmlCache.get(file);
+};
+
+// Thumbnails are real, live iframes scaled down from a 1280px-wide render. They load only
+// once scrolled near view, so a full page of artifacts doesn't all boot at once.
+let io, ro;
+function observeThumbs() {
+  io?.disconnect(); ro?.disconnect();
+  const live = $("live").checked;
+  ro = new ResizeObserver((es) => es.forEach((e) => {
+    const f = e.target.querySelector("iframe");
+    if (f) f.style.transform = `scale(${e.contentRect.width / 1280})`;
+  }));
+  io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    const th = e.target;
+    io.unobserve(th);
+    const f = document.createElement("iframe");
+    f.sandbox = "allow-scripts";
+    f.tabIndex = -1;
+    getHtml(th.dataset.src).then((h) => { f.srcdoc = h; });
+    f.style.transform = `scale(${th.clientWidth / 1280})`;
+    th.appendChild(f);
+    ro.observe(th);
+  }), { root: $("gallery"), rootMargin: "400px" });
+  if (live) document.querySelectorAll(".thumb[data-src]").forEach((t) => io.observe(t));
+}
+
+// ---- focus view + coding ----
+function openFocus(i) {
+  if (i < 0 || i >= visible.length) return;
+  focusIdx = i;
+  const a = visible[i];
+  $("focus").classList.add("open");
+  $("fFrame").removeAttribute("srcdoc");
+  getHtml(a.file).then((h) => { if (visible[focusIdx] === a) $("fFrame").srcdoc = h; });
+  $("fTitle").innerHTML = `<b>${esc(a.pid)} · #${a.seq}</b> ${esc(a.title || "untitled")} <span class="muted">(${i + 1} / ${visible.length})</span>`;
+  $("fCtx").href = ctxUrl(a);
+  $("fOpen").href = a.file;
+  $("fMeta").innerHTML = `<b>${esc(a.pid)}</b> <span class="pill ${a.cond}">${COND_LABEL[a.cond] || esc(a.cond)}</span> <span class="pill task">${TASK_LABEL[a.task] || esc(a.task)}</span>
+    <div class="muted" style="font-size:12px;margin-top:4px">artifact #${a.seq} · ${new Date(a.ts).toLocaleString()} · ${(a.chars || 0).toLocaleString()} chars</div>`;
+  const uc = a.task === "userchoice" ? DATA.scenarios?.userchoice?.[a.pid] : null;
+  $("fScenWrap").style.display = a.task === "userchoice" ? "" : "none";
+  $("fScen").textContent = uc || "(no topic saved)";
+  $("fPrompt").textContent = a.prompt || "(not found)";
+  $("fSaved").textContent = "";
+  drawCoding();
+  $("fPrev").disabled = i === 0;
+  $("fNext").disabled = i === visible.length - 1;
+}
+function closeFocus() {
+  $("focus").classList.remove("open");
+  $("fFrame").removeAttribute("srcdoc");
+  focusIdx = -1;
+  if (codesDirty) { // refresh tag chips / counts after coding, keeping the scroll position
+    codesDirty = false;
+    const y = $("gallery").scrollTop;
+    render();
+    $("gallery").scrollTop = y;
+  }
+}
+// The coding form for the focused artifact, for the current coder. Interactions only show for
+// interactive-condition artifacts. Other coders' codes are shown only in compare mode, so
+// annotators code independently first.
+function drawCoding() {
+  const a = visible[focusIdx];
+  const box = $("fCoding");
+  $("fCodingHd").firstChild.textContent = state.coder ? `Codes · ${state.coder} ` : "Codes ";
+  if (!state.coder) {
+    box.innerHTML = '<div class="disabled-note">Enter your coder name in the header to code this artifact.</div>';
+    $("fOthers").innerHTML = "";
+    return;
+  }
+  const m = mine(a) || { codes: [], other: {}, flag: false, note: "" };
+  const has = new Set(m.codes || []);
+  let h = `<button type="button" class="flagbtn${m.flag ? " on" : ""}" id="fFlag">🚩 ${m.flag ? "Needs discussion (flagged)" : "Flag: needs discussion"}</button>`;
+  for (const sc of CODEBOOK) {
+    if (sc.onlyCond && a.cond !== sc.onlyCond) continue;
+    h += `<div class="scheme"><div class="sh">${esc(sc.label)}</div>`;
+    for (const g of sc.groups) {
+      const solo = g.items.length === 1 && g.items[0][0] === g.id;
+      const cb = (id, label, cls) => `<label class="${cls}"><input type="checkbox" data-id="${id}"${has.has(id) ? " checked" : ""}> ${esc(label)}</label>` +
+        (isOther(id) && has.has(id) ? `<input class="othertxt" data-other="${id}" placeholder="describe…" value="${esc(m.other?.[id] || "")}">` : "");
+      if (solo) { h += `<div class="g">${cb(g.id, g.label, "solo")}</div>`; continue; }
+      h += `<div class="g"><div class="gl">${esc(g.label)}${g.hint ? ` <span class="muted">(${esc(g.hint)})</span>` : ""}</div>${g.items.map(([id, l]) => cb(id, l, "")).join("")}</div>`;
+    }
+    h += "</div>";
+  }
+  h += `<h4>Note</h4><textarea id="fNote" placeholder="memo, or what to discuss…">${esc(m.note || "")}</textarea>`;
+  box.innerHTML = h;
+  box.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => { saveCoding(); drawCoding(); }));
+  box.querySelectorAll("input.othertxt, #fNote").forEach((t) => t.addEventListener("input", () => saveCoding(700)));
+  $("fFlag").addEventListener("click", () => { saveCoding(0, true); drawCoding(); });
+  drawOthers();
+}
+function drawOthers() {
+  const a = visible[focusIdx];
+  const others = Object.entries(byCoder(a)).filter(([c]) => c !== state.coder);
+  if (!state.compare || !others.length) { $("fOthers").innerHTML = state.compare ? '<h4>Other coders</h4><div class="muted" style="font-size:12px">Nobody else has coded this yet.</div>' : ""; return; }
+  const mineSet = new Set(mine(a)?.codes || []);
+  $("fOthers").innerHTML = "<h4>Other coders</h4>" + others.map(([c, x]) => `<div class="others"><div class="who">${esc(c)}${x.flag ? ' <span class="tag flag">🚩 discuss</span>' : ""}</div>
+      <div class="tagrow">${(x.codes || []).map((id) => `<span class="tag${CODE[id]?.scheme === "interaction" ? " ix" : ""}${mineSet.has(id) ? "" : " diff"}" title="${esc(CODE[id]?.label || id)}">${esc(CODE[id]?.short || id)}${x.other?.[id] ? `: ${esc(x.other[id])}` : ""}</span>`).join("") || '<span class="muted">no codes</span>'}</div>
+      ${x.note ? `<div style="margin-top:4px;white-space:pre-wrap">${esc(x.note)}</div>` : ""}</div>`).join("") +
+    '<div class="hint">Dashed = not in your codes.</div>';
+}
+// Read the form back into this coder's record and save it (debounced while typing).
+const saveTimers = {}; // per artifact, so stepping to the next one never drops a pending save
+function saveCoding(delay = 0, toggleFlag = false) {
+  const a = visible[focusIdx];
+  if (!a || !state.coder) return;
+  const key = keyOf(a), box = $("fCoding");
+  const prev = mine(a) || {};
+  const rec = {
+    coder: state.coder, key,
+    codes: [...box.querySelectorAll("input[type=checkbox]:checked")].map((c) => c.dataset.id),
+    other: Object.fromEntries([...box.querySelectorAll("input.othertxt")].map((t) => [t.dataset.other, t.value])),
+    flag: toggleFlag ? !prev.flag : !!prev.flag,
+    note: $("fNote")?.value ?? prev.note ?? "",
+  };
+  (CODES[key] ||= {})[state.coder] = rec;
+  codesDirty = true;
+  $("fSaved").textContent = "saving…";
+  clearTimeout(saveTimers[key]);
+  saveTimers[key] = setTimeout(async () => {
+    try {
+      const r = await fetch("/api/artifact-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) });
+      if (!r.ok) throw new Error();
+      $("fSaved").textContent = "saved ✓";
+    } catch { $("fSaved").textContent = "⚠ not saved"; }
+  }, delay);
+}
+$("fPrev").onclick = () => openFocus(focusIdx - 1);
+$("fNext").onclick = () => openFocus(focusIdx + 1);
+$("fClose").onclick = closeFocus;
+$("focus").addEventListener("click", (e) => { if (e.target.id === "focus") closeFocus(); });
+document.addEventListener("keydown", (e) => {
+  if (focusIdx < 0 || /^(INPUT|TEXTAREA)$/.test(e.target.tagName) && e.key !== "Escape") return;
+  if (e.key === "Escape") closeFocus();
+  else if (e.key === "ArrowLeft") openFocus(focusIdx - 1);
+  else if (e.key === "ArrowRight") openFocus(focusIdx + 1);
+});
+
+// ---- header controls ----
+$("pids").value = state.pids;
+$("pids").addEventListener("change", () => { state.pids = $("pids").value.trim() || DEFAULT_PIDS; $("pids").value = state.pids; render(); });
+const savedSize = lsGet("ar-size");
+$("size").value = savedSize || 300;
+document.documentElement.style.setProperty("--thumb", $("size").value + "px");
+$("size").addEventListener("input", () => {
+  document.documentElement.style.setProperty("--thumb", $("size").value + "px");
+  try { localStorage.setItem("ar-size", $("size").value); } catch {}
+});
+$("live").addEventListener("change", renderGallery);
+$("refresh").addEventListener("click", () => load(true));
+$("coder").value = state.coder;
+$("coder").classList.toggle("missing", !state.coder);
+$("coder").addEventListener("change", () => {
+  state.coder = $("coder").value.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 30);
+  $("coder").value = state.coder;
+  $("coder").classList.toggle("missing", !state.coder);
+  lsSet("ar-coder", state.coder);
+  render();
+});
+$("compare").checked = state.compare;
+$("compare").addEventListener("change", () => { state.compare = $("compare").checked; if (!state.compare && state.code === "~disagree") state.code = ""; render(); });
+
+// One row per (artifact, coder) for the artifacts in scope, plus a 0/1 column per code —
+// ready for joint review or agreement statistics.
+$("csv").addEventListener("click", () => {
+  const ids = Object.keys(CODE);
+  const cols = ["pid", "cond", "task", "seq", "title", "coder", "flag", "codes", ...ids, "other", "note"];
+  const cell = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const rows = [cols.join(",")];
+  for (const a of inScope().sort(byPid)) for (const [c, x] of Object.entries(byCoder(a))) {
+    const set = new Set(x.codes || []);
+    rows.push([a.pid, a.cond, a.task, a.seq, a.title, c, x.flag ? 1 : 0, (x.codes || []).map((id) => CODE[id]?.label || id).join("; "),
+      ...ids.map((id) => (set.has(id) ? 1 : 0)), Object.entries(x.other || {}).map(([k, v]) => `${CODE[k]?.label || k}: ${v}`).join("; "), x.note].map(cell).join(","));
+  }
+  const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+  Object.assign(document.createElement("a"), { href: url, download: `artifact-codes-${new Date().toISOString().slice(0, 10)}.csv` }).click();
+  URL.revokeObjectURL(url);
+});
+
+load();
+</script>
+</body>
+</html>

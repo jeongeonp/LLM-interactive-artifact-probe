@@ -261,3 +261,49 @@ export async function setScenario(task, text) {
     console.error("setScenario (firestore) failed:", e?.message || e);
   }
 }
+
+// ---- Artifact review page (/artifact-review) -----------------------------
+// Events of one kind for an explicit list of pids (and optionally tasks) — e.g. only the
+// study's I#/S#/T# artifacts from the real tasks, so test pids and practice/demo turns are
+// never read (and never billed). Firestore caps a query at 30 `in` combinations
+// (pids × tasks), so the pid list is queried in chunks; no composite index is needed.
+export async function eventsForPids(kind, pids, tasks) {
+  try {
+    const out = [];
+    const step = tasks?.length ? Math.floor(30 / tasks.length) : 30;
+    for (let i = 0; i < pids.length; i += step) {
+      let q = events.where("kind", "==", kind).where("pid", "in", pids.slice(i, i + step));
+      if (tasks?.length) q = q.where("task", "in", tasks);
+      const snap = await q.get();
+      out.push(...snap.docs.map((d) => d.data()));
+    }
+    return out;
+  } catch (e) {
+    return onReadError(e, []);
+  }
+}
+
+// Every saved scenario ({ key: text }) — includes the per-pid "userchoice:<pid>" texts.
+export async function allScenarios() {
+  try {
+    const snap = await scenariosCol.get();
+    return Object.fromEntries(snap.docs.map((d) => [d.id, d.data().text ?? ""]));
+  } catch (e) {
+    return onReadError(e, {});
+  }
+}
+
+// Researcher-assigned artifact codes: one small doc per (coder, artifact),
+// id = coder__pid__cond__task__seq, so each annotator's codes stay separate.
+const codesCol = db.collection("artifactCodes");
+export async function getCodes() {
+  try {
+    const snap = await codesCol.get();
+    return Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
+  } catch (e) {
+    return onReadError(e, {});
+  }
+}
+export async function setCode(id, data) {
+  await codesCol.doc(String(id ?? "").replace(/[/#]/g, "_")).set({ ...data, updated: new Date().toISOString() });
+}

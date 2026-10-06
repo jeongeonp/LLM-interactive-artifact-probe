@@ -566,12 +566,21 @@ app.get("/api/artifact-review", async (req, res) => {
   res.json(v);
 });
 app.get("/api/artifact-codes", async (req, res) => res.json(await getCodes()));
+// One annotator's coding of one artifact: codebook ids (see CODEBOOK in artifact-review.html),
+// free text for any "Other" code, a needs-discussion flag, and a note.
 app.post("/api/artifact-codes", async (req, res) => {
-  const { key, tags, note } = req.body || {};
-  if (!key) return res.status(400).json({ error: "key required" });
-  const clean = [...new Set((Array.isArray(tags) ? tags : []).map((t) => String(t).trim().toLowerCase()).filter(Boolean))];
-  await setCode(key, { tags: clean, note: String(note ?? "") });
-  res.json({ ok: true, tags: clean });
+  const { coder, key, codes, other, flag, note } = req.body || {};
+  if (!key || !/^[A-Za-z0-9_-]{1,30}$/.test(String(coder || ""))) return res.status(400).json({ error: "coder (letters/digits) and key required" });
+  const data = {
+    coder: String(coder),
+    key: String(key),
+    codes: [...new Set((Array.isArray(codes) ? codes : []).map(String))],
+    other: Object.fromEntries(Object.entries(other || {}).map(([k, v]) => [String(k), String(v).slice(0, 500)]).filter(([, v]) => v.trim())),
+    flag: !!flag,
+    note: String(note ?? "").slice(0, 5000),
+  };
+  await setCode(`${data.coder}__${data.key}`, data);
+  res.json({ ok: true });
 });
 
 app.get("/api/export.json", async (req, res) => {

@@ -169,7 +169,7 @@ async function loadSide() {
       el)));
 }
 
-async function selectPid(pid, task, cond, el) {
+async function selectPid(pid, task, cond, el, opts = {}) {
   side.querySelectorAll(".pitem").forEach(p => p.classList.remove("active"));
   if (el) el.classList.add("active");
   active = pid;
@@ -185,8 +185,8 @@ async function selectPid(pid, task, cond, el) {
 
   const views = {
     transcript: () => renderTranscript(events),
-    full: () => renderFull(events),
-    artifacts: () => renderArtifacts(arts),
+    full: () => renderFull(events, opts.art),
+    artifacts: () => renderArtifacts(arts, opts.art),
     activity: () => renderActivity(tele, arts),
   };
 
@@ -204,12 +204,12 @@ async function selectPid(pid, task, cond, el) {
     <div id="view"></div>`;
   const view = detail.querySelector("#view");
   const render = v => { view.innerHTML = ""; view.appendChild(views[v]()); };
-  detail.querySelectorAll(".tabs button").forEach(b =>
-    b.addEventListener("click", () => {
-      detail.querySelectorAll(".tabs button").forEach(x => x.classList.remove("active"));
-      b.classList.add("active"); render(b.dataset.v);
-    }));
-  render("transcript");
+  const pick = (v) => {
+    detail.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x.dataset.v === v));
+    render(v);
+  };
+  detail.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => pick(b.dataset.v)));
+  pick(views[opts.tab] ? opts.tab : "transcript");
 }
 
 function el(html) { const d = document.createElement("div"); d.innerHTML = html; return d; }
@@ -236,7 +236,7 @@ function renderTranscript(events) {
 // on the left, a tabbed artifact pane on the right (one tab per artifact, in creation
 // order) — same side-by-side layout as the live interface, not a linear scroll. Purely
 // from the events already loaded for this session — no separate fetches, no /api/log calls.
-function renderFull(events) {
+function renderFull(events, startSeq) {
   const wrap = document.createElement("div");
   wrap.className = "fullview";
   const chatCol = document.createElement("div");
@@ -291,13 +291,13 @@ function renderFull(events) {
       addTab(artifacts.length - 1);
     }
   }
-  if (artifacts.length) showArtifact(artifacts.length - 1);
+  if (artifacts.length) showArtifact(startSeq ? Math.min(Math.max(+startSeq - 1, 0), artifacts.length - 1) : artifacts.length - 1);
   else artCol.innerHTML = '<p class="muted">No artifact in this session.</p>';
   if (!chatCol.children.length) chatCol.innerHTML = '<p class="muted">No conversation.</p>';
   return wrap;
 }
 
-function renderArtifacts(arts) {
+function renderArtifacts(arts, startSeq) {
   const box = document.createElement("div");
   if (!arts.length) { box.innerHTML = '<p class="muted">No artifacts created.</p>'; return box; }
   box.className = "artsplit";
@@ -325,7 +325,8 @@ function renderArtifacts(arts) {
   };
   box.querySelectorAll(".aitem").forEach(it =>
     it.addEventListener("click", () => show(+it.dataset.i)));
-  show(0);
+  const startIdx = startSeq ? arts.findIndex(a => String(a.data?.seq) === String(startSeq)) : -1;
+  show(startIdx >= 0 ? startIdx : 0);
   return box;
 }
 
@@ -352,7 +353,23 @@ function renderActivity(tele, arts) {
   return box;
 }
 
-loadSide();
+// Deep link: /review.html?pid=I5&task=relocation&cond=interactive&tab=full&art=3
+// (used by /artifact-review's "Context" links) — opens that session, tab and artifact.
+loadSide().then(() => {
+  const q = new URLSearchParams(location.search);
+  const pid = q.get("pid");
+  if (!pid) return;
+  const task = q.get("task") || "", cond = q.get("cond") || "";
+  const item = [...side.querySelectorAll(".pitem")].find(p =>
+    decodeURIComponent(p.dataset.pid) === pid &&
+    (!task || decodeURIComponent(p.dataset.task) === task) &&
+    (!cond || decodeURIComponent(p.dataset.cond) === cond));
+  if (item) {
+    for (let g = item.closest(".pgroup"); g; g = g.parentElement?.closest(".pgroup")) g.classList.remove("collapsed");
+    item.scrollIntoView({ block: "center" });
+  }
+  selectPid(pid, task, cond, item, { tab: q.get("tab") || "full", art: q.get("art") });
+});
 </script>
 </body>
 </html>
