@@ -135,3 +135,14 @@ export function setCode(id, data) {
     `INSERT INTO artifact_codes_v2 (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data`
   ).run(String(id), JSON.stringify({ ...data, updated: new Date().toISOString() }));
 }
+
+// ---- Process review page (/process-review) -------------------------------
+db.exec(`CREATE TABLE IF NOT EXISTS process_codes (id TEXT PRIMARY KEY, data TEXT);`);
+export function getProcessCodes() {
+  return Object.fromEntries(db.prepare("SELECT * FROM process_codes").all().map((r) => [r.id, JSON.parse(r.data || "{}")]));
+}
+export function setProcessCode(id, data) {
+  db.prepare(
+    `INSERT INTO process_codes (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data`
+  ).run(String(id), JSON.stringify({ ...data, updated: new Date().toISOString() }));
+}

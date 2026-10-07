@@ -6,7 +6,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode, getProcessCodes, setProcessCode } = await import(DB_BACKEND);
+import { listVideos, streamFile } from "./drive.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ART_DIR = path.join(__dirname, "data", "artifacts");
@@ -22,6 +23,7 @@ app.get("/", (req, res, next) => {
   res.redirect("/start.html");
 });
 app.get("/artifact-review", (req, res) => res.sendFile(path.join(__dirname, "public", "artifact-review.html")));
+app.get("/process-review", (req, res) => res.sendFile(path.join(__dirname, "public", "process-review.html")));
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -532,8 +534,10 @@ const isStudyPid = (pid) => /^[IST]\d+$/i.test(String(pid || ""));
 // raise the cap if the study grows past it. Unused pids cost nothing beyond the query.
 const STUDY_PIDS = ["I", "S", "T"].flatMap((p) => Array.from({ length: 60 }, (_, i) => p + (i + 1)));
 let _reviewCache = null; // { t, v }
-app.get("/api/artifact-review", async (req, res) => {
-  if (_reviewCache && Date.now() - _reviewCache.t < 5 * 60 * 1000 && !req.query.fresh) return res.json(_reviewCache.v);
+// Shared by /artifact-review and /process-review. `turns` (chat ts + prompt per session) stays
+// server-side for the artifact gallery and is sent only to the process page, for its timeline.
+async function reviewData(fresh) {
+  if (_reviewCache && Date.now() - _reviewCache.t < 5 * 60 * 1000 && !fresh) return _reviewCache.v;
   const parse = (r) => (typeof r.data === "string" ? JSON.parse(r.data || "{}") : r.data || {});
   const keep = (r) => isStudyPid(r.pid) && REVIEW_TASKS.has(r.task);
   const [arts, chats, scen] = await Promise.all([eventsForPids("artifact", STUDY_PIDS, [...REVIEW_TASKS]), eventsForPids("chat", STUDY_PIDS, [...REVIEW_TASKS]), allScenarios()]);
@@ -561,9 +565,13 @@ app.get("/api/artifact-review", async (req, res) => {
   });
   const scenarios = { relocation: scen.relocation ?? SCENARIOS.relocation, studytool: scen.studytool ?? SCENARIOS.studytool, userchoice: {} };
   for (const [k, v] of Object.entries(scen)) if (k.startsWith("userchoice:")) scenarios.userchoice[k.slice(11)] = v;
-  const v = { artifacts, scenarios };
+  const v = { artifacts, scenarios, turns: Object.fromEntries(turns) };
   _reviewCache = { t: Date.now(), v };
-  res.json(v);
+  return v;
+}
+app.get("/api/artifact-review", async (req, res) => {
+  const { artifacts, scenarios } = await reviewData(!!req.query.fresh);
+  res.json({ artifacts, scenarios });
 });
 app.get("/api/artifact-codes", async (req, res) => res.json(await getCodes()));
 // One annotator's coding of one artifact: codebook ids (see CODEBOOK in artifact-review.html),
@@ -580,6 +588,64 @@ app.post("/api/artifact-codes", async (req, res) => {
     note: String(note ?? "").slice(0, 5000),
   };
   await setCode(`${data.coder}__${data.key}`, data);
+  res.json({ ok: true });
+});
+
+// ---- Researcher: sensemaking-process coding of session recordings (/process-review) ----
+// Recordings live in Drive (drive.js); one video per pid covers both of that pid's tasks.
+// Payload: videos by pid, plus each study session's artifacts and chat-turn times so the page
+// can place them on the video timeline (no telemetry, same cached read as /artifact-review).
+app.get("/api/process-review", async (req, res) => {
+  let videos = {}, videoError = null;
+  try {
+    ({ videos } = await listVideos(!!req.query.fresh));
+  } catch (e) {
+    videoError = String(e?.message || e);
+  }
+  const { artifacts, scenarios, turns } = await reviewData(!!req.query.fresh);
+  const sessions = {};
+  const sess = (pid, cond, task) => (sessions[`${pid}|${task}`] ||= { pid, cond, task, artifacts: [], turns: [] });
+  for (const a of artifacts) sess(a.pid, a.cond, a.task).artifacts.push({ seq: a.seq, ts: a.ts, file: a.file, title: a.title, prompt: a.prompt });
+  for (const [k, list] of Object.entries(turns)) {
+    const [pid, cond, task] = k.split("|");
+    sess(pid, cond, task).turns = list.map((t) => ({ ts: t.ts, user: String(t.user ?? "").slice(0, 600) }));
+  }
+  res.json({ videos, sessions: Object.values(sessions), scenarios, videoError });
+});
+app.get("/api/drive/:id", async (req, res) => {
+  try {
+    await streamFile(String(req.params.id), req, res);
+  } catch (e) {
+    console.error("drive stream failed:", e?.message || e);
+    if (!res.headersSent) res.status(502).send("Drive error");
+  }
+});
+app.get("/api/process-codes", async (req, res) => res.json(await getProcessCodes()));
+// One coder's annotation of one session (pid × task): time segments on the recording, each a
+// Pirolli & Card sensemaking-loop stage (see STAGES in process-review.html), plus a session label.
+// Also { sync } docs: where the recording starts in wall-clock time, shared by all coders per pid.
+const ID_RE = /^[A-Za-z0-9_-]{1,30}$/;
+const num = (v) => (v == null || v === "" || !Number.isFinite(+v) ? null : Math.round(+v * 10) / 10);
+app.post("/api/process-codes", async (req, res) => {
+  const b = req.body || {};
+  if (b.sync) {
+    if (!ID_RE.test(String(b.pid || "")) || !Number.isFinite(+b.videoStart)) return res.status(400).json({ error: "pid, videoStart required" });
+    await setProcessCode(`sync__${b.pid}`, { type: "sync", pid: String(b.pid), videoStart: Math.round(+b.videoStart), by: String(b.coder || "").slice(0, 30),
+      clock: String(b.clock ?? "").slice(0, 40), at: num(b.at) });
+    return res.json({ ok: true });
+  }
+  if (![b.coder, b.pid, b.task].every((x) => ID_RE.test(String(x || "")))) return res.status(400).json({ error: "coder, pid, task required (letters/digits)" });
+  const segs = (Array.isArray(b.segs) ? b.segs : []).slice(0, 600).map((g) => ({
+    id: String(g.id || "").slice(0, 20),
+    t0: num(g.t0), t1: num(g.t1),
+    stage: Number.isInteger(+g.stage) ? +g.stage : null,
+    art: num(g.art),
+    marks: [...new Set((Array.isArray(g.marks) ? g.marks : []).map((m) => String(m).slice(0, 40)))].slice(0, 12),
+    shot: num(g.shot),
+    note: String(g.note ?? "").slice(0, 2000),
+  })).filter((g) => g.t0 != null);
+  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
+  await setProcessCode(`${data.coder}__${data.pid}__${data.task}`, data);
   res.json({ ok: true });
 });
 

@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Process Review</title>
+<style>
+  :root { --bg:#f7f6f2; --panel:#fff; --line:#e4e1d8; --accent:#b4622e; --text:#2a2725; --muted:#8a857c; --soft:#faf7f2; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system,Segoe UI,Roboto,sans-serif; color:var(--text); background:var(--bg); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; align-items:center; gap:14px; padding:9px 16px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header b { color:var(--accent); }
+  header label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  header input[type=text] { width:110px; padding:4px 8px; border:1px solid var(--line); border-radius:6px; font:12px ui-monospace,Menlo,monospace; }
+  header input#coder.missing { border-color:#b3261e; box-shadow:0 0 0 2px #fde8e4; }
+  header a, .linkbtn { color:#6f6a61; font-size:13px; text-decoration:none; background:none; border:0; cursor:pointer; padding:0; font-family:inherit; }
+  header a:hover, .linkbtn:hover { color:var(--accent); }
+  .grow { flex:1; }
+  .muted { color:var(--muted); }
+  kbd { font:11px ui-monospace,Menlo,monospace; background:#f2efe8; border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  button.b { padding:3px 9px; border:1px solid var(--line); border-radius:6px; background:#f2efe8; cursor:pointer; font:12px inherit; color:var(--text); white-space:nowrap; }
+  button.b:hover { border-color:var(--accent); }
+  button.b.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  main { display:flex; flex:1; min-height:0; }
+
+  /* ---- sidebar: one row per recording (pid), a chip per task in it ---- */
+  #side { width:220px; flex:none; overflow-y:auto; border-right:1px solid var(--line); background:var(--panel); padding:12px; }
+  #side h3 { margin:14px 0 6px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+  #side h3:first-child { margin-top:0; }
+  .prow { display:flex; align-items:center; gap:6px; padding:3px 0; }
+  .prow > b { width:34px; font-size:13px; }
+  .tchip { display:flex; align-items:center; gap:4px; padding:1px 7px; border:1px solid var(--line); border-radius:10px; font-size:11px; cursor:pointer; background:#f6f3ed; white-space:nowrap; }
+  .tchip:hover { border-color:var(--accent); }
+  .tchip.on { box-shadow:0 0 0 2px var(--accent); border-color:var(--accent); background:#fff; }
+  .tchip .dot { width:8px; height:8px; border-radius:50%; background:#d8d3c9; }
+  .tchip .n { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .legend { font-size:11px; color:var(--muted); margin-top:14px; line-height:1.8; }
+  .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+
+  /* ---- center: video, palette, timeline, sequence ---- */
+  #center { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+  #vwrap { flex:1 1 auto; min-height:220px; background:#111; position:relative; }
+  #vwrap video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#111; }
+  #vmsg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:14px; padding:20px; text-align:center; pointer-events:none; }
+  .ctl { display:flex; align-items:center; gap:8px; padding:6px 12px; background:var(--panel); border-bottom:1px solid var(--line); font-size:12px; flex-wrap:wrap; }
+  .ctl .time { font:13px ui-monospace,Menlo,monospace; min-width:150px; }
+  .ctl select { font:12px inherit; padding:2px 4px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .ctl .sep { width:1px; height:18px; background:var(--line); }
+  #palette { display:flex; flex-direction:column; gap:4px; padding:6px 12px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .prow2 { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+  .prow2 > span { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); width:82px; }
+  .stb { display:flex; align-items:center; gap:4px; padding:2px 8px 2px 3px; border-radius:11px; font-size:11.5px; cursor:pointer; border:1px solid transparent; background:#f6f3ed; color:var(--text); }
+  .stb:hover { border-color:var(--c); }
+  .stb i { font-style:normal; font-weight:700; font-size:10px; color:#fff; background:var(--c); border-radius:9px; min-width:18px; text-align:center; padding:0 4px; }
+  .stb.prod { background:repeating-linear-gradient(135deg,#f6f3ed 0 5px,#ece7dc 5px 7px); }
+  .stb:disabled { opacity:.45; cursor:not-allowed; }
+
+  #tlwrap { background:var(--panel); border-bottom:1px solid var(--line); padding:4px 12px 6px; user-select:none; }
+  #tl { position:relative; cursor:pointer; }
+  .tlrow { position:relative; }
+  #tlRuler { height:16px; border-bottom:1px solid var(--line); }
+  #tlRuler span { position:absolute; top:0; font-size:9.5px; color:var(--muted); transform:translateX(-50%); white-space:nowrap; }
+  #tlRuler span::after { content:""; position:absolute; left:50%; top:13px; height:3px; border-left:1px solid #c9c3b8; }
+  #tlEvents { height:20px; }
+  .ev { position:absolute; top:3px; transform:translateX(-50%); }
+  .ev.art { width:14px; height:14px; background:#2a2725; color:#fff; font-size:8.5px; font-weight:700; border-radius:3px; text-align:center; line-height:14px; z-index:2; }
+  .ev.art:hover { background:var(--accent); }
+  .ev.turn { top:6px; width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:7px solid #a9a296; }
+  .ev.turn:hover { border-top-color:var(--accent); }
+  .taskband { position:absolute; top:0; bottom:0; background:rgba(180,98,46,.07); border-left:1px dashed rgba(180,98,46,.5); border-right:1px dashed rgba(180,98,46,.5); pointer-events:none; }
+  #tlSegs { height:30px; background:#f4f1ea; border-radius:4px; }
+  .seg { position:absolute; top:2px; bottom:2px; background:var(--c); border-radius:3px; color:#fff; font-size:10px; font-weight:600; overflow:hidden; white-space:nowrap; padding:2px 4px; line-height:22px; min-width:2px; border-right:1px solid rgba(255,255,255,.6); }
+  .seg.prod { background:repeating-linear-gradient(135deg,var(--c) 0 6px,color-mix(in srgb,var(--c) 70%,#000) 6px 9px); }
+  .seg.open { -webkit-mask-image:linear-gradient(90deg,#000 70%,rgba(0,0,0,.35)); mask-image:linear-gradient(90deg,#000 70%,rgba(0,0,0,.35)); }
+  .seg.sel { box-shadow:0 0 0 2px #2a2725; z-index:3; overflow:visible; }
+  .seg .h { position:absolute; top:-2px; bottom:-2px; width:7px; background:#2a2725; cursor:ew-resize; border-radius:2px; }
+  .seg .h0 { left:-4px; } .seg .h1 { right:-4px; }
+  .seg .mk { position:absolute; top:-1px; right:2px; font-size:9px; }
+  .orow { height:10px; margin-top:2px; }
+  .orow .seg { top:0; bottom:0; padding:0; border-radius:2px; }
+  .orow .who { position:absolute; right:100%; margin-right:3px; font-size:9px; color:var(--muted); top:-2px; }
+  #playhead { position:absolute; top:0; bottom:0; width:0; border-left:2px solid #d0342c; pointer-events:none; z-index:5; }
+  #hover { position:absolute; top:-1px; font-size:10px; background:#2a2725; color:#fff; padding:0 4px; border-radius:3px; transform:translateX(-50%); pointer-events:none; display:none; z-index:6; white-space:nowrap; }
+  .tlbar { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); margin-bottom:3px; }
+
+  #seqpanel { flex:none; height:230px; overflow-y:auto; background:var(--soft); padding:8px 14px 10px; }
+  .seqhd { display:flex; align-items:center; gap:10px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); font-weight:700; margin-bottom:4px; }
+  .seqrow { display:flex; flex-wrap:wrap; align-items:flex-end; row-gap:6px; margin-bottom:8px; }
+  .seqrow .who { font-size:11px; font-weight:700; color:var(--muted); width:100%; }
+  .si { display:flex; flex-direction:column; align-items:center; cursor:pointer; padding:0 2px; border-radius:4px; }
+  .si:hover { background:#efe9df; }
+  .si.sel { background:#efe0d2; }
+  .si .mk { font-size:10.5px; color:#a5641c; font-style:italic; min-height:14px; white-space:nowrap; }
+  .si .lb { font-size:13px; white-space:nowrap; border-bottom:2px solid var(--c); }
+  .si .lb.prod { font-weight:700; }
+  .si .nm { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .arrow { color:#9a948a; padding:0 3px 15px; font-size:13px; }
+  #plot { width:100%; display:block; }
+  .empty { color:var(--muted); font-size:13px; padding:8px 0; }
+
+  /* ---- right panel ---- */
+  #right { width:370px; flex:none; display:flex; flex-direction:column; border-left:1px solid var(--line); background:var(--panel); min-height:0; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); }
+  .tabs button { flex:1; padding:8px 4px; border:0; background:none; cursor:pointer; font:13px inherit; color:var(--muted); border-bottom:2px solid transparent; }
+  .tabs button.on { color:var(--text); border-bottom-color:var(--accent); font-weight:600; }
+  .pane { flex:1; overflow-y:auto; padding:12px 14px; display:none; font-size:13px; }
+  .pane.on { display:block; }
+  .pane h4 { margin:12px 0 5px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+  .pane h4:first-child { margin-top:0; }
+  .sess { background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .sess .top { display:flex; align-items:center; gap:8px; }
+  .sess select, .ed select, .ed input[type=text] { font:12px inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .sess textarea, .ed textarea { width:100%; border:1px solid var(--line); border-radius:6px; padding:6px; font:12.5px inherit; resize:vertical; margin-top:6px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:11px; font-size:11px; font-weight:600; background:#e7eef7; color:#3a5a80; }
+  .pill.interactive { background:#e3f0e3; color:#356b35; } .pill.static { background:#f3e8dc; color:#8a5a2b; } .pill.text { background:#ece7f2; color:#5b4b82; }
+  #saved { font-size:11px; color:var(--muted); margin-left:auto; }
+  .ed { border:1px solid var(--accent); border-radius:10px; padding:10px; margin-top:10px; background:#fffdfa; }
+  .ed .r { display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; flex-wrap:wrap; }
+  .ed .r > span:first-child { width:52px; color:var(--muted); }
+  .ed .r select { flex:1; min-width:0; max-width:100%; }
+  .ed input.tm { width:78px; font:12px ui-monospace,Menlo,monospace; }
+  .ed .shot { width:100%; aspect-ratio:16/9; background:#eee9df; border-radius:6px; object-fit:contain; display:block; margin-top:6px; }
+  .mchip { padding:1px 8px; border-radius:10px; border:1px solid var(--line); font-size:11px; cursor:pointer; background:#f6f3ed; }
+  .mchip.on { background:#a5641c; border-color:#a5641c; color:#fff; }
+  .slist { margin-top:12px; }
+  .srow { display:flex; gap:8px; padding:5px; border-radius:7px; cursor:pointer; align-items:center; border:1px solid transparent; }
+  .srow:hover { background:#f6f3ed; }
+  .srow.sel { border-color:var(--accent); background:#fffdfa; }
+  .srow img, .srow .ni { width:72px; height:40px; object-fit:cover; border-radius:4px; background:#eee9df; flex:none; }
+  .srow .st { font-size:12px; font-weight:600; display:flex; align-items:center; gap:5px; }
+  .srow .st i { font-style:normal; font-size:10px; color:#fff; background:var(--c); border-radius:8px; padding:0 5px; }
+  .srow .tm { font:11px ui-monospace,Menlo,monospace; color:var(--muted); }
+  .srow .mk { font-size:10.5px; color:#a5641c; font-style:italic; }
+  .cue { display:flex; gap:8px; padding:3px 5px; border-radius:5px; cursor:pointer; font-size:12.5px; }
+  .cue:hover { background:#f6f3ed; }
+  .cue.now { background:#fdf0e0; }
+  .cue .t { font:11px ui-monospace,Menlo,monospace; color:var(--muted); flex:none; padding-top:1px; }
+  .cue .sp { font-weight:600; }
+  .cue.out { opacity:.5; }
+  .trbar { display:flex; gap:8px; align-items:center; margin-bottom:8px; position:sticky; top:-12px; background:var(--panel); padding:4px 0; z-index:1; }
+  .trbar input[type=search] { flex:1; padding:4px 8px; border:1px solid var(--line); border-radius:6px; font:12px inherit; }
+  .trbar label { font-size:11px; color:var(--muted); display:flex; gap:4px; align-items:center; white-space:nowrap; }
+  .syncbox { background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12px; }
+  .syncbox .r { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; align-items:center; }
+  .arow { border:1px solid var(--line); border-radius:8px; padding:7px 8px; margin-top:8px; }
+  .arow .hd { display:flex; align-items:center; gap:6px; font-size:12px; }
+  .arow .hd b { background:#2a2725; color:#fff; border-radius:3px; padding:0 5px; font-size:10.5px; }
+  .arow .hd .tt { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+  .arow .hd a { color:var(--accent); text-decoration:none; }
+  .arow .p { font-size:11.5px; color:#6f6a61; margin-top:3px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .arow .p::before { content:"↳ "; }
+  .athumb { position:relative; width:100%; aspect-ratio:4/3; overflow:hidden; background:#f2efe8; border-radius:5px; margin-top:6px; }
+  .athumb iframe { position:absolute; top:0; left:0; width:1280px; height:960px; border:0; transform-origin:0 0; pointer-events:none; background:#fff; }
+  .trow { font-size:11.5px; color:#6f6a61; padding:4px 6px; margin-top:6px; border-left:3px solid #d8d3c9; cursor:pointer; }
+  .trow:hover { border-left-color:var(--accent); }
+  .trow .tm, .arow .tm { font:11px ui-monospace,Menlo,monospace; color:var(--muted); }
+  .banner { background:#fdf6e9; border:1px solid #ecd3a3; border-radius:8px; padding:8px 10px; font-size:12.5px; margin-bottom:10px; }
+  .help { font-size:11.5px; color:var(--muted); line-height:1.7; margin-top:14px; }
+</style>
+</head>
+<body>
+<header>
+  <b>Process review</b>
+  <span class="muted" id="hdr" style="font-size:13px">loading…</span>
+  <label title="Your annotator name. Each coder's annotations are stored separately; it's kept in the URL (?coder=…).">Coder
+    <input type="text" id="coder" spellcheck="false" placeholder="your name" /></label>
+  <label title="Show other coders' segments and sequences for this session."><input type="checkbox" id="compare" /> compare coders</label>
+  <span class="grow"></span>
+  <button class="linkbtn" id="csvSeg" title="One row per segment, every coder">⭳ segments CSV</button>
+  <button class="linkbtn" id="csvSeq" title="One row per (coder, session): the derived sequence">⭳ sequences CSV</button>
+  <button class="linkbtn" id="refresh" title="Re-read sessions and the Drive folder">↻ refresh</button>
+  <a href="/artifact-review">Artifact review →</a>
+</header>
+<main>
+  <nav id="side"></nav>
+  <section id="center">
+    <div id="vwrap"><video id="vid" preload="metadata" playsinline></video><div id="vmsg">Pick a session on the left.</div></div>
+    <div class="ctl">
+      <button class="b" id="play" title="Play / pause (Space)">▶︎</button>
+      <button class="b" id="back5" title="Back 5 s (←)">−5s</button>
+      <button class="b" id="fwd5" title="Forward 5 s (→)">+5s</button>
+      <span class="time" id="time">0:00 / 0:00</span>
+      <select id="speed" title="Playback speed (- / =)"></select>
+      <button class="b" id="cc" title="Show transcript captions on the video">CC</button>
+      <span class="sep"></span>
+      <span class="muted" id="wall" title="Wall-clock time at the playhead (from the sync on the Events tab)"></span>
+      <span class="grow"></span>
+      <span class="muted" id="ctlHint">Type a stage number (e.g. <kbd>1</kbd><kbd>3</kbd>) to start a segment at the playhead</span>
+    </div>
+    <div id="palette"></div>
+    <div id="tlwrap">
+      <div class="tlbar">
+        <span>View</span>
+        <button class="b" data-view="task">this task</button>
+        <button class="b" data-view="full">whole video</button>
+        <button class="b" data-view="zoom">10 min</button>
+        <span class="grow"></span>
+        <span>◼ artifact · ▾ prompt sent · shaded = this task's window</span>
+      </div>
+      <div id="tl">
+        <div class="tlrow" id="tlRuler"></div>
+        <div class="tlrow" id="tlEvents"></div>
+        <div class="tlrow" id="tlSegs"></div>
+        <div id="tlOthers"></div>
+        <div id="playhead"></div><div id="hover"></div>
+      </div>
+    </div>
+    <div id="seqpanel">
+      <div class="seqhd">Sequence <button class="b" id="copySeq" style="text-transform:none;letter-spacing:0;font-weight:400">copy</button></div>
+      <div id="seq"></div>
+      <svg id="plot" height="150"></svg>
+    </div>
+  </section>
+  <aside id="right">
+    <div class="tabs"><button data-tab="segs" class="on">Segments</button><button data-tab="tr">Transcript</button><button data-tab="ev">Events &amp; sync</button></div>
+    <div class="pane on" id="pSegs"></div>
+    <div class="pane" id="pTr"></div>
+    <div class="pane" id="pEv"></div>
+  </aside>
+</main>
+<!-- frame grabber: must stay rendered (not display:none) or Chrome may never decode its frames -->
+<video id="grab" preload="auto" muted playsinline style="position:fixed;left:0;bottom:0;width:4px;height:4px;opacity:.01;pointer-events:none"></video>
+
+<script>
+// ---- codebook: Pirolli & Card (2005) sensemaking loop, numbered as in their figure ----------
+// loop F = foraging loop, S = sensemaking loop; prod = a product (data structure), which is where
+// a participant's artifact usually attaches, e.g. "schema (artifact 1)".
+const STAGES = [
+  { n: 1, name: "External data sources", loop: "F", prod: true, c: "#7f8c99" },
+  { n: 2, name: "Search & filter", loop: "F", c: "#2f6fbf" },
+  { n: 3, name: "Search for information", loop: "F", c: "#3d93d6" },
+  { n: 4, name: "Shoebox", loop: "F", prod: true, c: "#5f7fb0" },
+  { n: 5, name: "Read & extract", loop: "F", c: "#1f9e89" },
+  { n: 6, name: "Search for relations", loop: "F", c: "#4caf7a" },
+  { n: 7, name: "Evidence file", loop: "F", prod: true, c: "#2a6f5e" },
+  { n: 8, name: "Schematize", loop: "S", c: "#d99a1e" },
+  { n: 9, name: "Search for evidence", loop: "S", c: "#e07b39" },
+  { n: 10, name: "Schema", loop: "S", prod: true, c: "#a8581a" },
+  { n: 11, name: "Build case", loop: "S", c: "#d9534f" },
+  { n: 12, name: "Search for support", loop: "S", c: "#c2477a" },
+  { n: 13, name: "Hypothesis", loop: "S", c: "#9b3fb5" },
+  { n: 14, name: "Tell story", loop: "S", c: "#6a3fb5" },
+  { n: 15, name: "Reevaluate", loop: "S", c: "#8a6d3b" },
+  { n: 16, name: "Presentation", loop: "S", prod: true, c: "#4b2f80" },
+];
+const ST = Object.fromEntries(STAGES.map((s) => [s.n, s]));
+const MARKS = ["narrowing", "revisiting artifact", "cross-checking", "backtracking", "comparing"];
+const LABELS = [["", "— unlabeled", "#d8d3c9"], ["good", "Good / strong", "#5aae5e"], ["average", "Average / mediocre", "#e0b84a"], ["poor", "Non-informative", "#e57373"]];
+const LABEL_C = Object.fromEntries(LABELS.map(([k, , c]) => [k, c]));
+const COND = { I: "interactive", S: "static", T: "text" };
+const TASK_SHORT = { relocation: "relocation", studytool: "study tool", userchoice: "user choice" };
+
+// ---- tiny utils ----
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const fmt = (t, dec) => {
+  if (t == null || !isFinite(t)) return "—";
+  const neg = t < 0; t = Math.abs(t);
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  const ss = dec ? s.toFixed(1).padStart(4, "0") : String(Math.floor(s)).padStart(2, "0");
+  return (neg ? "−" : "") + (h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`);
+};
+const parseTime = (s) => {
+  if (!String(s ?? "").trim()) return null;
+  const p = String(s).trim().split(":").map(Number);
+  if (!p.length || p.some((x) => !isFinite(x))) return null;
+  return p.reduce((a, x) => a * 60 + x, 0);
+};
+const r1 = (t) => Math.round(t * 10) / 10;
+const uid = () => Math.random().toString(36).slice(2, 9);
+const stageLabel = (g, arts) => {
+  const s = ST[g.stage];
+  if (!s) return "?";
+  const a = g.art != null ? ` (artifact ${g.art})` : "";
+  return s.name.toLowerCase() + a;
+};
+
+// ---- state ----
+const q = new URLSearchParams(location.search);
+const state = {
+  coder: (q.get("coder") || lsGet("pr-coder") || "").replace(/[^A-Za-z0-9_-]/g, ""),
+  pid: q.get("pid") || "", task: q.get("task") || "",
+  view: lsGet("pr-view") || "task", tab: "segs", compare: q.get("compare") === "1",
+  sel: null, // selected segment id
+};
+let D = null; // { videos, sessions, scenarios }
+let CODES = {}; // "pid|task" -> { coder -> record }
+let SYNC = {}; // pid -> { videoStart, by }
+let VTT = {}; // pid -> cues[]
+const vid = $("vid");
+
+function syncUrl() {
+  const p = new URLSearchParams();
+  for (const k of ["coder", "pid", "task"]) if (state[k]) p.set(k, state[k]);
+  if (state.compare) p.set("compare", "1");
+  history.replaceState(null, "", "?" + p);
+}
+async function getJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url} → ${r.status}`);
+  return r.json();
+}
+
+// ---- data ----
+async function load(fresh) {
+  $("hdr").textContent = "loading…";
+  let d, c;
+  try {
+    [d, c] = await Promise.all([getJson("/api/process-review" + (fresh ? "?fresh=1" : "")), getJson("/api/process-codes")]);
+  } catch (e) {
+    $("hdr").textContent = "failed to load: " + e.message;
+    return;
+  }
+  D = d;
+  CODES = {}; SYNC = {};
+  for (const x of Object.values(c)) {
+    if (x?.type === "sync") SYNC[x.pid] = x;
+    else if (x?.coder && x?.pid && x?.task) ((CODES[`${x.pid}|${x.task}`] ||= {})[x.coder] = x);
+  }
+  const n = Object.keys(D.videos).length;
+  $("hdr").textContent = D.videoError ? `⚠ Drive: ${D.videoError}` : `${n} recordings`;
+  renderSide();
+  if (state.pid && D.videos[state.pid]) openSession(state.pid, state.task, true);
+  else showEmpty();
+}
+
+// Sessions for one recording: the pid's study tasks (scenario task first), or the task in the
+// file name when no study data exists for that pid.
+function sessionsFor(pid) {
+  const v = D.videos[pid];
+  const list = D.sessions.filter((s) => s.pid === pid);
+  if (!list.length && v) list.push({ pid, cond: COND[pid[0]] || "", task: v.task, artifacts: [], turns: [] });
+  const order = (t) => (t === "userchoice" ? 1 : 0);
+  return list.sort((a, b) => order(a.task) - order(b.task));
+}
+const cur = () => D && sessionsFor(state.pid).find((s) => s.task === state.task);
+const recOf = (pid, task, coder) => CODES[`${pid}|${task}`]?.[coder] || null;
+function mine(create) {
+  if (!state.coder) return null;
+  const k = `${state.pid}|${state.task}`;
+  let r = CODES[k]?.[state.coder];
+  if (!r && create) r = (CODES[k] ||= {})[state.coder] = { coder: state.coder, pid: state.pid, task: state.task, segs: [], label: "", note: "" };
+  return r;
+}
+const segs = () => mine()?.segs || [];
+
+// Video ↔ wall clock. Every recording has Zoom's date/time stamp burned into its bottom-right
+// corner, so a coder reads it once per recording (Events tab) and that sync is shared per pid.
+// Unsynced recordings show the whole video and no prompt/artifact markers.
+// The burned-in clocks are the study machines' local time (Pacific); read and show times in that zone.
+const TZ = "America/Los_Angeles";
+const tzOffset = (ms) => { const d = new Date(ms); return Date.parse(d.toLocaleString("en-US", { timeZone: TZ }) + " UTC") - Date.parse(d.toLocaleString("en-US", { timeZone: "UTC" }) + " UTC"); };
+const parseTz = (iso) => { const g = Date.parse(iso.replace(" ", "T") + "Z"); return isNaN(g) ? null : g - tzOffset(g); };
+const tzDay = (ms) => new Date(ms).toLocaleDateString("en-CA", { timeZone: TZ });
+const tzTime = (ms) => new Date(ms).toLocaleTimeString("en-GB", { timeZone: TZ });
+const videoStart = (pid) => SYNC[pid]?.videoStart ?? null;
+const vt = (ts, pid = state.pid) => { const s = videoStart(pid); return s == null ? null : (Date.parse(ts) - s) / 1000; };
+const duration = () => (isFinite(vid.duration) && vid.duration) || (D.videos[state.pid]?.durationMs || 0) / 1000;
+// A task's span in the video: a bit before its first prompt to a few minutes after its last artifact/prompt.
+function taskWindow(s = cur()) {
+  const dur = duration();
+  if (!s) return [0, dur];
+  const ts = [...s.turns.map((t) => t.ts), ...s.artifacts.map((a) => a.ts)].map((x) => vt(x, s.pid)).filter((x) => x != null && isFinite(x));
+  if (!ts.length) return [0, dur];
+  const a = Math.max(0, Math.min(...ts) - 300), b = Math.min(dur || Infinity, Math.max(...ts) + 240);
+  return b > a ? [a, b] : [0, dur];
+}
+function viewWindow() {
+  const dur = duration();
+  if (state.view === "full") return [0, dur || 1];
+  if (state.view === "zoom") {
+    const t = vid.currentTime || 0, span = Math.min(600, dur || 600);
+    const a = Math.max(0, Math.min(t - span / 2, (dur || span) - span));
+    return [a, a + span];
+  }
+  const [a, b] = taskWindow();
+  return [a, b > a ? b : a + 60];
+}
+
+// ---- sidebar ----
+function renderSide() {
+  const pids = Object.keys(D.videos).sort((a, b) => a[0].localeCompare(b[0]) || +a.slice(1) - +b.slice(1));
+  let h = "";
+  for (const p of ["I", "S", "T"]) {
+    const ps = pids.filter((x) => x[0] === p);
+    if (!ps.length) continue;
+    h += `<h3>${COND[p]} (${ps.length})</h3>`;
+    for (const pid of ps) {
+      h += `<div class="prow"><b>${pid}</b>` + sessionsFor(pid).map((s) => {
+        const r = recOf(pid, s.task, state.coder);
+        const others = Object.keys(CODES[`${pid}|${s.task}`] || {}).filter((c) => c !== state.coder).length;
+        const on = pid === state.pid && s.task === state.task ? " on" : "";
+        return `<span class="tchip${on}" data-pid="${pid}" data-task="${esc(s.task)}" title="${esc(s.task)}${others ? ` · ${others} other coder(s)` : ""}">
+          <span class="dot" style="background:${LABEL_C[r?.label || ""]}"></span>${esc(TASK_SHORT[s.task] || s.task)}${r?.segs?.length ? `<span class="n">${r.segs.length}</span>` : ""}</span>`;
+      }).join("") + "</div>";
+    }
+  }
+  h += `<div class="legend">${LABELS.map(([k, l, c]) => `<div><i style="background:${c}"></i>${esc(l)}</div>`).join("")}<div style="margin-top:4px">number = your segments</div></div>`;
+  $("side").innerHTML = h;
+}
+$("side").addEventListener("click", (e) => {
+  const c = e.target.closest(".tchip");
+  if (c) openSession(c.dataset.pid, c.dataset.task);
+});
+
+function showEmpty() {
+  $("vmsg").style.display = "flex";
+  $("vmsg").textContent = D?.videoError ? "Could not read the Drive folder: " + D.videoError : "Pick a session on the left.";
+  renderAll();
+}
+
+// ---- open a session ----
+let posTimer = null;
+function openSession(pid, task, fromUrl) {
+  const prevPid = state.pid;
+  const list = sessionsFor(pid);
+  state.pid = pid;
+  state.task = list.find((s) => s.task === task)?.task || list[0]?.task || "";
+  state.sel = null;
+  syncUrl();
+  renderSide();
+  const v = D.videos[pid];
+  const tParam = fromUrl ? parseTime(q.get("t") || "") : null;
+  const goStart = () => {
+    const [a, b] = taskWindow();
+    const saved = +lsGet(`pr-pos-${pid}-${state.task}`);
+    seek(tParam ?? (saved && saved >= a && saved <= b ? saved : a));
+  };
+  if (pid !== prevPid || !vid.src) {
+    $("vmsg").style.display = "flex";
+    $("vmsg").textContent = "Loading video from Drive…";
+    vid.src = `/api/drive/${v.videoId}`;
+    $("grab").src = vid.src;
+    for (const t of [...vid.querySelectorAll("track")]) t.remove();
+    if (v.vttId) {
+      const tr = document.createElement("track");
+      Object.assign(tr, { kind: "captions", label: "Transcript", srclang: "en", src: `/api/drive/${v.vttId}` });
+      vid.appendChild(tr);
+      tr.track.mode = ccOn ? "showing" : "hidden";
+    }
+    vid.addEventListener("loadedmetadata", () => { goStart(); renderAll(); }, { once: true });
+    loadVtt(pid);
+  } else goStart();
+  renderAll();
+}
+function seek(t) {
+  const d = duration();
+  vid.currentTime = Math.max(0, d ? Math.min(t, d - 0.05) : t);
+  updatePlayhead();
+}
+
+// ---- rendering ----
+function renderAll() {
+  renderPalette();
+  renderTimeline();
+  renderSeq();
+  renderPlot();
+  renderSegPane();
+  renderEvPane();
+  renderTr(true);
+  updatePlayhead();
+}
+
+function renderPalette() {
+  const dis = !state.coder || !state.pid ? " disabled" : "";
+  const row = (loop, title) => `<div class="prow2"><span>${title}</span>` + STAGES.filter((s) => s.loop === loop).map((s) =>
+    `<button class="stb${s.prod ? " prod" : ""}" style="--c:${s.c}" data-n="${s.n}"${dis} title="${esc(s.name)}${s.prod ? " (product)" : ""} — type ${s.n}"><i>${s.n}</i>${esc(s.name)}</button>`).join("") + "</div>";
+  $("palette").innerHTML = row("F", "Foraging") + row("S", "Sensemaking");
+}
+$("palette").addEventListener("click", (e) => {
+  const b = e.target.closest(".stb");
+  if (b && !b.disabled) addStage(+b.dataset.n);
+});
+
+const pct = (t, [a, b]) => ((t - a) / (b - a)) * 100;
+function effEnd(list, i) { return list[i].t1 ?? list[i + 1]?.t0 ?? null; }
+function segEls(list, w, withHandles) {
+  const now = vid.currentTime || 0;
+  return list.map((g, i) => {
+    const s = ST[g.stage] || { c: "#999", name: "?" };
+    let end = effEnd(list, i);
+    const open = end == null;
+    if (open) end = Math.max(g.t0 + 3, now > g.t0 ? now : g.t0 + 3);
+    const l = pct(g.t0, w), r = pct(end, w);
+    if (r < 0 || l > 100) return "";
+    const L = Math.max(0, l), W = Math.max(0.15, Math.min(100, r) - L);
+    const sel = withHandles && g.id === state.sel;
+    return `<div class="seg${s.prod ? " prod" : ""}${open ? " open" : ""}${sel ? " sel" : ""}" data-id="${g.id}" style="--c:${s.c};left:${L}%;width:${W}%"
+      title="${esc(`${g.stage} ${s.name}${g.art != null ? ` · artifact ${g.art}` : ""}${g.marks?.length ? ` · ${g.marks.join(", ")}` : ""}\n${fmt(g.t0)}–${open ? "…" : fmt(end)}${g.note ? "\n" + g.note : ""}`)}">${withHandles ? `${g.stage} ${esc(s.name)}` : ""}${withHandles && g.marks?.length ? '<span class="mk">●</span>' : ""}${sel ? `<span class="h h0" data-h="0"></span>${g.t1 != null ? '<span class="h h1" data-h="1"></span>' : ""}` : ""}</div>`;
+  }).join("");
+}
+function renderTimeline() {
+  document.querySelectorAll(".tlbar [data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === state.view));
+  if (!D || !state.pid) { for (const id of ["tlRuler", "tlEvents", "tlSegs", "tlOthers"]) $(id).innerHTML = ""; return; }
+  const w = viewWindow(), span = w[1] - w[0];
+  // ruler
+  const width = $("tl").clientWidth || 800;
+  const step = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].find((s) => (s / span) * width >= 70) || 3600;
+  let h = "";
+  for (let t = Math.ceil(w[0] / step) * step; t <= w[1]; t += step) h += `<span style="left:${pct(t, w)}%">${fmt(t)}</span>`;
+  $("tlRuler").innerHTML = h;
+  // task bands (both tasks of this recording), artifacts, prompts
+  const s = cur();
+  let ev = "";
+  for (const ss of sessionsFor(state.pid)) {
+    if (ss.task !== state.task && state.view === "task") continue;
+    const [a, b] = taskWindow(ss);
+    if (b > a) ev += `<div class="taskband" style="left:${Math.max(0, pct(a, w))}%;width:${Math.max(0, Math.min(100, pct(b, w)) - Math.max(0, pct(a, w)))}%;${ss.task !== state.task ? "background:rgba(0,0,0,.03);border-color:#ccc" : ""}" title="${esc(ss.task)}"></div>`;
+  }
+  for (const ss of sessionsFor(state.pid)) {
+    const dim = ss.task !== state.task ? "opacity:.35;" : "";
+    for (const t of ss.turns) {
+      const x = vt(t.ts);
+      if (x == null || x < w[0] || x > w[1]) continue;
+      ev += `<div class="ev turn" style="left:${pct(x, w)}%;${dim}" data-t="${x}" title="${esc(`${fmt(x)} · prompt (${ss.task}):\n${t.user}`)}"></div>`;
+    }
+    for (const a of ss.artifacts) {
+      const x = vt(a.ts);
+      if (x == null || x < w[0] || x > w[1]) continue;
+      ev += `<div class="ev art" style="left:${pct(x, w)}%;${dim}" data-t="${x}" title="${esc(`${fmt(x)} · artifact ${a.seq} (${ss.task}): ${a.title || ""}\n↳ ${a.prompt || ""}`)}">${a.seq}</div>`;
+    }
+  }
+  $("tlEvents").innerHTML = ev;
+  $("tlSegs").innerHTML = state.coder ? segEls(segs(), w, true) : `<div style="font-size:11px;color:var(--muted);padding:7px">Enter a coder name to annotate.</div>`;
+  // other coders
+  let o = "";
+  if (state.compare) for (const [c, r] of Object.entries(CODES[`${state.pid}|${state.task}`] || {})) {
+    if (c === state.coder || !r.segs?.length) continue;
+    o += `<div class="tlrow orow" title="${esc(c)}">${segEls(r.segs, w, false)}</div>`;
+  }
+  $("tlOthers").innerHTML = o;
+}
+function updatePlayhead() {
+  const t = vid.currentTime || 0, d = duration();
+  $("time").textContent = `${fmt(t, true)} / ${fmt(d)}`;
+  const vs = state.pid && D ? videoStart(state.pid) : null;
+  $("wall").textContent = !state.pid ? "" : vs != null ? tzTime(vs + t * 1000) + " PT" : "⚠ not synced (Events tab)";
+  if (!D || !state.pid) return;
+  const w = viewWindow(), p = pct(t, w);
+  $("playhead").style.display = p >= 0 && p <= 100 ? "" : "none";
+  $("playhead").style.left = p + "%";
+  $("play").textContent = vid.paused ? "▶︎" : "❚❚";
+}
+
+// Timeline interaction: click = seek (or select a segment), drag a selected segment's edge to retime.
+let drag = null;
+$("tl").addEventListener("mousedown", (e) => {
+  if (!D || !state.pid) return;
+  const h = e.target.closest(".h");
+  if (h) { drag = { id: h.closest(".seg").dataset.id, edge: +h.dataset.h }; e.preventDefault(); return; }
+  const sg = e.target.closest("#tlSegs .seg");
+  if (sg) { selectSeg(sg.dataset.id, true); return; }
+  const ev = e.target.closest(".ev");
+  if (ev) { seek(+ev.dataset.t); return; }
+  seek(tAtX(e.clientX));
+});
+const tAtX = (x) => { const r = $("tl").getBoundingClientRect(), w = viewWindow(); return w[0] + ((x - r.left) / r.width) * (w[1] - w[0]); };
+document.addEventListener("mousemove", (e) => {
+  const r = $("tl").getBoundingClientRect();
+  if (e.clientY >= r.top && e.clientY <= r.bottom && e.clientX >= r.left && e.clientX <= r.right && D && state.pid) {
+    $("hover").style.display = "block";
+    $("hover").style.left = ((e.clientX - r.left) / r.width) * 100 + "%";
+    $("hover").textContent = fmt(tAtX(e.clientX));
+  } else $("hover").style.display = "none";
+  if (!drag) return;
+  const list = segs(), i = list.findIndex((g) => g.id === drag.id);
+  if (i < 0) return;
+  const g = list[i], t = r1(tAtX(e.clientX));
+  if (drag.edge === 0) g.t0 = Math.max(i ? list[i - 1].t0 + 0.5 : 0, Math.min(t, (effEnd(list, i) ?? t + 1) - 0.5));
+  else g.t1 = Math.max(g.t0 + 0.5, Math.min(t, list[i + 1]?.t0 ?? Infinity));
+  renderTimeline();
+});
+document.addEventListener("mouseup", () => {
+  if (!drag) return;
+  const g = segs().find((x) => x.id === drag.id);
+  drag = null;
+  if (g) seek(g.t0);
+  changed();
+});
+document.querySelectorAll(".tlbar [data-view]").forEach((b) => b.addEventListener("click", () => {
+  state.view = b.dataset.view; lsSet("pr-view", state.view); renderTimeline(); renderPlot(); updatePlayhead();
+}));
+
+// ---- sequence + step plot ----
+function seqHtml(list, selectable) {
+  if (!list.length) return "";
+  return list.map((g, i) => {
+    const s = ST[g.stage] || { c: "#999" };
+    return (i ? '<span class="arrow">→</span>' : "") +
+      `<div class="si${selectable && g.id === state.sel ? " sel" : ""}" ${selectable ? `data-id="${g.id}"` : ""} style="--c:${s.c}" title="${esc(fmt(g.t0) + (g.note ? " · " + g.note : ""))}">
+        <span class="mk">${g.marks?.length ? "(" + esc(g.marks.join(", ")) + ")" : ""}</span>
+        <span class="lb${s.prod ? " prod" : ""}">${esc(stageLabel(g))}</span><span class="nm">${g.stage ?? ""}</span></div>`;
+  }).join("");
+}
+const seqText = (list) => list.map((g) => stageLabel(g)).join(" → ");
+function renderSeq() {
+  if (!D || !state.pid) { $("seq").innerHTML = ""; return; }
+  let h = state.coder
+    ? (segs().length ? `<div class="seqrow">${seqHtml(segs(), true)}</div>` : `<div class="empty">No segments yet. Play the video and type a stage number (or click a stage above) when the participant's activity changes; each new stage closes the previous segment.</div>`)
+    : `<div class="empty">Enter your coder name in the header to start.</div>`;
+  if (state.compare) for (const [c, r] of Object.entries(CODES[`${state.pid}|${state.task}`] || {})) {
+    if (c === state.coder || !r.segs?.length) continue;
+    h += `<div class="seqrow"><span class="who">${esc(c)}${r.label ? ` · ${esc(r.label)}` : ""}</span>${seqHtml(r.segs, false)}</div>`;
+  }
+  $("seq").innerHTML = h;
+}
+$("seq").addEventListener("click", (e) => { const si = e.target.closest(".si[data-id]"); if (si) selectSeg(si.dataset.id, true); });
+$("copySeq").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(seqText(segs())); $("copySeq").textContent = "copied ✓"; } catch { $("copySeq").textContent = "copy failed"; }
+  setTimeout(() => ($("copySeq").textContent = "copy"), 1500);
+});
+
+// Stage number over time — the y axis follows the figure's numbering (low = raw data, high = presentation),
+// so climbing = moving up in structure, drops = going back to foraging.
+function renderPlot() {
+  const svg = $("plot"), W = svg.clientWidth || 800, H = 150, L = 128, T = 6, B = 16;
+  if (!D || !state.pid || !state.coder) { svg.innerHTML = ""; return; }
+  const w = viewWindow(), X = (t) => L + ((t - w[0]) / (w[1] - w[0])) * (W - L - 6), Y = (n) => T + ((16 - n) / 15) * (H - T - B);
+  let h = "";
+  for (const s of STAGES) h += `<line x1="${L}" x2="${W - 6}" y1="${Y(s.n)}" y2="${Y(s.n)}" stroke="#ece8df" stroke-width="1"/>` +
+    `<text x="${L - 6}" y="${Y(s.n) + 3}" font-size="8.5" text-anchor="end" fill="${s.prod ? "#5a564e" : "#9a948a"}" ${s.prod ? 'font-weight="700"' : ""}>${s.n} ${esc(s.name.toLowerCase())}</text>`;
+  for (const a of cur()?.artifacts || []) {
+    const x = vt(a.ts);
+    if (x != null && x >= w[0] && x <= w[1]) h += `<line x1="${X(x)}" x2="${X(x)}" y1="${T}" y2="${H - B}" stroke="#2a2725" stroke-dasharray="2 3" opacity=".5"/><text x="${X(x)}" y="${H - 4}" font-size="9" text-anchor="middle" fill="#2a2725" font-weight="700">${a.seq}</text>`;
+  }
+  const list = segs();
+  let prev = null;
+  const now = vid.currentTime || 0;
+  list.forEach((g, i) => {
+    const s = ST[g.stage];
+    if (!s) return;
+    let end = effEnd(list, i) ?? Math.max(g.t0 + 3, now);
+    const x0 = X(Math.max(g.t0, w[0])), x1 = X(Math.min(end, w[1]));
+    if (prev && g.t0 >= w[0] && g.t0 <= w[1]) h += `<line x1="${X(g.t0)}" x2="${X(g.t0)}" y1="${Y(prev)}" y2="${Y(s.n)}" stroke="#b9b2a6" stroke-width="1.2"/>`;
+    if (x1 > x0) h += `<line x1="${x0}" x2="${x1}" y1="${Y(s.n)}" y2="${Y(s.n)}" stroke="${s.c}" stroke-width="${g.id === state.sel ? 6 : 4}" stroke-linecap="round"/>`;
+    prev = s.n;
+  });
+  const px = X(now);
+  if (px >= L && px <= W) h += `<line x1="${px}" x2="${px}" y1="${T}" y2="${H - B}" stroke="#d0342c" stroke-width="1.5"/>`;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = h;
+}
+
+// ---- editing ----
+function sortSegs() { const r = mine(); if (r) r.segs.sort((a, b) => a.t0 - b.t0); }
+function segAt(t) {
+  const list = segs();
+  for (let i = 0; i < list.length; i++) { const e = effEnd(list, i) ?? Infinity; if (list[i].t0 <= t && t < e) return list[i]; }
+  return null;
+}
+// For product stages, attach the latest artifact created up to a few seconds after t.
+function nearestArtifact(t) {
+  const a = (cur()?.artifacts || []).map((x) => ({ seq: x.seq, t: vt(x.ts) })).filter((x) => x.t != null && x.t <= t + 15).sort((a, b) => b.t - a.t)[0];
+  return a ? a.seq : null;
+}
+// A stage at the playhead: inside a segment → split it there (or relabel it, if right at its start);
+// in a gap → open a new segment that runs until the next one starts.
+function addStage(n) {
+  if (!state.coder || !state.pid || !ST[n]) return;
+  const r = mine(true), t = r1(vid.currentTime || 0), c = segAt(t);
+  let g;
+  if (c && Math.abs(c.t0 - t) < 0.6) { c.stage = n; g = c; }
+  else {
+    g = { id: uid(), t0: t, t1: c ? c.t1 : null, stage: n, art: null, marks: [], note: "", shot: null };
+    if (c) c.t1 = t;
+    r.segs.push(g);
+  }
+  if (ST[n].prod && g.art == null) g.art = nearestArtifact(t);
+  sortSegs();
+  state.sel = g.id;
+  changed();
+}
+function closeAt() {
+  const t = r1(vid.currentTime || 0), c = segAt(t);
+  if (c && t > c.t0) { c.t1 = t; changed(); }
+}
+function selectSeg(id, doSeek) {
+  state.sel = id;
+  const g = segs().find((x) => x.id === id);
+  if (g && doSeek) seek(g.t0);
+  renderTimeline(); renderSeq(); renderPlot(); renderSegPane();
+  document.querySelector(`.srow[data-id="${id}"]`)?.scrollIntoView({ block: "nearest" });
+}
+function deleteSel() {
+  const r = mine();
+  if (!r || !state.sel) return;
+  const i = r.segs.findIndex((g) => g.id === state.sel);
+  if (i < 0) return;
+  // keep the timeline contiguous: the previous segment absorbs the deleted one
+  if (i > 0 && r.segs[i - 1].t1 === r.segs[i].t0) r.segs[i - 1].t1 = r.segs[i].t1;
+  r.segs.splice(i, 1);
+  state.sel = r.segs[Math.min(i, r.segs.length - 1)]?.id || null;
+  changed();
+}
+function changed() {
+  renderTimeline(); renderSeq(); renderPlot(); renderSegPane(); renderSide();
+  save();
+}
+let saveT = null;
+function save() {
+  const r = mine();
+  if (!r) return;
+  $("saved") && ($("saved").textContent = "saving…");
+  clearTimeout(saveT);
+  saveT = setTimeout(async () => {
+    try {
+      const res = await fetch("/api/process-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(r) });
+      if (!res.ok) throw new Error(res.status);
+      $("saved") && ($("saved").textContent = "saved ✓");
+    } catch (e) {
+      $("saved") && ($("saved").textContent = "⚠ save failed — " + e.message);
+    }
+  }, 600);
+}
+
+// ---- frame thumbnails: a hidden second <video> seeks and draws to a canvas (same-origin, so allowed) ----
+const thumbCache = new Map();
+let grabQ = Promise.resolve();
+function frameAt(t) {
+  const key = `${state.pid}@${r1(t)}`;
+  if (thumbCache.has(key)) return thumbCache.get(key);
+  const g = $("grab"), pid = state.pid;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const ev = (name, ms) => new Promise((r) => { const to = setTimeout(r, ms); g.addEventListener(name, () => { clearTimeout(to); r(); }, { once: true }); });
+  // after 'seeked', give the decoder a moment (or until the frame is presented, where supported)
+  const presented = (ms) => new Promise((r) => { const to = setTimeout(r, ms); g.requestVideoFrameCallback?.(() => { clearTimeout(to); r(); }); });
+  const draw = () => {
+    const c = document.createElement("canvas");
+    c.width = 480; c.height = Math.round((480 * (g.videoHeight || 9)) / (g.videoWidth || 16));
+    const x = c.getContext("2d");
+    x.drawImage(g, 0, 0, c.width, c.height);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 400) lit += d[i] + d[i + 1] + d[i + 2];
+    return { url: c.toDataURL("image/jpeg", 0.75), blank: lit === 0 };
+  };
+  const p = (grabQ = grabQ.then(async () => {
+    if (pid !== state.pid) return null;
+    if (g.readyState < 1) await ev("loadedmetadata", 15000);
+    const sk = ev("seeked", 15000);
+    g.currentTime = t + 0.05;
+    await sk;
+    if (g.readyState < 2) await ev("canplay", 5000);
+    await presented(400);
+    try {
+      let f = draw();
+      if (f.blank) { await wait(800); f = draw(); } // first frames after load can come back empty
+      return f.blank ? null : f.url;
+    } catch { return null; }
+  }));
+  thumbCache.set(key, p);
+  p.then((x) => x || thumbCache.delete(key));
+  return p;
+}
+function fillThumbs(root) {
+  root.querySelectorAll("img[data-t]").forEach((img) => {
+    frameAt(+img.dataset.t).then((u) => { if (u) img.src = u; });
+  });
+}
+function captureNow() {
+  const g = segs().find((x) => x.id === state.sel);
+  if (!g) return;
+  g.shot = r1(vid.currentTime || 0);
+  try {
+    const c = document.createElement("canvas");
+    c.width = 480; c.height = Math.round((480 * (vid.videoHeight || 9)) / (vid.videoWidth || 16));
+    c.getContext("2d").drawImage(vid, 0, 0, c.width, c.height);
+    thumbCache.set(`${state.pid}@${g.shot}`, Promise.resolve(c.toDataURL("image/jpeg", 0.75)));
+  } catch {}
+  changed();
+}
+
+// ---- right panel: session + segment editor + segment list ----
+function renderSegPane() {
+  const p = $("pSegs");
+  if (!D || !state.pid) { p.innerHTML = `<div class="empty">Pick a session on the left.</div>` + helpHtml(); return; }
+  const s = cur(), r = mine();
+  let h = `<div class="sess"><div class="top"><b>${esc(state.pid)}</b><span class="pill ${esc(s?.cond)}">${esc(s?.cond)}</span><span class="pill">${esc(TASK_SHORT[state.task] || state.task)}</span><span id="saved"></span></div>`;
+  if (!state.coder) h += `<div class="banner" style="margin:8px 0 0">Enter your <b>coder</b> name at the top to annotate. Each coder's annotations are saved separately.</div></div>`;
+  else h += `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;font-size:12px"><span class="muted">Session</span><select id="sLabel">${LABELS.map(([k, l]) => `<option value="${k}"${(r?.label || "") === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
+    <textarea id="sNote" rows="2" placeholder="Session memo (e.g. narrowing factor, overall pattern)…">${esc(r?.note || "")}</textarea></div>`;
+  const list = segs(), g = list.find((x) => x.id === state.sel);
+  if (g) {
+    const i = list.indexOf(g), end = effEnd(list, i);
+    const opt = (n) => `<option value="${n}"${g.stage === n ? " selected" : ""}>${n} · ${esc(ST[n].name)}${ST[n].prod ? " (product)" : ""}</option>`;
+    const arts = cur()?.artifacts || [];
+    h += `<div class="ed">
+      <div class="r"><span>Stage</span><select id="eStage"><optgroup label="Foraging loop">${STAGES.filter((s) => s.loop === "F").map((s) => opt(s.n)).join("")}</optgroup><optgroup label="Sensemaking loop">${STAGES.filter((s) => s.loop === "S").map((s) => opt(s.n)).join("")}</optgroup></select>
+        <button class="b" id="eDel" title="Delete segment (Backspace)" style="margin-left:auto">🗑</button></div>
+      <div class="r"><span>Start</span><input class="tm" id="eT0" value="${fmt(g.t0, true)}" /><button class="b" id="eT0now" title="Set start to playhead ([)">⤓ now</button><button class="b" data-nudge="t0:-1">−1s</button><button class="b" data-nudge="t0:1">+1s</button></div>
+      <div class="r"><span>End</span><input class="tm" id="eT1" value="${g.t1 != null ? fmt(g.t1, true) : ""}" placeholder="${end != null ? "→ " + fmt(end) : "open"}" /><button class="b" id="eT1now" title="Set end to playhead (])">⤓ now</button><button class="b" data-nudge="t1:-1">−1s</button><button class="b" data-nudge="t1:1">+1s</button></div>
+      <div class="r"><span>Artifact</span><select id="eArt"><option value="">— none</option>${arts.map((a) => `<option value="${a.seq}"${g.art === a.seq ? " selected" : ""}>artifact ${a.seq}${a.title ? " · " + esc(a.title.slice(0, 40)) : ""}</option>`).join("")}</select></div>
+      <div class="r"><span>Markers</span>${[...new Set([...MARKS, ...(g.marks || [])])].map((m) => `<span class="mchip${g.marks?.includes(m) ? " on" : ""}" data-m="${esc(m)}">${esc(m)}</span>`).join("")}<input type="text" id="eMark" placeholder="+ other" style="width:80px" /></div>
+      <img class="shot" data-t="${g.shot ?? g.t0 + 0.5}" alt="" />
+      <div class="r" style="margin-top:4px"><button class="b" id="eShot" title="Use the current video frame as this segment's screenshot (X)">📷 use current frame</button><span class="muted">${g.shot != null ? "frame @ " + fmt(g.shot) : "frame @ start"}</span></div>
+      <textarea id="eNote" rows="3" placeholder="What is the participant doing? (evidence for this code)">${esc(g.note || "")}</textarea>
+    </div>`;
+  }
+  h += `<div class="slist">${list.length ? list.map((x, i) => {
+    const s = ST[x.stage] || { c: "#999", name: "?" }, e = effEnd(list, i);
+    return `<div class="srow${x.id === state.sel ? " sel" : ""}" data-id="${x.id}"><img data-t="${x.shot ?? x.t0 + 0.5}" alt="" />
+      <div style="min-width:0"><div class="st" style="--c:${s.c}"><i>${x.stage}</i>${esc(stageLabel(x))}</div>
+      <div class="tm">${fmt(x.t0)} – ${e != null ? fmt(e) : "…"}${e != null ? ` (${fmt(e - x.t0)})` : ""}</div>
+      ${x.marks?.length ? `<div class="mk">(${esc(x.marks.join(", "))})</div>` : ""}</div></div>`;
+  }).join("") : ""}</div>` + helpHtml();
+  p.innerHTML = h;
+  fillThumbs(p);
+}
+const helpHtml = () => `<div class="help"><b>Keys</b> (outside text boxes)<br>
+  <kbd>2</kbd>…<kbd>1</kbd><kbd>6</kbd> start that stage at the playhead (splits the current segment)<br>
+  <kbd>]</kbd> end the current segment here · <kbd>[</kbd> move selected start here<br>
+  <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> ±5 s (<kbd>Shift</kbd> ±1 s) · <kbd>-</kbd><kbd>=</kbd> speed<br>
+  <kbd>↑</kbd><kbd>↓</kbd> previous/next segment · <kbd>X</kbd> screenshot · <kbd>⌫</kbd> delete · <kbd>Esc</kbd> deselect</div>`;
+
+$("pSegs").addEventListener("click", (e) => {
+  const row = e.target.closest(".srow");
+  if (row) return selectSeg(row.dataset.id, true);
+  const g = segs().find((x) => x.id === state.sel);
+  if (!g) return;
+  const t = e.target;
+  if (t.id === "eDel") deleteSel();
+  else if (t.id === "eT0now") { g.t0 = r1(vid.currentTime); sortSegs(); changed(); }
+  else if (t.id === "eT1now") { const v = r1(vid.currentTime); if (v > g.t0) { g.t1 = v; changed(); } }
+  else if (t.id === "eShot") captureNow();
+  else if (t.dataset.nudge) {
+    const [k, d] = t.dataset.nudge.split(":");
+    const list = segs(), i = list.indexOf(g);
+    if (k === "t0") g.t0 = r1(Math.max(0, g.t0 + +d));
+    else g.t1 = r1(Math.max(g.t0 + 0.5, (g.t1 ?? effEnd(list, i) ?? g.t0) + +d));
+    sortSegs(); seek(k === "t0" ? g.t0 : g.t1); changed();
+  } else if (t.classList.contains("mchip")) {
+    const m = t.dataset.m;
+    g.marks = g.marks?.includes(m) ? g.marks.filter((x) => x !== m) : [...(g.marks || []), m];
+    changed();
+  }
+});
+$("pSegs").addEventListener("change", (e) => {
+  const t = e.target, r = mine();
+  if (t.id === "sLabel") { mine(true).label = t.value; changed(); return; }
+  const g = segs().find((x) => x.id === state.sel);
+  if (!g) return;
+  if (t.id === "eStage") { g.stage = +t.value; if (ST[g.stage].prod && g.art == null) g.art = nearestArtifact(g.t0); changed(); }
+  else if (t.id === "eArt") { g.art = t.value === "" ? null : +t.value; changed(); }
+  else if (t.id === "eT0" || t.id === "eT1") {
+    const v = t.value.trim() === "" ? null : parseTime(t.value);
+    if (t.id === "eT0" && v != null) g.t0 = r1(v);
+    if (t.id === "eT1") g.t1 = v == null ? null : r1(Math.max(v, g.t0 + 0.5));
+    sortSegs(); changed();
+  }
+});
+$("pSegs").addEventListener("input", (e) => {
+  if (e.target.id === "sNote") { mine(true).note = e.target.value; save(); }
+  if (e.target.id === "eNote") { const g = segs().find((x) => x.id === state.sel); if (g) { g.note = e.target.value; save(); renderSeq(); } }
+});
+$("pSegs").addEventListener("keydown", (e) => {
+  if (e.target.id === "eMark" && e.key === "Enter" && e.target.value.trim()) {
+    const g = segs().find((x) => x.id === state.sel);
+    if (g) { g.marks = [...new Set([...(g.marks || []), e.target.value.trim().toLowerCase()])]; changed(); }
+  }
+});
+
+// ---- right panel: events (artifacts + prompts) and video sync ----
+function renderEvPane() {
+  const p = $("pEv");
+  if (!D || !state.pid) { p.innerHTML = ""; return; }
+  const s = cur(), vs = videoStart(state.pid), sy = SYNC[state.pid];
+  const sessDay = (s?.turns[0] || s?.artifacts[0])?.ts;
+  let h = `<div class="syncbox"><b>Video sync</b> <span class="muted">(shared by all coders)</span><br>
+    ${vs != null ? `Recording starts at <b>${tzDay(vs)} ${tzTime(vs)}</b> <span class="muted">Pacific</span><br><span class="muted">set by ${esc(sy?.by || "?")}${sy?.clock ? ` from the on-screen clock (${esc(sy.clock)} at ${fmt(sy.at)})` : ""}</span>`
+      : `<span style="color:#b3261e;font-weight:600">Not synced yet</span> <span class="muted">— prompts and artifacts can't be placed on the timeline.</span>`}
+    <div style="margin-top:8px">The video's bottom-right corner shows the wall clock. Type what it shows at the playhead:</div>
+    <canvas id="clockCrop" width="420" height="56" style="width:100%;background:#111;border-radius:4px;margin-top:4px"></canvas>
+    <div class="r"><input type="text" id="clockIn" placeholder="${sessDay ? tzDay(Date.parse(sessDay)) + " " : ""}12:48:02" style="flex:1;font:12px ui-monospace,Menlo,monospace;padding:3px 6px;border:1px solid var(--line);border-radius:6px" />
+      <button class="b" id="clockSet">set sync</button></div>
+    ${vs != null ? `<div class="r"><span class="muted">nudge</span>${[-5, -1, 1, 5].map((d) => `<button class="b" data-shift="${d}">${d > 0 ? "+" : ""}${d}s</button>`).join("")}</div>` : ""}
+    <div class="muted" style="margin-top:6px;font-size:11px">Times are Pacific, as shown in the recordings. Time only (12:48:02) uses this session's date.</div></div>`;
+  const items = [...(s?.turns || []).map((t) => ({ k: "t", ts: t.ts, t })), ...(s?.artifacts || []).map((a) => ({ k: "a", ts: a.ts, a }))].sort((a, b) => (a.ts < b.ts ? -1 : 1));
+  if (!items.length) h += `<div class="empty">No logged prompts or artifacts for this session.</div>`;
+  for (const it of items) {
+    const x = vt(it.ts);
+    if (it.k === "t") h += `<div class="trow" data-t="${x}"><span class="tm">${fmt(x)}</span> 💬 ${esc(it.t.user.slice(0, 220))}</div>`;
+    else {
+      const a = it.a;
+      h += `<div class="arow"><div class="hd"><b>${a.seq}</b><span class="tt" title="${esc(a.title || "")}">${esc(a.title || "artifact " + a.seq)}</span>
+        <a href="#" data-seek="${x}" class="tm">${fmt(x)}</a> <a href="${esc(a.file)}" target="_blank" title="Open the artifact">↗</a></div>
+        <div class="athumb"><iframe sandbox="allow-scripts" data-file="${esc(a.file)}" tabindex="-1"></iframe></div>
+</div>`;
+    }
+  }
+  p.innerHTML = h;
+  scaleThumbs(p);
+  drawClock();
+}
+// Zoom's timestamp sits in the bottom-right corner of the frame: show it enlarged next to the input.
+function drawClock() {
+  const c = $("clockCrop");
+  if (!c || !vid.videoWidth) return;
+  const w = Math.round(vid.videoWidth * 0.2), h = Math.round(w * (56 / 420));
+  try { c.getContext("2d").drawImage(vid, vid.videoWidth - w, vid.videoHeight - h, w, h, 0, 0, c.width, c.height); } catch {}
+}
+function syncFromClock() {
+  const raw = $("clockIn").value.trim();
+  const s = cur(), day = (s?.turns[0] || s?.artifacts[0])?.ts;
+  const ms = /^\d{4}-\d\d-\d\d/.test(raw) ? parseTz(raw) : day && /^\d{1,2}:\d\d:\d\d$/.test(raw) ? parseTz(tzDay(Date.parse(day)) + " " + raw.padStart(8, "0")) : null;
+  if (ms == null) { $("clockIn").style.borderColor = "#b3261e"; return; }
+  setSync(ms - vid.currentTime * 1000, { clock: raw, at: r1(vid.currentTime) });
+}
+// Artifact previews: live iframes from the artifact HTML (srcdoc, as in /artifact-review), scaled from 1280px.
+const htmlCache = new Map();
+const getHtml = (file) => {
+  if (!htmlCache.has(file)) htmlCache.set(file, fetch(file).then((r) => (r.ok ? r.text() : `<p style="font:14px sans-serif;color:#999;padding:20px">Could not load ${file}</p>`)));
+  return htmlCache.get(file);
+};
+function scaleThumbs(root) {
+  root.querySelectorAll("iframe[data-file]:not([srcdoc])").forEach((f) => getHtml(f.dataset.file).then((h) => { f.srcdoc = h; }));
+  root.querySelectorAll(".athumb").forEach((t) => { const f = t.querySelector("iframe"); f.style.transform = `scale(${t.clientWidth / 1280})`; });
+}
+$("pEv").addEventListener("click", (e) => {
+  const t = e.target;
+  const row = t.closest(".trow");
+  if (row) return seek(+row.dataset.t);
+  if (t.dataset.seek != null) { e.preventDefault(); return seek(+t.dataset.seek); }
+  if (t.dataset.shift) return setSync(videoStart(state.pid) - +t.dataset.shift * 1000, SYNC[state.pid]);
+  if (t.id === "clockSet") return syncFromClock();
+});
+$("pEv").addEventListener("keydown", (e) => { if (e.target.id === "clockIn" && e.key === "Enter") syncFromClock(); });
+async function setSync(ms, extra) {
+  const pid = state.pid;
+  SYNC[pid] = { type: "sync", pid, videoStart: Math.round(ms), by: state.coder, clock: extra?.clock || "", at: extra?.at ?? null };
+  renderAll();
+  try {
+    const r = await fetch("/api/process-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sync: true, ...SYNC[pid], coder: state.coder }) });
+    if (!r.ok) throw new Error(r.status);
+  } catch (e) { alert("Saving the sync failed: " + e.message); }
+}
+
+// ---- right panel: transcript (the recording's .vtt from Drive) ----
+async function loadVtt(pid) {
+  const v = D.videos[pid];
+  if (!v?.vttId || VTT[pid]) return;
+  VTT[pid] = [];
+  try {
+    const txt = await (await fetch(`/api/drive/${v.vttId}`)).text();
+    const toS = (s) => { const [h, m, x] = s.trim().split(":"); return +h * 3600 + +m * 60 + parseFloat(x); };
+    VTT[pid] = txt.split(/\r?\n\r?\n/).map((b) => {
+      const lines = b.trim().split(/\r?\n/);
+      const i = lines.findIndex((l) => l.includes("-->"));
+      if (i < 0) return null;
+      const [a, z] = lines[i].split("-->");
+      const text = lines.slice(i + 1).join(" ");
+      const m = text.match(/^([^:]{1,40}):\s*(.*)$/);
+      return { t0: toS(a), t1: toS(z.split(" ").filter(Boolean)[0]), sp: m ? m[1] : "", text: m ? m[2] : text };
+    }).filter(Boolean);
+  } catch { VTT[pid] = null; }
+  if (pid === state.pid) renderTr(true);
+}
+let trQuery = "", trFollow = true, trTaskOnly = true, lastCue = -1;
+function renderTr(full) {
+  const p = $("pTr");
+  if (!D || !state.pid) { p.innerHTML = ""; return; }
+  const cues = VTT[state.pid];
+  if (full) {
+    const bar = `<div class="trbar"><input type="search" id="trQ" placeholder="Search transcript…" value="${esc(trQuery)}" />
+      <label><input type="checkbox" id="trTask"${trTaskOnly ? " checked" : ""}/> this task</label><label><input type="checkbox" id="trFollow"${trFollow ? " checked" : ""}/> follow</label></div>`;
+    if (!D.videos[state.pid]?.vttId) { p.innerHTML = `<div class="empty">No transcript (.vtt) in Drive for ${esc(state.pid)}.</div>`; return; }
+    if (cues == null) { p.innerHTML = `<div class="empty">Could not load the transcript.</div>`; return; }
+    if (!cues.length) { p.innerHTML = bar + `<div class="empty">Loading transcript…</div>`; return; }
+    const [a, b] = taskWindow(), qq = trQuery.toLowerCase();
+    p.innerHTML = bar + cues.map((c, i) => {
+      if (trTaskOnly && (c.t1 < a || c.t0 > b)) return "";
+      if (qq && !(c.sp + " " + c.text).toLowerCase().includes(qq)) return "";
+      return `<div class="cue" data-i="${i}" data-t="${c.t0}"><span class="t">${fmt(c.t0)}</span><span><span class="sp">${esc(c.sp)}</span>${c.sp ? ": " : ""}${esc(c.text)}</span></div>`;
+    }).join("");
+    lastCue = -1;
+  }
+  if (!cues?.length) return;
+  const t = vid.currentTime || 0;
+  let i = cues.findIndex((c) => c.t0 <= t && t < c.t1);
+  if (i < 0) i = cues.findIndex((c) => c.t0 > t) - 1;
+  if (i === lastCue) return;
+  p.querySelector(".cue.now")?.classList.remove("now");
+  const el = p.querySelector(`.cue[data-i="${i}"]`);
+  if (el) { el.classList.add("now"); if (trFollow && state.tab === "tr" && !p.matches(":hover")) el.scrollIntoView({ block: "center" }); }
+  lastCue = i;
+}
+$("pTr").addEventListener("click", (e) => { const c = e.target.closest(".cue"); if (c) seek(+c.dataset.t); });
+$("pTr").addEventListener("input", (e) => { if (e.target.id === "trQ") { trQuery = e.target.value; renderTr(true); $("trQ").focus(); } });
+$("pTr").addEventListener("change", (e) => {
+  if (e.target.id === "trFollow") trFollow = e.target.checked;
+  if (e.target.id === "trTask") { trTaskOnly = e.target.checked; renderTr(true); }
+});
+
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+  state.tab = b.dataset.tab;
+  document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
+  for (const [k, id] of [["segs", "pSegs"], ["tr", "pTr"], ["ev", "pEv"]]) $(id).classList.toggle("on", k === state.tab);
+  if (state.tab === "ev") scaleThumbs($("pEv"));
+  if (state.tab === "tr") { lastCue = -1; renderTr(false); }
+}));
+
+// ---- player controls ----
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+$("speed").innerHTML = SPEEDS.map((s) => `<option value="${s}">${s}×</option>`).join("");
+const setSpeed = (s) => { vid.playbackRate = s; $("speed").value = s; lsSet("pr-speed", s); };
+setSpeed(+lsGet("pr-speed") || 1);
+vid.addEventListener("loadedmetadata", () => setSpeed(+$("speed").value));
+$("speed").addEventListener("change", () => setSpeed(+$("speed").value));
+const togglePlay = () => (vid.paused ? vid.play() : vid.pause());
+$("play").addEventListener("click", togglePlay);
+$("back5").addEventListener("click", () => seek(vid.currentTime - 5));
+$("fwd5").addEventListener("click", () => seek(vid.currentTime + 5));
+let ccOn = lsGet("pr-cc") === "1";
+const applyCc = () => { $("cc").classList.toggle("on", ccOn); for (const t of vid.textTracks) t.mode = ccOn ? "showing" : "hidden"; };
+$("cc").addEventListener("click", () => { ccOn = !ccOn; lsSet("pr-cc", ccOn ? "1" : "0"); applyCc(); });
+applyCc();
+vid.addEventListener("loadeddata", () => ($("vmsg").style.display = "none"));
+vid.addEventListener("play", updatePlayhead);
+vid.addEventListener("pause", () => { updatePlayhead(); drawClock(); });
+vid.addEventListener("error", () => { $("vmsg").style.display = "flex"; $("vmsg").textContent = "Could not load the video from Drive."; });
+// While playing: move the playhead every frame; redraw the open segment, plot and transcript ~2×/s.
+let lastSlow = 0;
+(function tick(ts) {
+  if (!vid.paused) {
+    updatePlayhead();
+    if (ts - lastSlow > 500) {
+      lastSlow = ts;
+      if (state.view === "zoom" || segs().some((g, i, l) => effEnd(l, i) == null)) renderTimeline();
+      renderPlot();
+      renderTr(false);
+    }
+  }
+  requestAnimationFrame(tick);
+})(0);
+vid.addEventListener("seeked", () => { drawClock(); updatePlayhead(); if (state.view === "zoom") renderTimeline(); renderPlot(); renderTr(false); });
+setInterval(() => { if (state.pid && !vid.paused) lsSet(`pr-pos-${state.pid}-${state.task}`, vid.currentTime.toFixed(1)); }, 5000);
+window.addEventListener("resize", () => { renderTimeline(); renderPlot(); scaleThumbs($("pEv")); });
+
+// ---- keyboard ----
+let numBuf = "", numT = null;
+const flushNum = () => { clearTimeout(numT); if (numBuf) addStage(+numBuf); numBuf = ""; };
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!D || !state.pid) return;
+  const k = e.code === "BracketRight" ? "]" : e.code === "BracketLeft" ? "[" : e.key;
+  if (/^\d$/.test(k)) {
+    // "1" waits briefly for a second digit (10–16); any other digit is a stage on its own.
+    e.preventDefault();
+    if (numBuf === "1") { numBuf += k; return flushNum(); }
+    if (k === "1") { numBuf = "1"; numT = setTimeout(flushNum, 700); return; }
+    numBuf = k; return flushNum();
+  }
+  const list = segs(), i = list.findIndex((g) => g.id === state.sel);
+  const map = {
+    " ": togglePlay,
+    ArrowLeft: () => seek(vid.currentTime - (e.shiftKey ? 1 : 5)),
+    ArrowRight: () => seek(vid.currentTime + (e.shiftKey ? 1 : 5)),
+    ArrowUp: () => list.length && selectSeg(list[Math.max(0, i < 0 ? list.length - 1 : i - 1)].id, true),
+    ArrowDown: () => list.length && selectSeg(list[Math.min(list.length - 1, i + 1)].id, true),
+    "]": closeAt,
+    "[": () => { const g = list[i]; if (g) { g.t0 = r1(vid.currentTime); sortSegs(); changed(); } },
+    x: captureNow, X: captureNow,
+    Backspace: deleteSel, Delete: deleteSel,
+    Escape: () => { state.sel = null; renderTimeline(); renderSeq(); renderPlot(); renderSegPane(); },
+    "-": () => setSpeed(SPEEDS[Math.max(0, SPEEDS.indexOf(vid.playbackRate) - 1)] ?? 1),
+    "=": () => setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(vid.playbackRate) + 1)] ?? 1),
+  };
+  if (map[k]) { e.preventDefault(); map[k](); }
+});
+
+// ---- header ----
+$("coder").value = state.coder;
+$("coder").classList.toggle("missing", !state.coder);
+$("coder").addEventListener("change", () => {
+  state.coder = $("coder").value.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 30);
+  $("coder").value = state.coder;
+  $("coder").classList.toggle("missing", !state.coder);
+  lsSet("pr-coder", state.coder);
+  state.sel = null;
+  syncUrl(); renderSide(); renderAll();
+});
+$("compare").checked = state.compare;
+$("compare").addEventListener("change", () => { state.compare = $("compare").checked; syncUrl(); renderAll(); });
+$("refresh").addEventListener("click", () => load(true));
+
+// ---- export ----
+const csvEsc = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+function download(name, rows) {
+  const blob = new Blob([rows.map((r) => r.map(csvEsc).join(",")).join("\n")], { type: "text/csv" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: name });
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function allRecs() {
+  return Object.values(CODES).flatMap((m) => Object.values(m)).filter((r) => r.segs?.length || r.label || r.note)
+    .sort((a, b) => a.coder.localeCompare(b.coder) || a.pid.localeCompare(b.pid, undefined, { numeric: true }) || a.task.localeCompare(b.task));
+}
+const condOf = (r) => D.sessions.find((s) => s.pid === r.pid && s.task === r.task)?.cond || COND[r.pid[0]] || "";
+$("csvSeg").addEventListener("click", () => {
+  const rows = [["coder", "pid", "cond", "task", "session_label", "idx", "start_s", "end_s", "dur_s", "start", "end", "stage_num", "stage", "loop", "product", "artifact", "markers", "note", "start_wallclock"]];
+  for (const r of allRecs()) r.segs.forEach((g, i) => {
+    const s = ST[g.stage] || {}, e = effEnd(r.segs, i), vs = videoStart(r.pid);
+    rows.push([r.coder, r.pid, condOf(r), r.task, r.label, i + 1, g.t0, e ?? "", e != null ? r1(e - g.t0) : "", fmt(g.t0, true), e != null ? fmt(e, true) : "",
+      g.stage, s.name, s.loop === "F" ? "foraging" : "sensemaking", s.prod ? 1 : 0, g.art ?? "", (g.marks || []).join("; "), g.note, vs != null ? new Date(vs + g.t0 * 1000).toISOString() : ""]);
+  });
+  download(`process_segments_${Date.now()}.csv`, rows);
+});
+$("csvSeq").addEventListener("click", () => {
+  const rows = [["coder", "pid", "cond", "task", "session_label", "n_segments", "sequence", "stage_numbers", "session_note"]];
+  for (const r of allRecs()) rows.push([r.coder, r.pid, condOf(r), r.task, r.label, r.segs.length, seqText(r.segs), r.segs.map((g) => g.stage).join(" "), r.note]);
+  download(`process_sequences_${Date.now()}.csv`, rows);
+});
+
+load();
+</script>
+</body>
+</html>

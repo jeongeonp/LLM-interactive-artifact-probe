@@ -307,3 +307,18 @@ export async function getCodes() {
 export async function setCode(id, data) {
   await codesCol.doc(String(id ?? "").replace(/[/#]/g, "_")).set({ ...data, updated: new Date().toISOString() });
 }
+
+// Process-review annotations (/process-review): one doc per (coder, pid, task) with the coded
+// segments, plus one { type: "sync" } doc per pid. Small, read once per page load.
+const processCol = db.collection("processCodes");
+export async function getProcessCodes() {
+  try {
+    const snap = await processCol.get();
+    return Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
+  } catch (e) {
+    return onReadError(e, {});
+  }
+}
+export async function setProcessCode(id, data) {
+  await processCol.doc(String(id ?? "").replace(/[/#]/g, "_")).set({ ...data, updated: new Date().toISOString() });
+}
