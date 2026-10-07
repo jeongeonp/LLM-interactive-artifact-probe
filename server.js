@@ -7,7 +7,8 @@ import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
 const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode, getProcessCodes, setProcessCode } = await import(DB_BACKEND);
-import { listVideos, streamFile } from "./drive.js";
+import { listVideos, streamFile, accessToken } from "./drive.js";
+import crypto from "crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ART_DIR = path.join(__dirname, "data", "artifacts");
@@ -16,6 +17,18 @@ fs.mkdirSync(ART_DIR, { recursive: true });
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY from .env
 const app = express();
 app.use(express.json({ limit: "5mb" }));
+
+// Process review shows participant recordings: gate it with HTTP basic auth (any username, password =
+// PROCESS_REVIEW_PASSWORD). Without a password it's open on localhost but closed on Cloud Run (K_SERVICE).
+const REVIEW_PW = process.env.PROCESS_REVIEW_PASSWORD || "";
+const sha = (s) => crypto.createHash("sha256").update(String(s)).digest();
+app.use(["/process-review", "/process-review.html", "/api/process-review", "/api/process-codes", "/api/drive", "/api/drive-token"], (req, res, next) => {
+  if (!REVIEW_PW) return process.env.K_SERVICE ? res.status(503).send("Process review is disabled: set PROCESS_REVIEW_PASSWORD on the service.") : next();
+  const [type, b64] = String(req.headers.authorization || "").split(" ");
+  const pw = type === "Basic" ? Buffer.from(b64 || "", "base64").toString().split(":").slice(1).join(":") : "";
+  if (pw && crypto.timingSafeEqual(sha(pw), sha(REVIEW_PW))) return next();
+  res.set("WWW-Authenticate", 'Basic realm="process-review"').status(401).send("Password required.");
+});
 
 // Root: participant session when ?pid= is present, otherwise the researcher launcher.
 app.get("/", (req, res, next) => {
@@ -611,6 +624,13 @@ app.get("/api/process-review", async (req, res) => {
     sess(pid, cond, task).turns = list.map((t) => ({ ts: t.ts, user: String(t.user ?? "").slice(0, 600) }));
   }
   res.json({ videos, sessions: Object.values(sessions), scenarios, videoError });
+});
+app.get("/api/drive-token", async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store").json(await accessToken());
+  } catch (e) {
+    res.status(502).json({ error: String(e?.message || e) });
+  }
 });
 app.get("/api/drive/:id", async (req, res) => {
   try {

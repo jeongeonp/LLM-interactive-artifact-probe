@@ -21,6 +21,13 @@ async function token() {
   return (await _client.getAccessToken()).token; // cached + refreshed by the library
 }
 
+// A short-lived read-only token for the browser (see public/process-sw.js), so video bytes go
+// straight from Drive to the reviewer instead of through this server.
+export async function accessToken() {
+  const t = await token();
+  return { token: t, expires: _client.credentials?.expiry_date || Date.now() + 30 * 60e3 };
+}
+
 // File names look like "I14-relo.mp4", "S1-tool.vtt", "S06-relo.txt": pid (leading zeros
 // dropped, so S06 = S6), then the scenario task. One recording covers the whole study session,
 // i.e. both the scenario task and the userchoice task.

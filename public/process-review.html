@@ -226,6 +226,8 @@
       <span class="time" id="time">0:00 / 0:00</span>
       <select id="speed" title="Playback speed (- / =)"></select>
       <button class="b" id="cc" title="Show transcript captions on the video">CC</button>
+      <button class="b" id="mute" title="Mute / unmute">🔊</button>
+      <input type="range" id="vol" min="0" max="1" step="0.05" title="Volume" style="width:80px;accent-color:var(--accent)" />
       <span class="sep"></span>
       <span class="muted" id="wall" title="Wall-clock time at the playhead (from the sync on the Events tab)"></span>
       <span class="grow"></span>
@@ -362,8 +364,20 @@ async function getJson(url) {
   return r.json();
 }
 
+// Videos stream straight from Drive through a service worker (public/process-sw.js) when it's active;
+// otherwise /api/drive/<id> is served by the server proxy. ?s= gives the worker the file size.
+const swReady = !("serviceWorker" in navigator) ? Promise.resolve(false) :
+  navigator.serviceWorker.register("/process-sw.js", { scope: "/process-review" })
+    .then(() => (navigator.serviceWorker.controller ? true : new Promise((res) => {
+      navigator.serviceWorker.addEventListener("controllerchange", () => res(true), { once: true });
+      setTimeout(() => res(!!navigator.serviceWorker.controller), 3000);
+    })))
+    .catch(() => false);
+const videoSrc = (v) => `/api/drive/${v.videoId}${v.size ? `?s=${v.size}` : ""}`;
+
 // ---- data ----
 async function load(fresh) {
+  await swReady;
   $("hdr").textContent = "loading…";
   let d, c;
   try {
@@ -503,7 +517,7 @@ function openSession(pid, task, fromUrl) {
   if (pid !== prevPid || !vid.src) {
     $("vmsg").style.display = "flex";
     $("vmsg").textContent = "Loading video from Drive…";
-    vid.src = `/api/drive/${v.videoId}`;
+    vid.src = videoSrc(v);
     $("grab").src = vid.src;
     for (const t of [...vid.querySelectorAll("track")]) t.remove();
     if (v.vttId) {
@@ -1294,6 +1308,11 @@ $("back5").addEventListener("click", () => seek(vid.currentTime - 5));
 $("fwd5").addEventListener("click", () => seek(vid.currentTime + 5));
 let ccOn = lsGet("pr-cc") === "1";
 const applyCc = () => { $("cc").classList.toggle("on", ccOn); for (const t of vid.textTracks) t.mode = ccOn ? "showing" : "hidden"; };
+// volume (remembered per browser)
+const applyVol = () => { $("vol").value = vid.muted ? 0 : vid.volume; $("mute").textContent = vid.muted || vid.volume === 0 ? "🔇" : vid.volume < 0.5 ? "🔉" : "🔊"; };
+vid.volume = +(lsGet("pr-vol") ?? 1); vid.muted = lsGet("pr-muted") === "1"; applyVol();
+$("vol").addEventListener("input", () => { vid.volume = +$("vol").value; vid.muted = vid.volume === 0; lsSet("pr-vol", vid.volume); lsSet("pr-muted", vid.muted ? "1" : "0"); applyVol(); });
+$("mute").addEventListener("click", () => { vid.muted = !vid.muted; if (!vid.muted && vid.volume === 0) vid.volume = 0.5; lsSet("pr-muted", vid.muted ? "1" : "0"); lsSet("pr-vol", vid.volume); applyVol(); });
 $("cc").addEventListener("click", () => { ccOn = !ccOn; lsSet("pr-cc", ccOn ? "1" : "0"); applyCc(); });
 applyCc();
 vid.addEventListener("loadeddata", () => ($("vmsg").style.display = "none"));
