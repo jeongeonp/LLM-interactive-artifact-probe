@@ -622,10 +622,16 @@ app.get("/api/drive/:id", async (req, res) => {
 });
 app.get("/api/process-codes", async (req, res) => res.json(await getProcessCodes()));
 // One coder's annotation of one session (pid × task): time segments on the recording, each a
-// Pirolli & Card sensemaking-loop stage (see STAGES in process-review.html), plus a session label.
+// Pirolli & Card process (arrow) stage (see STAGES in process-review.html), pins for the loop's nodes
+// and for markers, and a session label.
 // Also { sync } docs: where the recording starts in wall-clock time, shared by all coders per pid.
 const ID_RE = /^[A-Za-z0-9_-]{1,30}$/;
 const num = (v) => (v == null || v === "" || !Number.isFinite(+v) ? null : Math.round(+v * 10) / 10);
+// focus boxes on a screenshot: fractions of the video frame, at most 12 per item
+const boxes = (a) => (Array.isArray(a) ? a : []).slice(0, 12).map((b) => {
+  const f = (v) => Math.round(Math.max(0, Math.min(1, +v || 0)) * 1000) / 1000;
+  return { x: f(b?.x), y: f(b?.y), w: f(b?.w), h: f(b?.h) };
+}).filter((b) => b.w > 0 && b.h > 0);
 app.post("/api/process-codes", async (req, res) => {
   const b = req.body || {};
   if (b.sync) {
@@ -640,11 +646,18 @@ app.post("/api/process-codes", async (req, res) => {
     t0: num(g.t0), t1: num(g.t1),
     stage: Number.isInteger(+g.stage) ? +g.stage : null,
     art: num(g.art),
-    marks: [...new Set((Array.isArray(g.marks) ? g.marks : []).map((m) => String(m).slice(0, 40)))].slice(0, 12),
     shot: num(g.shot),
+    boxes: boxes(g.boxes), focus: String(g.focus ?? "").slice(0, 300),
     note: String(g.note ?? "").slice(0, 2000),
   })).filter((g) => g.t0 != null);
-  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
+  // pins are moments, not spans: a node of the loop (stage 1/4/7/10/13/16, with the artifact that
+  // provided it) or a marker (kind: narrowing, revisiting artifact, ...)
+  const pins = (Array.isArray(b.pins) ? b.pins : []).slice(0, 600).map((x) => ({
+    id: String(x.id || "").slice(0, 20), t: num(x.t), stage: Number.isInteger(+x.stage) && +x.stage > 0 ? +x.stage : null, art: num(x.art),
+    kind: String(x.kind ?? "").trim().slice(0, 40), note: String(x.note ?? "").slice(0, 2000), shot: num(x.shot),
+    boxes: boxes(x.boxes), focus: String(x.focus ?? "").slice(0, 300),
+  })).filter((x) => x.t != null && (x.kind || x.stage));
+  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
   await setProcessCode(`${data.coder}__${data.pid}__${data.task}`, data);
   res.json({ ok: true });
 });

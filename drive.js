@@ -13,9 +13,11 @@ const KEY = path.join(__dirname, "serviceAccountKey.json");
 export const VIDEO_FOLDER = process.env.VIDEO_FOLDER || "1c9kIrNwaPHIxSYF6hRlwxMmJkiP-bjTd";
 const API = "https://www.googleapis.com/drive/v3/files";
 
+// Locally: the key file. Deployed (Cloud Run ships without it, see .gcloudignore): the service's
+// built-in credentials — then the Drive folder must also be shared with the Cloud Run service account.
 let _client = null;
 async function token() {
-  _client ||= await new GoogleAuth({ keyFile: KEY, scopes: ["https://www.googleapis.com/auth/drive.readonly"] }).getClient();
+  _client ||= await new GoogleAuth({ ...(fs.existsSync(KEY) ? { keyFile: KEY } : {}), scopes: ["https://www.googleapis.com/auth/drive.readonly"] }).getClient();
   return (await _client.getAccessToken()).token; // cached + refreshed by the library
 }
 
@@ -31,7 +33,6 @@ const parseName = (name) => {
 let _list = null; // { t, v: { videos: { pid -> {...} }, ids: Set } }
 export async function listVideos(fresh) {
   if (_list && Date.now() - _list.t < 10 * 60 * 1000 && !fresh) return _list.v;
-  if (!fs.existsSync(KEY)) throw new Error("serviceAccountKey.json missing");
   const files = [];
   let pageToken;
   do {
