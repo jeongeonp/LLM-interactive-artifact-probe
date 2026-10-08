@@ -444,13 +444,28 @@ const tzTime = (ms) => new Date(ms).toLocaleTimeString("en-GB", { timeZone: TZ }
 const videoStart = (pid) => SYNC[pid]?.videoStart ?? null;
 const vt = (ts, pid = state.pid) => { const s = videoStart(pid); return s == null ? null : (Date.parse(ts) - s) / 1000; };
 const duration = () => (isFinite(vid.duration) && vid.duration) || (D.videos[state.pid]?.durationMs || 0) / 1000;
-// A task's span in the video: a bit before its first prompt to a few minutes after its last artifact/prompt.
-function taskWindow(s = cur()) {
-  const dur = duration();
-  if (!s) return [0, dur];
+// A task's span in the video: from a few minutes before its first prompt/artifact until the next task
+// of the recording begins (participants keep exploring, reflecting and talking after their last prompt),
+// or 15 min after its last event for the final task. Always widened to cover what's been coded.
+const eventSpan = (s) => {
   const ts = [...s.turns.map((t) => t.ts), ...s.artifacts.map((a) => a.ts)].map((x) => vt(x, s.pid)).filter((x) => x != null && isFinite(x));
-  if (!ts.length) return [0, dur];
-  const a = Math.max(0, Math.min(...ts) - 300), b = Math.min(dur || Infinity, Math.max(...ts) + 240);
+  return ts.length ? [Math.min(...ts), Math.max(...ts)] : null;
+};
+const LEAD = 300;
+function taskWindow(s = cur()) {
+  const dur = s && s.pid !== state.pid ? (D.videos[s.pid]?.durationMs || 0) / 1000 : duration();
+  if (!s) return [0, dur];
+  const span = eventSpan(s);
+  if (!span) return [0, dur];
+  const later = sessionsFor(s.pid).map(eventSpan).filter((x) => x && x[0] > span[1]).map((x) => x[0]);
+  let a = Math.max(0, span[0] - LEAD);
+  let b = later.length ? Math.max(span[1] + 60, Math.min(...later) - LEAD) : span[1] + 900;
+  // never cut off what's already coded in this session (any coder)
+  for (const r of Object.values(CODES[`${s.pid}|${s.task}`] || {})) {
+    for (const g of r.segs || []) { a = Math.min(a, g.t0); b = Math.max(b, (g.t1 ?? g.t0) + 30); }
+    for (const p of r.pins || []) { a = Math.min(a, p.t); b = Math.max(b, p.t + 30); }
+  }
+  a = Math.max(0, a); b = Math.min(dur || Infinity, b);
   return b > a ? [a, b] : [0, dur];
 }
 function viewWindow() {
