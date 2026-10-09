@@ -127,6 +127,17 @@
   .scheme .gl .muted { font-weight:400; font-size:11px; }
   .scheme label { display:flex; align-items:center; gap:6px; font-size:12.5px; padding:1px 0 1px 10px; cursor:pointer; }
   .scheme label.solo { padding-left:0; font-weight:600; }
+  .scheme label.sub { padding-left:30px; font-size:12px; }
+  .scheme label .x { font-size:10px; color:#9a6b1d; font-weight:600; }
+  .scheme label .acts { margin-left:auto; display:none; gap:6px; }
+  .scheme label:hover .acts { display:flex; }
+  .scheme .acts button, .scheme .addlink { border:0; background:none; padding:0; cursor:pointer; font:11px inherit; color:var(--muted); }
+  .scheme .acts button:hover, .scheme .addlink:hover { color:var(--accent); }
+  .scheme .addlink { display:block; margin:2px 0 0 10px; }
+  .scheme .addlink.top { margin:8px 0 0; }
+  .scheme .addrow { display:flex; gap:5px; margin:3px 0 2px 10px; }
+  .scheme .addrow input { flex:1; font:12px inherit; padding:3px 6px; border:1px solid var(--accent); border-radius:6px; }
+  .tagtab tr.sub td:first-child { padding-left:26px; color:#6f6a61; font-size:11px; }
   .scheme input.othertxt { margin:2px 0 2px 32px; width:calc(100% - 32px); font:12px inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
   .flagbtn { display:flex; align-items:center; gap:7px; width:100%; padding:7px 10px; margin-top:8px; border:1px solid var(--line); border-radius:8px; background:#faf7f2; cursor:pointer; font:inherit; font-size:13px; }
   .flagbtn.on { background:#fde8e4; border-color:#e6a69b; color:#b3261e; font-weight:700; }
@@ -223,11 +234,61 @@ const CODEBOOK = [
     { id: "iother", label: "Other", items: [["iother", "Other"]] },
   ] },
 ];
-const CODE = {}; // id -> { label, short, group, scheme }
-for (const sc of CODEBOOK) for (const g of sc.groups) for (const [id, l] of g.items)
-  CODE[id] = { label: g.items.length === 1 && id === g.id ? l : `${g.label} › ${l}`, short: l === "Other" ? `${g.label.split(" ")[0]}: other` : l, group: g.id, scheme: sc.id };
-const GROUP_ITEMS = Object.fromEntries(CODEBOOK.flatMap((sc) => sc.groups.map((g) => [g.id, g.items.map(([id]) => id)])));
+// The working codebook = CODEBOOK above + codes the annotators added while coding
+// (new categories, new codes in a category, or sub-codes of a code). Sub-codes roll up:
+// ticking one ticks its parent too, so analysis can always collapse back to the parent.
+let BOOK = [], ADDS = [];
+const CODE = {};        // id -> { label (full path), short, group, scheme, parent, custom, by }
+const GROUP_ITEMS = {}; // group id -> every code id inside it (sub-codes included)
+const DESC = {};        // code id -> [itself, ...its sub-codes]
+function buildBook() {
+  BOOK = CODEBOOK.map((sc) => ({ ...sc, groups: sc.groups.map((g) => {
+    const solo = g.items.length === 1 && g.items[0][0] === g.id;
+    return { ...g, solo, items: g.items.map(([id, label]) => ({ id, label, subs: [] })) };
+  }) }));
+  const placed = new Set();
+  // Added codes can nest under other added codes, so place them in passes until stable.
+  for (let pass = 0; pass < 4; pass++) for (const c of ADDS) {
+    if (placed.has(c.id)) continue;
+    const sc = BOOK.find((x) => x.id === c.scheme);
+    if (!sc) continue;
+    const node = { id: c.id, label: c.label, custom: true, by: c.createdBy, subs: [] };
+    if (c.kind === "group") { sc.groups.push({ id: c.id, label: c.label, custom: true, by: c.createdBy, items: [] }); placed.add(c.id); continue; }
+    const g = sc.groups.find((x) => x.id === c.parent);
+    if (c.kind === "item" && g) { g.items.push(node); placed.add(c.id); continue; }
+    const parentItem = sc.groups.flatMap((x) => x.items).find((x) => x.id === c.parent);
+    if (c.kind === "sub" && parentItem) { parentItem.subs.push(node); placed.add(c.id); }
+  }
+  for (const o of [CODE, GROUP_ITEMS, DESC]) for (const k of Object.keys(o)) delete o[k];
+  for (const sc of BOOK) for (const g of sc.groups) {
+    GROUP_ITEMS[g.id] = [];
+    for (const it of g.items) {
+      const base = g.solo && it.id === g.id ? it.label : `${g.label} › ${it.label}`;
+      CODE[it.id] = { label: base, short: it.label === "Other" ? `${g.label.split(" ")[0]}: other` : it.label, group: g.id, scheme: sc.id, parent: null, custom: !!it.custom, by: it.by };
+      DESC[it.id] = [it.id];
+      GROUP_ITEMS[g.id].push(it.id);
+      for (const sub of it.subs) {
+        CODE[sub.id] = { label: `${base} › ${sub.label}`, short: `${it.label} › ${sub.label}`, group: g.id, scheme: sc.id, parent: it.id, custom: true, by: sub.by };
+        DESC[sub.id] = [sub.id];
+        DESC[it.id].push(sub.id);
+        GROUP_ITEMS[g.id].push(sub.id);
+      }
+    }
+  }
+}
+buildBook();
 const isOther = (id) => id.endsWith(".other") || id === "iother";
+async function loadBook() {
+  try {
+    const r = await fetch("/api/artifact-codebook");
+    if (!r.ok) return false;
+    const next = await r.json();
+    const changed = JSON.stringify(next) !== JSON.stringify(ADDS);
+    ADDS = next;
+    if (changed) buildBook();
+    return changed;
+  } catch { return false; }
+}
 
 const q = new URLSearchParams(location.search);
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -273,7 +334,7 @@ async function load(fresh) {
   };
   let d, c;
   try {
-    [d, c] = await Promise.all([getJson("/api/artifact-review" + (fresh ? "?fresh=1" : "")), getJson("/api/artifact-codes")]);
+    [d, c] = await Promise.all([getJson("/api/artifact-review" + (fresh ? "?fresh=1" : "")), getJson("/api/artifact-codes"), loadBook()]);
   } catch (e) {
     $("hdrCount").textContent = "failed to load";
     $("gallery").innerHTML = `<p style="color:#b3261e">Could not load artifacts: ${esc(e.message)}</p>` +
@@ -307,7 +368,7 @@ function matchesCode(a, f) {
   if (f === "~flag") return flagged(a);
   if (f === "~uncoded") return state.compare ? agreement(a) === "none" || agreement(a) === "single" : !isCoded(mine(a));
   if (f === "~disagree") return agreement(a) === "disagree";
-  const ids = f.startsWith("g:") ? GROUP_ITEMS[f.slice(2)] || [] : [f];
+  const ids = f.startsWith("g:") ? GROUP_ITEMS[f.slice(2)] || [] : DESC[f] || [f];
   const have = viewCodes(a);
   return ids.some((id) => have.includes(id));
 }
@@ -374,16 +435,20 @@ function renderTags(scope) {
   h += `<div class="chips" style="margin-bottom:6px">${stat.map(([f, l]) => `<span class="chip${state.code === f ? " on" : ""}" data-code="${f}">${l}<span class="n">${n(f)}</span></span>`).join("")}</div>`;
   const row = (f, label, cls, showS) => `<tr class="${cls}${state.code === f ? " on" : ""}" data-code="${esc(f)}"><td>${esc(label)}</td><td class="num">${n(f, "interactive") || ""}</td><td class="num">${showS ? n(f, "static") || "" : ""}</td></tr>`;
   h += `<table class="tagtab"><tr><th></th><th>I</th><th>S</th></tr>`;
-  for (const sc of CODEBOOK) {
+  for (const sc of BOOK) {
     const showS = sc.onlyCond !== "interactive";
     h += `<tr class="scheme"><td colspan="3">${esc(sc.label)}${showS ? "" : " (I only)"}</td></tr>`;
     for (const g of sc.groups) {
-      const solo = g.items.length === 1 && g.items[0][0] === g.id;
-      h += row(solo ? g.id : "g:" + g.id, g.label, "grp", showS);
-      if (!solo) for (const [id, l] of g.items) h += row(id, l, "item", showS);
+      const solo = g.solo && g.items.length === 1;
+      h += row(solo ? g.id : "g:" + g.id, g.label + (g.custom ? " ✚" : ""), "grp", showS);
+      for (const it of g.items) {
+        if (!solo) h += row(it.id, it.label + (it.custom ? " ✚" : ""), "item", showS);
+        for (const sub of it.subs) h += row(sub.id, "↳ " + sub.label, "sub", showS);
+      }
     }
   }
   h += "</table>";
+  if (ADDS.length) h += '<div class="hint">✚ / ↳ = added while coding. Counts for a code include its sub-codes.</div>';
   $("tags").innerHTML = h;
   $("tags").querySelectorAll("[data-code]").forEach((el) =>
     el.addEventListener("click", () => { state.code = state.code === el.dataset.code ? "" : el.dataset.code; render(); }));
@@ -523,6 +588,7 @@ function openFocus(i) {
   $("fPrompt").textContent = a.prompt || "(not found)";
   $("fSaved").textContent = "";
   drawCoding();
+  loadBook().then((changed) => { if (changed && visible[focusIdx] === a) { codesDirty = true; drawCoding(); } });
   $("fPrev").disabled = i === 0;
   $("fNext").disabled = i === visible.length - 1;
 }
@@ -552,24 +618,89 @@ function drawCoding() {
   const m = mine(a) || { codes: [], other: {}, flag: false, note: "" };
   const has = new Set(m.codes || []);
   let h = `<button type="button" class="flagbtn${m.flag ? " on" : ""}" id="fFlag">🚩 ${m.flag ? "Needs discussion (flagged)" : "Flag: needs discussion"}</button>`;
-  for (const sc of CODEBOOK) {
+  // One checkbox per code. Hover shows "+ sub" (nest a finer code under it) and, for codes
+  // added while coding, rename / delete.
+  const cb = (node, label, cls, sc) => {
+    const acts = (node.subs ? `<button type="button" data-add="sub" data-parent="${node.id}" data-scheme="${sc.id}" title="Add a finer code under this one">+ sub</button>` : "") +
+      (node.custom ? `<button type="button" data-rename="${node.id}">rename</button><button type="button" data-del="${node.id}">delete</button>` : "");
+    return `<label class="${cls}"><input type="checkbox" data-id="${node.id}"${has.has(node.id) ? " checked" : ""}> ${esc(label)}` +
+      (node.custom ? ` <span class="x" title="added by ${esc(node.by || "?")}">✚</span>` : "") + `<span class="acts">${acts}</span></label>` +
+      (isOther(node.id) && has.has(node.id) ? `<input class="othertxt" data-other="${node.id}" placeholder="describe… (seeing it again? add it as a code below)" value="${esc(m.other?.[node.id] || "")}">` : "") +
+      (node.subs || []).map((sub) => cb(sub, sub.label, "sub", sc)).join("");
+  };
+  for (const sc of BOOK) {
     if (sc.onlyCond && a.cond !== sc.onlyCond) continue;
     h += `<div class="scheme"><div class="sh">${esc(sc.label)}</div>`;
     for (const g of sc.groups) {
-      const solo = g.items.length === 1 && g.items[0][0] === g.id;
-      const cb = (id, label, cls) => `<label class="${cls}"><input type="checkbox" data-id="${id}"${has.has(id) ? " checked" : ""}> ${esc(label)}</label>` +
-        (isOther(id) && has.has(id) ? `<input class="othertxt" data-other="${id}" placeholder="describe…" value="${esc(m.other?.[id] || "")}">` : "");
-      if (solo) { h += `<div class="g">${cb(g.id, g.label, "solo")}</div>`; continue; }
-      h += `<div class="g"><div class="gl">${esc(g.label)}${g.hint ? ` <span class="muted">(${esc(g.hint)})</span>` : ""}</div>${g.items.map(([id, l]) => cb(id, l, "")).join("")}</div>`;
+      if (g.solo && g.items.length === 1) {
+        h += `<div class="g">${cb(g.items[0], g.label, "solo", sc)}<button type="button" class="addlink" data-add="item" data-parent="${g.id}" data-scheme="${sc.id}">+ add code here</button></div>`;
+        continue;
+      }
+      h += `<div class="g"><div class="gl">${esc(g.label)}${g.custom ? ` <span class="x" title="added by ${esc(g.by || "?")}">✚</span>` : ""}${g.hint ? ` <span class="muted">(${esc(g.hint)})</span>` : ""}</div>` +
+        g.items.map((it) => cb(it, it.label, "", sc)).join("") +
+        `<button type="button" class="addlink" data-add="item" data-parent="${g.id}" data-scheme="${sc.id}">+ add code</button></div>`;
     }
-    h += "</div>";
+    h += `<button type="button" class="addlink top" data-add="group" data-scheme="${sc.id}">+ add category</button></div>`;
   }
   h += `<h4>Note</h4><textarea id="fNote" placeholder="memo, or what to discuss…">${esc(m.note || "")}</textarea>`;
   box.innerHTML = h;
-  box.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => { saveCoding(); drawCoding(); }));
+  box.querySelectorAll("input[type=checkbox]").forEach((c) => c.addEventListener("change", () => {
+    const id = c.dataset.id, q = (x) => box.querySelector(`input[type=checkbox][data-id="${x}"]`);
+    if (c.checked && CODE[id]?.parent) q(CODE[id].parent).checked = true;           // sub-code implies its parent
+    if (!c.checked) (DESC[id] || []).forEach((x) => { const e = q(x); if (e) e.checked = false; }); // unticking a parent clears its subs
+    saveCoding(); drawCoding();
+  }));
+  box.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); showAddRow(b); }));
+  box.querySelectorAll("[data-rename]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); renameCode(b.dataset.rename); }));
+  box.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); deleteCode(b.dataset.del); }));
   box.querySelectorAll("input.othertxt, #fNote").forEach((t) => t.addEventListener("input", () => saveCoding(700)));
   $("fFlag").addEventListener("click", () => { saveCoding(0, true); drawCoding(); });
   drawOthers();
+}
+// Inline "name the new code" field in place of the + link; Enter saves to the shared codebook.
+function showAddRow(btn) {
+  const kind = btn.dataset.add, what = kind === "group" ? "category" : kind === "sub" ? "sub-code" : "code";
+  const row = document.createElement("div");
+  row.className = "addrow";
+  row.innerHTML = `<input placeholder="new ${what} name, Enter to add" maxlength="80">`;
+  const anchor = kind === "sub" ? btn.closest("label") : btn;
+  anchor.insertAdjacentElement("afterend", row);
+  if (kind !== "sub") btn.style.display = "none";
+  const inp = row.querySelector("input");
+  inp.focus();
+  inp.addEventListener("keydown", async (e) => {
+    if (e.key === "Escape") { e.stopPropagation(); drawCoding(); return; }
+    if (e.key !== "Enter" || !inp.value.trim()) return;
+    inp.disabled = true;
+    const r = await fetch("/api/artifact-codebook", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coder: state.coder, scheme: btn.dataset.scheme, kind, parent: btn.dataset.parent, label: inp.value }) });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) { alert(out.error || "Could not add the code."); inp.disabled = false; return; }
+    await loadBook();
+    codesDirty = true;
+    // Apply the new code to this artifact right away (not for an empty new category).
+    if (kind !== "group") {
+      const a = visible[focusIdx], m = mine(a) || { codes: [] };
+      const codes = new Set([...(m.codes || []), out.id]);
+      if (kind === "sub") codes.add(btn.dataset.parent);
+      (CODES[keyOf(a)] ||= {})[state.coder] = { ...m, coder: state.coder, key: keyOf(a), codes: [...codes] };
+    }
+    drawCoding();
+    if (kind !== "group") saveCoding();
+  });
+}
+async function renameCode(id) {
+  const name = prompt("Rename code (applies for every coder):", ADDS.find((c) => c.id === id)?.label || "");
+  if (!name || !name.trim()) return;
+  const r = await fetch("/api/artifact-codebook", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, label: name, coder: state.coder }) });
+  if (!r.ok) return alert((await r.json().catch(() => ({}))).error || "Rename failed.");
+  await loadBook(); codesDirty = true; drawCoding();
+}
+async function deleteCode(id) {
+  if (!confirm(`Delete "${CODE[id]?.label || id}" from the codebook? Only possible if nobody has applied it.`)) return;
+  const r = await fetch("/api/artifact-codebook/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+  if (!r.ok) return alert((await r.json().catch(() => ({}))).error || "Delete failed.");
+  await loadBook(); codesDirty = true; drawCoding();
 }
 function drawOthers() {
   const a = visible[focusIdx];

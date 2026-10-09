@@ -308,6 +308,24 @@ export async function setCode(id, data) {
   await codesCol.doc(String(id ?? "").replace(/[/#]/g, "_")).set({ ...data, updated: new Date().toISOString() });
 }
 
+// Codes the annotators add to the artifact codebook as they go (new categories, codes, or
+// sub-codes of existing ones). Shared by every coder; tiny, so read whole.
+const codebookCol = db.collection("artifactCodebook");
+export async function getCodebookAdds() {
+  try {
+    const snap = await codebookCol.get();
+    return snap.docs.map((d) => d.data());
+  } catch (e) {
+    return onReadError(e, []);
+  }
+}
+export async function setCodebookAdd(id, data) {
+  await codebookCol.doc(String(id)).set({ ...data, updated: new Date().toISOString() });
+}
+export async function deleteCodebookAdd(id) {
+  await codebookCol.doc(String(id)).delete();
+}
+
 // Process-review annotations (/process-review): one doc per (coder, pid, task) with the coded
 // segments, plus one { type: "sync" } doc per pid. Small, read once per page load.
 const processCol = db.collection("processCodes");

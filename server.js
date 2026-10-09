@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode, getProcessCodes, setProcessCode } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode, getCodebookAdds, setCodebookAdd, deleteCodebookAdd, getProcessCodes, setProcessCode } = await import(DB_BACKEND);
 import { listVideos, streamFile, accessToken } from "./drive.js";
 import crypto from "crypto";
 
@@ -601,6 +601,48 @@ app.post("/api/artifact-codes", async (req, res) => {
     note: String(note ?? "").slice(0, 5000),
   };
   await setCode(`${data.coder}__${data.key}`, data);
+  res.json({ ok: true });
+});
+
+// Codebook additions made while coding. kind: "group" (new category in a scheme), "item"
+// (new code in a category; parent = category id) or "sub" (sub-code; parent = code id).
+// Cached briefly; every write clears the cache so the other coder sees it on next fetch.
+let _cbCache = null; // { t, v }
+const codebookAdds = async () => {
+  if (!_cbCache || Date.now() - _cbCache.t > 30000) _cbCache = { t: Date.now(), v: await getCodebookAdds() };
+  return _cbCache.v;
+};
+app.get("/api/artifact-codebook", async (req, res) => res.json(await codebookAdds()));
+app.post("/api/artifact-codebook", async (req, res) => {
+  const { coder, scheme, kind, parent, label, id: editId } = req.body || {};
+  const name = String(label ?? "").trim().slice(0, 80);
+  if (!name) return res.status(400).json({ error: "label required" });
+  if (editId) { // rename an added code
+    const cur = (await codebookAdds()).find((c) => c.id === editId);
+    if (!cur) return res.status(404).json({ error: "not found" });
+    await setCodebookAdd(editId, { ...cur, label: name, renamedBy: String(coder || "") });
+    _cbCache = null;
+    return res.json({ ok: true, id: editId });
+  }
+  if (!["group", "item", "sub"].includes(kind) || !/^[a-z]+$/.test(String(scheme || ""))) return res.status(400).json({ error: "bad kind/scheme" });
+  if (kind !== "group" && !parent) return res.status(400).json({ error: "parent required" });
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "code";
+  const id = `x_${slug}_${Math.random().toString(36).slice(2, 6)}`;
+  const doc = { id, scheme, kind, parent: kind === "group" ? null : String(parent), label: name, createdBy: String(coder || ""), created: new Date().toISOString() };
+  await setCodebookAdd(id, doc);
+  _cbCache = null;
+  res.json({ ok: true, id, code: doc });
+});
+// Remove an added code — only if no coder has applied it and nothing is nested under it.
+app.post("/api/artifact-codebook/delete", async (req, res) => {
+  const id = String(req.body?.id || "");
+  const adds = await codebookAdds();
+  if (!adds.some((c) => c.id === id)) return res.status(404).json({ error: "not found" });
+  if (adds.some((c) => c.parent === id)) return res.status(409).json({ error: "it has codes nested under it — remove those first" });
+  const used = Object.values(await getCodes()).filter((x) => (x.codes || []).includes(id)).map((x) => x.coder);
+  if (used.length) return res.status(409).json({ error: `still applied by ${[...new Set(used)].join(", ")} — untick it everywhere first` });
+  await deleteCodebookAdd(id);
+  _cbCache = null;
   res.json({ ok: true });
 });
 

@@ -146,3 +146,16 @@ export function setProcessCode(id, data) {
     `INSERT INTO process_codes (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data`
   ).run(String(id), JSON.stringify({ ...data, updated: new Date().toISOString() }));
 }
+
+// Codes added to the artifact codebook while coding (see /api/artifact-codebook).
+db.exec(`CREATE TABLE IF NOT EXISTS artifact_codebook (id TEXT PRIMARY KEY, data TEXT);`);
+export function getCodebookAdds() {
+  return db.prepare("SELECT data FROM artifact_codebook").all().map((r) => JSON.parse(r.data || "{}"));
+}
+export function setCodebookAdd(id, data) {
+  db.prepare("INSERT INTO artifact_codebook (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data")
+    .run(String(id), JSON.stringify({ ...data, updated: new Date().toISOString() }));
+}
+export function deleteCodebookAdd(id) {
+  db.prepare("DELETE FROM artifact_codebook WHERE id = ?").run(String(id));
+}
