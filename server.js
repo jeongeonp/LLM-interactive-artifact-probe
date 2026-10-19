@@ -713,9 +713,10 @@ app.post("/api/process-codes", async (req, res) => {
     note: String(g.note ?? "").slice(0, 2000),
   })).filter((g) => g.t0 != null);
   // pins are moments, not spans: a node of the loop (stage 1/4/7/10/13/16, with the artifact that
-  // provided it) or a marker (kind: narrowing, revisiting artifact, ...)
+  // provided it, or src "participant" when the participant produced it) or a marker (kind: narrowing, revisiting artifact, ...)
   const pins = (Array.isArray(b.pins) ? b.pins : []).slice(0, 600).map((x) => ({
     id: String(x.id || "").slice(0, 20), t: num(x.t), stage: Number.isInteger(+x.stage) && +x.stage > 0 ? +x.stage : null, art: num(x.art),
+    src: x.src === "participant" ? "participant" : null, // node produced by the participant rather than an artifact
     kind: String(x.kind ?? "").trim().slice(0, 40), note: String(x.note ?? "").slice(0, 2000), shot: num(x.shot),
     boxes: boxes(x.boxes), focus: String(x.focus ?? "").slice(0, 300),
   })).filter((x) => x.t != null && (x.kind || x.stage));

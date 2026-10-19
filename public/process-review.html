@@ -153,6 +153,13 @@
   #zoom .zb .r { display:flex; gap:8px; align-items:center; margin-top:8px; font-size:13px; }
   /* marker pins: a moment, not a span */
   #tlPins { height:18px; }
+  /* markers get their own lane under the process bar — they annotate the process, they aren't part of it */
+  #tlMarks { height:18px; margin-top:3px; border-top:1px dashed #e3d6c4; }
+  #tlMarks::before { content:"markers"; position:absolute; left:2px; top:3px; font-size:9px; color:#b9ab97; pointer-events:none; }
+  .mkrow { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin:-2px 0 10px; padding-top:5px; border-top:1px dashed #e3d6c4; }
+  .mkrow .mkl { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:700; margin-right:2px; }
+  .mkrow .pinchip { margin:0; }
+  .mkrow .pinchip small { font-style:normal; opacity:.8; margin-left:4px; font-variant-numeric:tabular-nums; }
   .pinm { position:absolute; top:1px; transform:translateX(-1px); height:16px; border-left:2px solid var(--pin); padding:0 4px 0 2px; font-size:9.5px; line-height:13px; color:#fff; white-space:nowrap; cursor:pointer; z-index:2; }
   .pinm span { background:var(--pin); border-radius:0 3px 3px 0; padding:0 4px; display:inline-block; max-width:120px; overflow:hidden; text-overflow:ellipsis; vertical-align:top; }
   .pinm.sel span { box-shadow:0 0 0 2px #2a2725; }
@@ -250,6 +257,7 @@
         <div class="tlrow" id="tlEvents"></div>
         <div class="tlrow" id="tlPins"></div>
         <div class="tlrow" id="tlSegs"></div>
+        <div class="tlrow" id="tlMarks"></div>
         <div id="tlOthers"></div>
         <div id="playhead"></div><div id="hover"></div>
       </div>
@@ -327,15 +335,17 @@ const parseTime = (s) => {
 const r1 = (t) => Math.round(t * 10) / 10;
 const uid = () => Math.random().toString(36).slice(2, 9);
 const isNode = (n) => !!ST[n]?.node;
-// a node pin's artifact: explicit pick (n), explicitly none (0), or automatic (null) = current artifact
-const nodeArt = (p, pid, task) => (p.art === 0 ? null : p.art ?? currentArtifact(p.t, pid, task));
+// a node pin's source: the participant (src "participant"), or an artifact — explicit pick (n),
+// explicitly none (0), or automatic (null) = current artifact
+const byParticipant = (p) => p.src === "participant";
+const nodeArt = (p, pid, task) => (byParticipant(p) || p.art === 0 ? null : p.art ?? currentArtifact(p.t, pid, task));
 const isMarker = (p) => !p.stage; // a pin is either a node (has stage) or a marker (has kind)
 const pinLabel = (p) => (p.stage ? stageLabel(p) : p.kind);
 const stageLabel = (g, pid, task) => {
   const s = ST[g.stage];
   if (!s) return "?";
   const art = g.t0 === undefined ? nodeArt(g, pid, task) : g.art;
-  const a = art != null ? ` (artifact ${art})` : "";
+  const a = g.t0 === undefined && byParticipant(g) ? " (participant)" : art != null ? ` (artifact ${art})` : "";
   return s.name.toLowerCase() + a;
 };
 
@@ -613,7 +623,7 @@ function segEls(list, w, withHandles) {
 }
 function renderTimeline() {
   document.querySelectorAll(".tlbar [data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === state.view));
-  if (!D || !state.pid) { for (const id of ["tlRuler", "tlEvents", "tlSegs", "tlOthers"]) $(id).innerHTML = ""; return; }
+  if (!D || !state.pid) { for (const id of ["tlRuler", "tlEvents", "tlPins", "tlSegs", "tlMarks", "tlOthers"]) $(id).innerHTML = ""; return; }
   const w = viewWindow(), span = w[1] - w[0];
   // ruler
   const width = $("tl").clientWidth || 800;
@@ -643,8 +653,12 @@ function renderTimeline() {
     }
   }
   $("tlEvents").innerHTML = ev;
-  $("tlPins").innerHTML = state.coder ? pins().filter((p) => p.t >= w[0] && p.t <= w[1]).map((p) =>
-    `<div class="pinm${p.stage ? " node" : ""}${p.id === state.selPin ? " sel" : ""}" data-pin="${p.id}" style="left:${pct(p.t, w)}%;${p.stage ? `--c:${ST[p.stage].c};${ST[p.stage].ink ? `--ink:${ST[p.stage].ink}` : ""}` : ""}" title="${esc(`${fmt(p.t)} · ${pinLabel(p)}${p.note ? "\n" + p.note : ""}`)}"><span>${p.stage ? `${p.stage} ${esc(ST[p.stage].name.toLowerCase())}${nodeArt(p) != null ? " · a" + nodeArt(p) : ""}` : esc(p.kind)}</span></div>`).join("") : "";
+  // nodes sit above the process bar; markers get their own lane below it
+  const pinEl = (p) =>
+    `<div class="pinm${p.stage ? " node" : ""}${p.id === state.selPin ? " sel" : ""}" data-pin="${p.id}" style="left:${pct(p.t, w)}%;${p.stage ? `--c:${ST[p.stage].c};${ST[p.stage].ink ? `--ink:${ST[p.stage].ink}` : ""}` : ""}" title="${esc(`${fmt(p.t)} · ${pinLabel(p)}${p.note ? "\n" + p.note : ""}`)}"><span>${p.stage ? `${p.stage} ${esc(ST[p.stage].name.toLowerCase())}${byParticipant(p) ? " · P" : nodeArt(p) != null ? " · a" + nodeArt(p) : ""}` : esc(p.kind)}</span></div>`;
+  const inView = state.coder ? pins().filter((p) => p.t >= w[0] && p.t <= w[1]) : [];
+  $("tlPins").innerHTML = inView.filter((p) => !isMarker(p)).map(pinEl).join("");
+  $("tlMarks").innerHTML = inView.filter(isMarker).map(pinEl).join("");
   $("tlSegs").innerHTML = state.coder ? segEls(segs(), w, true) : `<div style="font-size:11px;color:var(--muted);padding:7px">Enter a coder name to annotate.</div>`;
   // other coders
   let o = "";
@@ -761,24 +775,31 @@ function groupItems(items) {
   }
   return out;
 }
+// The process itself: nodes and process segments only. Markers annotate it and are listed separately.
+const procItems = (r) => seqItems(r).filter((it) => !(it.k === "p" && isMarker(it.p)));
+const markersHtml = (r, selectable) => {
+  const ms = (r?.pins || []).filter(isMarker).sort((a, b) => a.t - b.t);
+  return ms.length ? `<div class="mkrow"><span class="mkl">Markers</span>` + ms.map((p) =>
+    `<span class="pinchip${selectable && p.id === state.selPin ? " sel" : ""}" ${selectable ? `data-pin="${p.id}"` : ""} title="${esc(fmt(p.t) + (p.note ? " · " + p.note : ""))}">${esc(p.kind)}<small>${fmt(p.t)}</small></span>`).join("") + "</div>" : "";
+};
 function seqHtml(r, selectable) {
-  const items = seqItems(r);
+  const items = procItems(r);
   if (!items.length) return "";
   if (groupBy === "none") return itemsHtml(items, selectable);
   // the arrow into a group wraps together with it, so no arrow is left dangling at a line end
   return groupItems(items).map((gr, i) => `<div class="gwrap">${i ? '<span class="garrow">→</span>' : ""}` +
     `<div class="sgrp ${gr.cls}"><div class="gh" title="${esc(gr.sub || "")}">${esc(gr.label)}${gr.sub ? ` · <span>${esc(gr.sub)}</span>` : ""}</div><div class="gb">${itemsHtml(gr.items, selectable)}</div></div></div>`).join("");
 }
-// Plain text: "hypothesis → schema (artifact 1) (narrowing) → build case …"
-const seqText = (r) => seqItems(r).reduce((acc, it) => it.k === "p" && isMarker(it.p) ? acc + ` (${it.p.kind})` : acc + (acc ? " → " : "") + stageLabel(it.k === "p" ? it.p : it.g, r.pid, r.task), "");
+// Plain text: "hypothesis → schema (artifact 1) → build case …" (process only, no markers)
+const seqText = (r) => procItems(r).map((it) => stageLabel(it.k === "p" ? it.p : it.g, r.pid, r.task)).join(" → ");
 function renderSeq() {
   if (!D || !state.pid) { $("seq").innerHTML = ""; return; }
   let h = state.coder
-    ? (segs().length || pins().length ? `<div class="seqrow${groupBy !== "none" ? " grouped" : ""}">${seqHtml(mine(), true)}</div>` : `<div class="empty">Nothing coded yet. Play the video and type a number (or click above): a node (1, 4, 7, 10, 13, 16) pins that moment; an arrow starts a process segment that runs until the next one.</div>`)
+    ? (segs().length || pins().length ? `<div class="seqrow${groupBy !== "none" ? " grouped" : ""}">${seqHtml(mine(), true)}</div>${markersHtml(mine(), true)}` : `<div class="empty">Nothing coded yet. Play the video and type a number (or click above): a node (1, 4, 7, 10, 13, 16) pins that moment; an arrow starts a process segment that runs until the next one.</div>`)
     : `<div class="empty">Enter your coder name in the header to start.</div>`;
   if (state.compare) for (const [c, r] of Object.entries(CODES[`${state.pid}|${state.task}`] || {})) {
     if (c === state.coder || !(r.segs?.length || r.pins?.length)) continue;
-    h += `<div class="seqrow${groupBy !== "none" ? " grouped" : ""}"><span class="who">${esc(c)}${r.label ? ` · ${esc(r.label)}` : ""}</span>${seqHtml(r, false)}</div>`;
+    h += `<div class="seqrow${groupBy !== "none" ? " grouped" : ""}"><span class="who">${esc(c)}${r.label ? ` · ${esc(r.label)}` : ""}</span>${seqHtml(r, false)}</div>${markersHtml(r, false)}`;
   }
   $("seq").innerHTML = h;
 }
@@ -1067,7 +1088,7 @@ function renderSegPane() {
     h += `<div class="ed" style="border-color:${ST[pn.stage].c}">
       <div class="r"><span>Node</span><select id="nStage">${nopt}</select><button class="b" id="eDel" title="Delete (Backspace)" style="margin-left:auto">🗑</button></div>
       <div class="r"><span>At</span><input class="tm" id="pT" value="${fmt(pn.t, true)}" /><button class="b" id="pTnow" title="Move to playhead">⤓ now</button><button class="b" data-pnudge="-1">−1s</button><button class="b" data-pnudge="1">+1s</button></div>
-      <div class="r"><span>Artifact</span><select id="nArt"><option value=""${pn.art == null ? " selected" : ""}>auto · ${currentArtifact(pn.t) != null ? "artifact " + currentArtifact(pn.t) : "none yet"}</option><option value="0"${pn.art === 0 ? " selected" : ""}>— none</option>${arts.map((a) => `<option value="${a.seq}"${pn.art === a.seq ? " selected" : ""}>artifact ${a.seq}${a.title ? " · " + esc(a.title.slice(0, 40)) : ""}</option>`).join("")}</select></div>
+      <div class="r"><span>From</span><select id="nArt"><option value=""${pn.art == null && !byParticipant(pn) ? " selected" : ""}>auto · ${currentArtifact(pn.t) != null ? "artifact " + currentArtifact(pn.t) : "none yet"}</option><option value="P"${byParticipant(pn) ? " selected" : ""}>participant (their own)</option><option value="0"${pn.art === 0 && !byParticipant(pn) ? " selected" : ""}>— none</option>${arts.map((a) => `<option value="${a.seq}"${pn.art === a.seq && !byParticipant(pn) ? " selected" : ""}>artifact ${a.seq}${a.title ? " · " + esc(a.title.slice(0, 40)) : ""}</option>`).join("")}</select></div>
       ${shotHtml(pn)}${shotButtons(pn)}${focusRow(pn, "eFocus")}
       <textarea id="pNote" rows="3" placeholder="What does the participant get here? (evidence for this code)">${esc(pn.note || "")}</textarea>
     </div>`;
@@ -1155,7 +1176,10 @@ $("pSegs").addEventListener("change", (e) => {
   if (pn) {
     if (t.id === "pKind" && t.value.trim()) pn.kind = t.value.trim().toLowerCase();
     if (t.id === "nStage") pn.stage = +t.value;
-    if (t.id === "nArt") pn.art = t.value === "" ? null : +t.value; // "" = auto, 0 = none
+    if (t.id === "nArt") { // "" = auto, 0 = none, P = the participant produced it
+      pn.src = t.value === "P" ? "participant" : null;
+      pn.art = t.value === "" || t.value === "P" ? null : +t.value;
+    }
     if (t.id === "pT") { const v = parseTime(t.value); if (v != null) { pn.t = r1(v); mine().pins.sort((a, b) => a.t - b.t); } }
     changed();
     return;
@@ -1435,7 +1459,7 @@ $("csvSeg").addEventListener("click", () => {
     let n = 0;
     for (const it of seqItems(r)) {
       if (it.k === "p" && isMarker(it.p)) { const p = it.p; rows.push([r.coder, r.pid, condOf(r), r.task, r.label, "marker", "", p.t, "", "", fmt(p.t, true), "", "", "", "", "", "", p.kind, "", "", "", p.note, wall(p.t)]); continue; }
-      if (it.k === "p") { const p = it.p, s = ST[p.stage] || {}; rows.push([r.coder, r.pid, condOf(r), r.task, r.label, "node", ++n, p.t, "", "", fmt(p.t, true), "", p.stage, s.name, s.loop === "F" ? "foraging" : "sensemaking", 1, nodeArt(p, r.pid, r.task) ?? "", "", p.focus || "", boxesCsv(p), shotT(p), p.note, wall(p.t)]); continue; }
+      if (it.k === "p") { const p = it.p, s = ST[p.stage] || {}; rows.push([r.coder, r.pid, condOf(r), r.task, r.label, "node", ++n, p.t, "", "", fmt(p.t, true), "", p.stage, s.name, s.loop === "F" ? "foraging" : "sensemaking", 1, byParticipant(p) ? "participant" : nodeArt(p, r.pid, r.task) ?? "", "", p.focus || "", boxesCsv(p), shotT(p), p.note, wall(p.t)]); continue; }
       const g = it.g, i = r.segs.indexOf(g), s = ST[g.stage] || {}, e = effEnd(r.segs, i);
       rows.push([r.coder, r.pid, condOf(r), r.task, r.label, "segment", ++n, g.t0, e ?? "", e != null ? r1(e - g.t0) : "", fmt(g.t0, true), e != null ? fmt(e, true) : "",
         g.stage, s.name, s.loop === "F" ? "foraging" : "sensemaking", 0, g.art ?? "", "", g.focus || "", boxesCsv(g), shotT(g), g.note, wall(g.t0)]);
