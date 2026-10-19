@@ -30,11 +30,16 @@ export async function accessToken() {
 
 // File names look like "I14-relo.mp4", "S1-tool.vtt", "S06-relo.txt": pid (leading zeros
 // dropped, so S06 = S6), then the scenario task. One recording covers the whole study session,
-// i.e. both the scenario task and the userchoice task.
+// i.e. both the scenario task and the userchoice task. A recording of two back-to-back sessions
+// joins them with "_" ("T4-tool_T5-tool.mp4"); the same file then serves both pids. Zoom's
+// closed captions ("….cc.vtt") are used only when there is no plain .vtt transcript.
 const TASK = { relo: "relocation", tool: "studytool" };
 const parseName = (name) => {
-  const m = String(name).match(/^([A-Za-z])0*(\d+)-([a-z]+)\.(mp4|mov|webm|vtt|txt)$/i);
-  return m && { pid: m[1].toUpperCase() + m[2], task: TASK[m[3].toLowerCase()] || m[3].toLowerCase(), ext: m[4].toLowerCase() };
+  const m = String(name).match(/^([A-Za-z]0*\d+-[a-z]+(?:_[A-Za-z]0*\d+-[a-z]+)*)(\.cc)?\.(mp4|mov|webm|vtt|txt)$/i);
+  if (!m) return null;
+  const parts = m[1].split("_").map((p) => p.match(/^([A-Za-z])0*(\d+)-([a-z]+)$/i));
+  return { sessions: parts.map((x) => ({ pid: x[1].toUpperCase() + x[2], task: TASK[x[3].toLowerCase()] || x[3].toLowerCase() })),
+    ext: m[3].toLowerCase(), cc: !!m[2], shared: parts.length > 1 };
 };
 
 let _list = null; // { t, v: { videos: { pid -> {...} }, ids: Set } }
@@ -59,16 +64,22 @@ export async function listVideos(fresh) {
   for (const f of files) {
     const p = parseName(f.name);
     if (!p) continue;
-    const v = (videos[p.pid] ||= { pid: p.pid, task: p.task });
-    if (["mp4", "mov", "webm"].includes(p.ext)) {
-      Object.assign(v, { name: f.name, videoId: f.id, size: +f.size || null, modifiedTime: f.modifiedTime,
-        durationMs: +f.videoMediaMetadata?.durationMillis || null, width: f.videoMediaMetadata?.width, height: f.videoMediaMetadata?.height });
-    } else if (p.ext === "vtt") v.vttId = f.id;
-    else if (p.ext === "txt") v.txtId = f.id;
+    for (const { pid, task } of p.sessions) {
+      const v = (videos[pid] ||= { pid, task });
+      if (p.shared) v.sharedWith = p.sessions.map((x) => x.pid).filter((x) => x !== pid);
+      if (["mp4", "mov", "webm"].includes(p.ext)) {
+        Object.assign(v, { name: f.name, videoId: f.id, size: +f.size || null, modifiedTime: f.modifiedTime,
+          durationMs: +f.videoMediaMetadata?.durationMillis || null, width: f.videoMediaMetadata?.width, height: f.videoMediaMetadata?.height });
+      } else if (p.ext === "vtt") { if (!p.cc || !v.vttId) v.vttId = f.id; }
+      else if (p.ext === "txt") v.txtId = f.id;
+    }
   }
-  for (const k of Object.keys(videos)) if (!videos[k].videoId) delete videos[k];
+  // Transcript but no video yet (e.g. still uploading): listed separately so the page can show
+  // them as pending rather than silently leaving them out.
+  const pending = {};
+  for (const k of Object.keys(videos)) if (!videos[k].videoId) { pending[k] = videos[k]; delete videos[k]; }
   const ids = new Set(Object.values(videos).flatMap((v) => [v.videoId, v.vttId, v.txtId].filter(Boolean)));
-  _list = { t: Date.now(), v: { videos, ids } };
+  _list = { t: Date.now(), v: { videos, pending, ids } };
   return _list.v;
 }
 

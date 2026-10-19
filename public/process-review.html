@@ -200,6 +200,8 @@
   .trow .tm, .arow .tm { font:11px ui-monospace,Menlo,monospace; color:var(--muted); }
   .banner { background:#fdf6e9; border:1px solid #ecd3a3; border-radius:8px; padding:8px 10px; font-size:12.5px; margin-bottom:10px; }
   .help { font-size:11.5px; color:var(--muted); line-height:1.7; margin-top:14px; }
+  .prow.pending { opacity:.55; font-size:12px; }
+  .prow.pending .muted { margin-left:6px; }
 </style>
 </head>
 <body>
@@ -441,7 +443,10 @@ const tzOffset = (ms) => { const d = new Date(ms); return Date.parse(d.toLocaleS
 const parseTz = (iso) => { const g = Date.parse(iso.replace(" ", "T") + "Z"); return isNaN(g) ? null : g - tzOffset(g); };
 const tzDay = (ms) => new Date(ms).toLocaleDateString("en-CA", { timeZone: TZ });
 const tzTime = (ms) => new Date(ms).toLocaleTimeString("en-GB", { timeZone: TZ });
-const videoStart = (pid) => SYNC[pid]?.videoStart ?? null;
+// A recording shared by back-to-back sessions (e.g. T4-tool_T5-tool) has one start time, so a
+// pid without its own sync borrows its partner's.
+const syncOf = (pid) => SYNC[pid] || (D?.videos[pid]?.sharedWith || []).map((x) => SYNC[x]).find(Boolean);
+const videoStart = (pid) => syncOf(pid)?.videoStart ?? null;
 const vt = (ts, pid = state.pid) => { const s = videoStart(pid); return s == null ? null : (Date.parse(ts) - s) / 1000; };
 const duration = () => (isFinite(vid.duration) && vid.duration) || (D.videos[state.pid]?.durationMs || 0) / 1000;
 // A task's span in the video: from a few minutes before its first prompt/artifact until the next task
@@ -482,14 +487,19 @@ function viewWindow() {
 
 // ---- sidebar ----
 function renderSide() {
-  const pids = Object.keys(D.videos).sort((a, b) => a[0].localeCompare(b[0]) || +a.slice(1) - +b.slice(1));
+  const byNum = (a, b) => a[0].localeCompare(b[0]) || +a.slice(1) - +b.slice(1);
+  const pids = Object.keys(D.videos).sort(byNum);
+  const pending = (D.pending || []).filter((x) => !D.videos[x]).sort(byNum);
   let h = "";
   for (const p of ["I", "S", "T"]) {
-    const ps = pids.filter((x) => x[0] === p);
-    if (!ps.length) continue;
-    h += `<h3>${COND[p]} (${ps.length})</h3>`;
+    const ps = pids.filter((x) => x[0] === p), wait = pending.filter((x) => x[0] === p);
+    if (!ps.length && !wait.length) continue;
+    h += `<h3>${COND[p]} (${ps.length}${wait.length ? ` + ${wait.length} pending` : ""})</h3>`;
+    // Transcript in Drive but no video yet — shown so it's clear they're coming, not missing.
+    for (const pid of wait) h += `<div class="prow pending" title="Transcript is in Drive; the video isn't yet. Use ↻ refresh once it has uploaded."><b>${pid}</b><span class="muted">video pending</span></div>`;
     for (const pid of ps) {
-      h += `<div class="prow"><b>${pid}</b>` + sessionsFor(pid).map((s) => {
+      const shared = D.videos[pid]?.sharedWith;
+      h += `<div class="prow"><b${shared?.length ? ` title="Same recording as ${esc(shared.join(", "))}"` : ""}>${pid}${shared?.length ? "⁺" : ""}</b>` + sessionsFor(pid).map((s) => {
         const r = recOf(pid, s.task, state.coder);
         const others = Object.keys(CODES[`${pid}|${s.task}`] || {}).filter((c) => c !== state.coder).length;
         const on = pid === state.pid && s.task === state.task ? " on" : "";
@@ -1175,7 +1185,7 @@ $("pSegs").addEventListener("keydown", (e) => {
 function renderEvPane() {
   const p = $("pEv");
   if (!D || !state.pid) { p.innerHTML = ""; return; }
-  const s = cur(), vs = videoStart(state.pid), sy = SYNC[state.pid];
+  const s = cur(), vs = videoStart(state.pid), sy = syncOf(state.pid);
   const sessDay = (s?.turns[0] || s?.artifacts[0])?.ts;
   let h = `<div class="syncbox"><b>Video sync</b> <span class="muted">(shared by all coders)</span><br>
     ${vs != null ? `Recording starts at <b>${tzDay(vs)} ${tzTime(vs)}</b> <span class="muted">Pacific</span><br><span class="muted">set by ${esc(sy?.by || "?")}${sy?.clock ? ` from the on-screen clock (${esc(sy.clock)} at ${fmt(sy.at)})` : ""}</span>`
@@ -1232,17 +1242,20 @@ $("pEv").addEventListener("click", (e) => {
   const row = t.closest(".trow");
   if (row) return seek(+row.dataset.t);
   if (t.dataset.seek != null) { e.preventDefault(); return seek(+t.dataset.seek); }
-  if (t.dataset.shift) return setSync(videoStart(state.pid) - +t.dataset.shift * 1000, SYNC[state.pid]);
+  if (t.dataset.shift) return setSync(videoStart(state.pid) - +t.dataset.shift * 1000, syncOf(state.pid));
   if (t.id === "clockSet") return syncFromClock();
 });
 $("pEv").addEventListener("keydown", (e) => { if (e.target.id === "clockIn" && e.key === "Enter") syncFromClock(); });
 async function setSync(ms, extra) {
-  const pid = state.pid;
-  SYNC[pid] = { type: "sync", pid, videoStart: Math.round(ms), by: state.coder, clock: extra?.clock || "", at: extra?.at ?? null };
+  // Same video for every pid on a shared recording, so the sync is saved for all of them.
+  const pids = [state.pid, ...(D.videos[state.pid]?.sharedWith || [])];
+  for (const pid of pids) SYNC[pid] = { type: "sync", pid, videoStart: Math.round(ms), by: state.coder, clock: extra?.clock || "", at: extra?.at ?? null };
   renderAll();
   try {
-    const r = await fetch("/api/process-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sync: true, ...SYNC[pid], coder: state.coder }) });
-    if (!r.ok) throw new Error(r.status);
+    for (const pid of pids) {
+      const r = await fetch("/api/process-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sync: true, ...SYNC[pid], coder: state.coder }) });
+      if (!r.ok) throw new Error(r.status);
+    }
   } catch (e) { alert("Saving the sync failed: " + e.message); }
 }
 

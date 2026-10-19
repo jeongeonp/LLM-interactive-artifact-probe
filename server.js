@@ -651,9 +651,9 @@ app.post("/api/artifact-codebook/delete", async (req, res) => {
 // Payload: videos by pid, plus each study session's artifacts and chat-turn times so the page
 // can place them on the video timeline (no telemetry, same cached read as /artifact-review).
 app.get("/api/process-review", async (req, res) => {
-  let videos = {}, videoError = null;
+  let videos = {}, pending = {}, videoError = null;
   try {
-    ({ videos } = await listVideos(!!req.query.fresh));
+    ({ videos, pending } = await listVideos(!!req.query.fresh));
   } catch (e) {
     videoError = String(e?.message || e);
   }
@@ -665,7 +665,7 @@ app.get("/api/process-review", async (req, res) => {
     const [pid, cond, task] = k.split("|");
     sess(pid, cond, task).turns = list.map((t) => ({ ts: t.ts, user: String(t.user ?? "").slice(0, 600) }));
   }
-  res.json({ videos, sessions: Object.values(sessions), scenarios, videoError });
+  res.json({ videos, pending: Object.keys(pending), sessions: Object.values(sessions), scenarios, videoError });
 });
 app.get("/api/drive-token", async (req, res) => {
   try {
