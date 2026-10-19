@@ -20,3 +20,6 @@ backfill-artifact-html.mjs
 diag.mjs
 migrate-p03.mjs
 seed-demo.mjs
+
+# Local Claude Code settings / worktrees
+.claude/
