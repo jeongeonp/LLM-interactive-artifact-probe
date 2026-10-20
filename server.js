@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode, getCodebookAdds, setCodebookAdd, deleteCodebookAdd, getProcessCodes, setProcessCode } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode, getCodebookAdds, setCodebookAdd, deleteCodebookAdd, getProcessCodes, getProcessCode, setProcessCode, updateProcessCode } = await import(DB_BACKEND);
 import { listVideos, streamFile, accessToken } from "./drive.js";
 import crypto from "crypto";
 
@@ -587,9 +587,15 @@ app.get("/api/artifact-review", async (req, res) => {
   res.json({ artifacts, scenarios });
 });
 app.get("/api/artifact-codes", async (req, res) => res.json(await getCodes()));
+// Async route errors (e.g. a Firestore timeout) would otherwise be unhandled rejections, which
+// crash the whole process in Node ≥15. Report them as a 500 so the page shows "not saved" instead.
+const safe = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch((e) => {
+  console.error(`${req.method} ${req.path} failed:`, e?.message || e);
+  if (!res.headersSent) res.status(500).json({ error: String(e?.message || e) });
+});
 // One annotator's coding of one artifact: codebook ids (see CODEBOOK in artifact-review.html),
 // free text for any "Other" code, a needs-discussion flag, and a note.
-app.post("/api/artifact-codes", async (req, res) => {
+app.post("/api/artifact-codes", safe(async (req, res) => {
   const { coder, key, codes, other, flag, note } = req.body || {};
   if (!key || !/^[A-Za-z0-9_-]{1,30}$/.test(String(coder || ""))) return res.status(400).json({ error: "coder (letters/digits) and key required" });
   const data = {
@@ -602,7 +608,7 @@ app.post("/api/artifact-codes", async (req, res) => {
   };
   await setCode(`${data.coder}__${data.key}`, data);
   res.json({ ok: true });
-});
+}));
 
 // Codebook additions made while coding. kind: "group" (new category in a scheme), "item"
 // (new code in a category; parent = category id) or "sub" (sub-code; parent = code id).
@@ -613,7 +619,7 @@ const codebookAdds = async () => {
   return _cbCache.v;
 };
 app.get("/api/artifact-codebook", async (req, res) => res.json(await codebookAdds()));
-app.post("/api/artifact-codebook", async (req, res) => {
+app.post("/api/artifact-codebook", safe(async (req, res) => {
   const { coder, scheme, kind, parent, label, id: editId } = req.body || {};
   const name = String(label ?? "").trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: "label required" });
@@ -632,9 +638,9 @@ app.post("/api/artifact-codebook", async (req, res) => {
   await setCodebookAdd(id, doc);
   _cbCache = null;
   res.json({ ok: true, id, code: doc });
-});
+}));
 // Remove an added code — only if no coder has applied it and nothing is nested under it.
-app.post("/api/artifact-codebook/delete", async (req, res) => {
+app.post("/api/artifact-codebook/delete", safe(async (req, res) => {
   const id = String(req.body?.id || "");
   const adds = await codebookAdds();
   if (!adds.some((c) => c.id === id)) return res.status(404).json({ error: "not found" });
@@ -644,12 +650,21 @@ app.post("/api/artifact-codebook/delete", async (req, res) => {
   await deleteCodebookAdd(id);
   _cbCache = null;
   res.json({ ok: true });
-});
+}));
 
 // ---- Researcher: sensemaking-process coding of session recordings (/process-review) ----
 // Recordings live in Drive (drive.js); one video per pid covers both of that pid's tasks.
 // Payload: videos by pid, plus each study session's artifacts and chat-turn times so the page
 // can place them on the video timeline (no telemetry, same cached read as /artifact-review).
+// Reflection overlays logged per round (kind "reflection") — they mark the turn structure the
+// chunked "turns" view is built from. Small, cached like reviewData.
+let _reflCache = null;
+async function reflections(fresh) {
+  if (_reflCache && Date.now() - _reflCache.t < 5 * 60 * 1000 && !fresh) return _reflCache.v;
+  const rows = await eventsForPids("reflection", STUDY_PIDS, [...REVIEW_TASKS]);
+  _reflCache = { t: Date.now(), v: rows };
+  return rows;
+}
 app.get("/api/process-review", async (req, res) => {
   let videos = {}, pending = {}, videoError = null;
   try {
@@ -664,6 +679,11 @@ app.get("/api/process-review", async (req, res) => {
   for (const [k, list] of Object.entries(turns)) {
     const [pid, cond, task] = k.split("|");
     sess(pid, cond, task).turns = list.map((t) => ({ ts: t.ts, user: String(t.user ?? "").slice(0, 600) }));
+  }
+  // reflection overlays: logged when closed; duration_ms (since Oct 4) gives when they opened
+  for (const r of await reflections(!!req.query.fresh)) {
+    const d = typeof r.data === "string" ? JSON.parse(r.data || "{}") : r.data || {};
+    (sess(r.pid, r.cond, r.task).reflections ||= []).push({ ts: r.ts, type: r.type, round: d.round ?? null, dur: d.duration_ms ?? null, endTask: !!d.endTask });
   }
   res.json({ videos, pending: Object.keys(pending), sessions: Object.values(sessions), scenarios, videoError });
 });
@@ -694,7 +714,45 @@ const boxes = (a) => (Array.isArray(a) ? a : []).slice(0, 12).map((b) => {
   const f = (v) => Math.round(Math.max(0, Math.min(1, +v || 0)) * 1000) / 1000;
   return { x: f(b?.x), y: f(b?.y), w: f(b?.w), h: f(b?.h) };
 }).filter((b) => b.w > 0 && b.h > 0);
-app.post("/api/process-codes", async (req, res) => {
+// Turns (chunked view), keyed by the prompt's logged timestamp: per turn an intent edge (+ possible
+// alternatives), the artifact node with who led to it, and the engagement steps (edges, and
+// participant-led nodes) in order. auto/unsure mark slots drafted from timeline codes (shown grey
+// until a coder confirms or edits them).
+const st = (v) => (Number.isInteger(+v) && +v > 0 && +v <= 16 ? +v : null);
+const flags = (x) => ({ ...(x?.auto ? { auto: true } : {}), ...(x?.unsure ? { unsure: true } : {}) });
+// evidence on any coded slot/step: screenshot time, focus boxes + text, and a coder's "uncertain" flag
+const evid = (x) => ({ shot: num(x?.shot), boxes: boxes(x?.boxes), focus: String(x?.focus ?? "").slice(0, 300),
+  ...(x?.flag ? { flag: true, flagNote: String(x?.flagNote ?? "").slice(0, 500) } : {}) });
+function cleanTurns(obj) {
+  const turns = {};
+  for (const [k, x] of Object.entries(obj && typeof obj === "object" ? obj : {}).slice(0, 300)) {
+    if (!x || typeof x !== "object") continue;
+    turns[String(k).slice(0, 40)] = {
+      intent: { stage: st(x.intent?.stage), alts: (Array.isArray(x.intent?.alts) ? x.intent.alts : []).map(st).filter(Boolean).slice(0, 6), note: String(x.intent?.note ?? "").slice(0, 2000), ...flags(x.intent), ...evid(x.intent) },
+      node: { stage: st(x.node?.stage), led: ["user", "artifact", "ai"].includes(x.node?.led) ? x.node.led : null, note: String(x.node?.note ?? "").slice(0, 2000), ...flags(x.node), ...evid(x.node) },
+      eng: (Array.isArray(x.eng) ? x.eng : []).slice(0, 60).map((e) => ({ k: e?.k === "n" ? "n" : "e", stage: st(e?.stage), t: num(e?.t), note: String(e?.note ?? "").slice(0, 2000), ...evid(e) })),
+      ...(x.engAuto ? { engAuto: true } : {}), ...(x.engUnsure ? { engUnsure: true } : {}),
+      adj: num(x.adj),
+    };
+  }
+  return turns;
+}
+const cleanStart = (x) => ({ hyp: x?.hyp === true ? true : x?.hyp === false ? false : null, note: String(x?.note ?? "").slice(0, 2000), ...flags(x) });
+// Add turn drafts (made from a coder's timeline codes) to their record — only the turns/start
+// fields, and only if they have no turns yet, so segments, pins and any turn coding stay untouched.
+app.post("/api/process-codes/draft-turns", safe(async (req, res) => {
+  const b = req.body || {};
+  if (![b.coder, b.pid, b.task].every((x) => ID_RE.test(String(x || "")))) return res.status(400).json({ error: "coder, pid, task required" });
+  const id = `${b.coder}__${b.pid}__${b.task}`;
+  const cur = await getProcessCode(id);
+  if (!cur || cur.type !== "session") return res.status(404).json({ error: "no record" });
+  if (Object.keys(cur.turns || {}).length) return res.status(409).json({ error: "already has turns — left as is" });
+  const fields = { turns: cleanTurns(b.turns) };
+  if (cur.start?.hyp == null && b.start) fields.start = cleanStart(b.start);
+  await updateProcessCode(id, fields);
+  res.json({ ok: true, turns: Object.keys(fields.turns).length });
+}));
+app.post("/api/process-codes", safe(async (req, res) => {
   const b = req.body || {};
   if (b.sync) {
     if (!ID_RE.test(String(b.pid || "")) || !Number.isFinite(+b.videoStart)) return res.status(400).json({ error: "pid, videoStart required" });
@@ -720,10 +778,19 @@ app.post("/api/process-codes", async (req, res) => {
     kind: String(x.kind ?? "").trim().slice(0, 40), note: String(x.note ?? "").slice(0, 2000), shot: num(x.shot),
     boxes: boxes(x.boxes), focus: String(x.focus ?? "").slice(0, 300),
   })).filter((x) => x.t != null && (x.kind || x.stage));
-  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
+  // turns (chunked view): keyed by the prompt's logged timestamp; per turn an intent edge (+ possible
+  // alternatives), the artifact node with who led to it, and the engagement steps (edges, and
+  // participant-led nodes) in order.
+  // a save from a page that predates turns (an old open tab) must not wipe stored turns
+  const turnsIn = b.turns && typeof b.turns === "object" ? b.turns : (await getProcessCode(`${b.coder}__${b.pid}__${b.task}`))?.turns || {};
+  const turns = cleanTurns(turnsIn);
+  // starting point: did they come in with a hypothesis (true → a participant 13 opens the sequence)
+  const startIn = b.start && typeof b.start === "object" ? b.start : b.turns ? {} : (await getProcessCode(`${b.coder}__${b.pid}__${b.task}`))?.start || {};
+  const start = cleanStart(startIn);
+  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, turns, start, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
   await setProcessCode(`${data.coder}__${data.pid}__${data.task}`, data);
   res.json({ ok: true });
-});
+}));
 
 app.get("/api/export.json", async (req, res) => {
   const rows = await allEvents(req.query.pid);

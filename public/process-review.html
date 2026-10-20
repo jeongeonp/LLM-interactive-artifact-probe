@@ -207,6 +207,137 @@
   .trow .tm, .arow .tm { font:11px ui-monospace,Menlo,monospace; color:var(--muted); }
   .banner { background:#fdf6e9; border:1px solid #ecd3a3; border-radius:8px; padding:8px 10px; font-size:12.5px; margin-bottom:10px; }
   .help { font-size:11.5px; color:var(--muted); line-height:1.7; margin-top:14px; }
+  /* ---- compare board: every coder on one shared time axis, replaces timeline + sequence ---- */
+  #cmpboard { display:none; flex:none; max-height:58%; overflow-y:auto; background:var(--panel); border-bottom:1px solid var(--line); padding:6px 12px 10px; user-select:none; }
+  #center.cmp #palette, #center.cmp #tlwrap, #center.cmp #seqpanel { display:none; }
+  /* compare mode: a smaller video, the board takes the rest of the column */
+  #center.cmp #cmpboard { display:block; flex:1 1 auto; max-height:none; min-height:0; }
+  #center.cmp #vwrap { flex:0 0 32%; min-height:150px; }
+  #center.cmp #ctlHint { display:none; }
+  .cb-head { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); margin-bottom:4px; flex-wrap:wrap; }
+  .cb-head .stat { font-size:12px; color:var(--text); }
+  .cb-head .stat b { font-variant-numeric:tabular-nums; }
+  .cb-grid { display:grid; grid-template-columns:86px 1fr; column-gap:8px; position:relative; }
+  .cb-grid .lbl { font-size:11.5px; font-weight:700; text-align:right; padding-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cb-grid .lbl small { display:block; font-weight:400; color:var(--muted); font-size:10px; }
+  .cb-lane { position:relative; }
+  .cb-ruler { height:16px; font-size:10px; color:var(--muted); position:relative; border-bottom:1px solid var(--line); }
+  .cb-ruler span { position:absolute; transform:translateX(-50%); top:1px; }
+  .cb-ev { height:14px; position:relative; }
+  .cb-coder { border:1px solid var(--line); border-radius:6px; background:#fcfbf8; padding:2px 0; margin-top:6px; }
+  .cb-coder.me { border-color:#e2c9b3; background:#fffaf5; }
+  .cb-nodes, .cb-marks { height:16px; position:relative; }
+  .cb-segs { height:24px; position:relative; background:#f4f1ea; border-radius:3px; }
+  .cb-segs .seg { line-height:20px; font-size:10px; }
+  .cb-nodes .pinm, .cb-marks .pinm { height:14px; font-size:9px; line-height:12px; }
+  .cb-marks { border-top:1px dashed #eadfce; }
+  .cb-agree { height:12px; position:relative; margin:3px 0 0; }
+  .cb-agree i { position:absolute; top:0; bottom:0; }
+  .cb-agree i.same { background:#5aae5e; } .cb-agree i.loop { background:#e0b84a; } .cb-agree i.diff { background:#e05a4f; } .cb-agree i.gap { background:repeating-linear-gradient(45deg,#e9e4da,#e9e4da 3px,#f6f3ed 3px,#f6f3ed 6px); }
+  .cb-agree i.on { outline:2px solid #2a2725; z-index:2; }
+  /* artifact periods across every lane: a divider at each artifact's creation time */
+  .cb-art { position:absolute; top:16px; bottom:0; width:0; border-left:1px dashed rgba(42,39,37,.35); pointer-events:none; z-index:4; }
+  .cb-art span { position:absolute; top:-15px; left:-9px; font-size:9px; font-weight:700; background:#2a2725; color:#fff; border-radius:3px; padding:0 3px; }
+  #pCmp .seqrow { background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:6px 8px; margin-top:5px; }
+  #pCmp .seqrow .who { margin-bottom:2px; }
+  #pCmp .mkrow { margin:4px 0 0; width:100%; }
+  .cb-ph { position:absolute; top:0; bottom:0; width:0; border-left:2px solid #d0342c; pointer-events:none; z-index:6; }
+  .cb-legend { display:flex; gap:10px; font-size:10.5px; color:var(--muted); }
+  .cb-legend i { display:inline-block; width:10px; height:8px; border-radius:2px; margin-right:3px; vertical-align:middle; }
+  /* right-pane Compare tab */
+  .kpi { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .kpi div { background:var(--soft); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
+  .kpi b { display:block; font-size:18px; font-variant-numeric:tabular-nums; }
+  .kpi span { font-size:11px; color:var(--muted); }
+  .dis { display:grid; grid-template-columns:auto 1fr; gap:2px 8px; padding:6px 6px; border-left:3px solid #e05a4f; margin-top:5px; border-radius:0 6px 6px 0; background:var(--soft); cursor:pointer; font-size:12px; }
+  .dis.loop { border-left-color:#e0b84a; }
+  .dis:hover, .dis.on { background:#f3ece2; }
+  .dis .tm { font:11px ui-monospace,Menlo,monospace; color:var(--muted); grid-row:span 2; padding-top:1px; }
+  .dis .c { display:flex; gap:5px; align-items:center; min-width:0; }
+  .dis .c b { font-size:10.5px; color:var(--muted); min-width:44px; }
+  .dis .sw { width:9px; height:9px; border-radius:2px; flex:none; }
+  .seqcmp { font-size:12px; line-height:1.6; padding:6px 8px; background:var(--soft); border:1px solid var(--line); border-radius:8px; margin-top:5px; }
+  .seqcmp b { display:block; font-size:11px; color:var(--muted); }
+  /* ---- turns view: each prompt is a turn = ① intent edge → ② artifact node → ③ engagement ---- */
+  #turnboard { display:none; flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--soft); padding:8px 12px 30px; }
+  #center.turns #turnboard { display:block; }
+  #center.turns #seqpanel { display:none; }
+  #center.turns #vwrap { flex:0 0 34%; min-height:150px; }
+  #center.turns #ctlHint { display:none; }
+  #center.turns #tlLegend::before { content:"▮ intent · ▮ engagement · │ artifact/reply · "; }
+  .tseq { display:flex; flex-wrap:wrap; align-items:flex-end; row-gap:6px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 8px; margin-bottom:8px; }
+  .tseq .who { font-size:11px; font-weight:700; color:var(--muted); width:100%; }
+  .tseq .tsep { align-self:stretch; display:flex; align-items:center; font-size:9.5px; font-weight:700; color:#b9ab97; padding:0 4px; border-left:1px dashed #d8cfc0; margin-left:4px; }
+  .tcard { background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:8px; }
+  .tcard.seltc { box-shadow:0 0 0 2px var(--accent); }
+  .tcard .th { display:flex; align-items:baseline; gap:8px; padding:6px 10px; border-bottom:1px solid var(--line); font-size:12px; }
+  .tcard .th b { font-size:13px; }
+  .tcard .th .pr-text { flex:1; min-width:0; color:#5a564e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  .tcard .th .pr-text.open { white-space:pre-wrap; }
+  .tslots { display:grid; grid-template-columns:1fr 0.8fr 1.4fr; }
+  .slot { padding:7px 10px 8px; border-right:1px solid var(--line); font-size:12px; min-width:0; }
+  .slot:last-child { border-right:0; }
+  .slot .sh { display:flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-bottom:5px; flex-wrap:wrap; }
+  .slot .sh .tm { font:10.5px ui-monospace,Menlo,monospace; text-transform:none; letter-spacing:0; font-weight:400; }
+  .slot.intent { background:#f6f3fb; } .slot.node { background:#fff8ef; } .slot.eng { background:#f2f8f3; }
+  .slot select { font:12px inherit; padding:2px 4px; border:1px solid var(--line); border-radius:6px; background:#fff; max-width:100%; }
+  .slot input.nt { width:100%; margin-top:5px; font:11.5px inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .play { border:1px solid var(--line); background:#fff; border-radius:10px; padding:0 7px; font-size:10.5px; cursor:pointer; color:var(--text); text-transform:none; letter-spacing:0; font-weight:600; }
+  .play:hover { border-color:var(--accent); color:var(--accent); }
+  .play.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .nudge { border:0; background:none; cursor:pointer; color:var(--muted); font-size:10px; padding:0 2px; }
+  .nudge:hover { color:var(--accent); }
+  .alts { display:flex; flex-wrap:wrap; gap:3px; align-items:center; margin-top:5px; font-size:11px; color:var(--muted); }
+  .alts .alt { background:#ece6f5; color:#4b3d6e; border-radius:9px; padding:0 6px; cursor:pointer; }
+  .alts .alt::after { content:" ×"; opacity:.6; }
+  .alts select { font-size:11px; padding:0 2px; }
+  .led { display:flex; gap:3px; margin-top:5px; align-items:center; font-size:11px; color:var(--muted); }
+  .led button { border:1px solid var(--line); background:#fff; border-radius:9px; padding:0 8px; font-size:11px; cursor:pointer; }
+  .led button.on { background:#2a2725; color:#fff; border-color:#2a2725; }
+  .engl { display:flex; flex-direction:column; gap:3px; }
+  .eitem { display:flex; align-items:center; gap:4px; }
+  .eitem .k { font-size:10px; width:14px; text-align:center; color:var(--muted); }
+  .eitem.n select { border-color:#e6b97f; background:#fff8ef; font-weight:600; }
+  .eitem .t { font:10.5px ui-monospace,Menlo,monospace; color:var(--muted); cursor:pointer; }
+  .eitem button { border:0; background:none; cursor:pointer; color:var(--muted); font-size:11px; padding:0 2px; }
+  .eitem button:hover { color:var(--accent); }
+  .eitem input { flex:1; min-width:40px; font:11px inherit; padding:2px 5px; border:1px solid var(--line); border-radius:5px; background:#fff; }
+  .eadd { display:flex; gap:5px; margin-top:4px; }
+  .eadd button { border:1px dashed #b9c9bd; background:none; border-radius:6px; font-size:11px; padding:1px 7px; cursor:pointer; color:#3f6b4a; }
+  .eadd button.n { border-color:#e6b97f; color:#9a5a12; }
+  .tmarks { padding:3px 10px 5px; font-size:11px; color:var(--muted); border-top:1px dashed #eadfce; display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+  .tmarks .pinchip { margin:0; font-size:10.5px; }
+  .tcmp { border-top:1px solid var(--line); padding:4px 10px 6px; font-size:11.5px; background:#fbfaf7; }
+  .tcmp .row { display:grid; grid-template-columns:70px 1fr 0.8fr 1.4fr; gap:8px; padding:2px 0; align-items:baseline; }
+  .tcmp .row b { font-size:11px; color:var(--muted); }
+  .tcmp .ok { color:#2f7a3a; } .tcmp .no { color:#b3261e; font-weight:600; }
+  .tsum { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .tsum div { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:4px 10px; font-size:11px; color:var(--muted); }
+  .tsum b { display:block; font-size:16px; color:var(--text); font-variant-numeric:tabular-nums; }
+  /* drafted from timeline codes: grey until a coder confirms or edits; unsure = needs a look */
+  .slot.auto { background:repeating-linear-gradient(135deg,#f3f2ef,#f3f2ef 6px,#eceae5 6px,#eceae5 12px); }
+  .slot.auto select, .slot.auto .eitem select { color:#77736b; border-style:dashed; }
+  .draft { font-size:9.5px; font-weight:700; text-transform:none; letter-spacing:0; color:#77736b; background:#e4e1da; border-radius:8px; padding:0 6px; cursor:pointer; }
+  .draft.unsure { background:#d6d2c9; color:#4f4b44; }
+  .draft:hover { background:#2f7a3a; color:#fff; }
+  .flagb { border:0; background:none; cursor:pointer; font-size:11px; padding:0 2px; opacity:.35; filter:grayscale(1); }
+  .flagb:hover { opacity:.8; }
+  .flagb.on { opacity:1; filter:none; }
+  .slot.flagged, .eitem.flagged select { box-shadow:inset 3px 0 0 #d0342c; }
+  .slot .sh .sel-me { cursor:pointer; }
+  .srow .flg { color:#d0342c; font-size:11px; }
+  .srow.tsep-row { padding:6px 4px 2px; font-size:11px; font-weight:700; color:var(--muted); border:0; cursor:default; background:none; }
+  /* reference figure (Pirolli & Card's sensemaking loop, redrawn) */
+  .figref { margin-top:14px; border:1px solid var(--line); border-radius:8px; background:#fff; padding:6px; cursor:zoom-in; }
+  .figref .cap { font-size:10.5px; color:var(--muted); margin-bottom:2px; }
+  #figz { position:fixed; inset:0; background:rgba(20,18,16,.75); z-index:31; display:none; align-items:center; justify-content:center; padding:24px; cursor:zoom-out; }
+  #figz.open { display:flex; }
+  #figz .fb { background:#fff; border-radius:10px; padding:14px; width:min(1100px, 96vw); }
+  .startc { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:7px 10px; font-size:12px; }
+  .chunkband { position:absolute; top:3px; bottom:3px; border-radius:3px; font-size:9.5px; color:#fff; font-weight:700; padding:0 4px; line-height:18px; overflow:hidden; white-space:nowrap; cursor:pointer; }
+  .chunkband.i { background:#9a8cc4; } .chunkband.e { background:#7fb38c; }
+  .chunknode { position:absolute; top:0; bottom:0; width:0; border-left:2px solid #2a2725; z-index:2; }
+  .chunknode span { position:absolute; top:-1px; left:1px; background:#2a2725; color:#fff; font-size:9px; padding:0 3px; border-radius:0 3px 3px 0; }
   .prow.pending { opacity:.55; font-size:12px; }
   .prow.pending .muted { margin-left:6px; }
 </style>
@@ -221,6 +352,7 @@
   <span class="grow"></span>
   <button class="linkbtn" id="csvSeg" title="One row per node, process segment and marker, every coder">⭳ segments CSV</button>
   <button class="linkbtn" id="csvSeq" title="One row per (coder, session): the derived sequence">⭳ sequences CSV</button>
+  <button class="linkbtn" id="csvTurns" title="One row per turn slot (intent / node / engagement step), every coder">⭳ turns CSV</button>
   <button class="linkbtn" id="refresh" title="Re-read sessions and the Drive folder">↻ refresh</button>
   <a href="/artifact-review">Artifact review →</a>
 </header>
@@ -245,12 +377,15 @@
     <div id="palette"></div>
     <div id="tlwrap">
       <div class="tlbar">
+        <button class="b" data-mode="turns" title="Code each turn: intent → artifact → engagement">turns</button>
+        <button class="b" data-mode="timeline" title="Code on the timeline (segments and pins)">timeline</button>
+        <span class="sep" style="width:1px;height:16px;background:var(--line)"></span>
         <span>View</span>
         <button class="b" data-view="task">this task</button>
         <button class="b" data-view="full">whole video</button>
         <button class="b" data-view="zoom">10 min</button>
         <span class="grow"></span>
-        <span>◼ artifact · ▾ prompt sent · shaded = this task's window</span>
+        <span id="tlLegend" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">◼ artifact · ▾ prompt sent · shaded = this task's window</span>
       </div>
       <div id="tl">
         <div class="tlrow" id="tlRuler"></div>
@@ -262,6 +397,8 @@
         <div id="playhead"></div><div id="hover"></div>
       </div>
     </div>
+    <div id="cmpboard"></div>
+    <div id="turnboard"></div>
     <div id="seqpanel">
       <div class="seqhd">Sequence <button class="b" id="copySeq" style="text-transform:none;letter-spacing:0;font-weight:400">copy</button>
         <label style="text-transform:none;letter-spacing:0;font-weight:400;display:flex;gap:4px;align-items:center">group by
@@ -272,13 +409,15 @@
     </div>
   </section>
   <aside id="right">
-    <div class="tabs"><button data-tab="segs" class="on">Segments</button><button data-tab="tr">Transcript</button><button data-tab="ev">Events &amp; sync</button></div>
+    <div class="tabs"><button data-tab="segs" class="on" id="tabSegs">Segments</button><button data-tab="tr">Transcript</button><button data-tab="ev">Events &amp; sync</button><button data-tab="cmp" id="tabCmp" style="display:none">Compare</button></div>
     <div class="pane on" id="pSegs"></div>
     <div class="pane" id="pTr"></div>
     <div class="pane" id="pEv"></div>
+    <div class="pane" id="pCmp"></div>
   </aside>
 </main>
 <div id="zoom"><div class="zb" id="zoomBox"></div></div>
+<div id="figz"><div class="fb" id="figzBox"></div></div>
 <!-- frame grabber: must stay rendered (not display:none) or Chrome may never decode its frames -->
 <video id="grab" preload="auto" muted playsinline style="position:fixed;left:0;bottom:0;width:4px;height:4px;opacity:.01;pointer-events:none"></video>
 
@@ -355,6 +494,7 @@ const state = {
   coder: (q.get("coder") || lsGet("pr-coder") || "").replace(/[^A-Za-z0-9_-]/g, ""),
   pid: q.get("pid") || "", task: q.get("task") || "",
   view: lsGet("pr-view") || "task", tab: "segs", compare: q.get("compare") === "1",
+  mode: lsGet("pr-mode") || "turns", // "turns" (chunked per prompt) or "timeline" (segments + pins)
   sel: null, // selected segment id
   selPin: null, // selected marker pin id
 };
@@ -403,7 +543,7 @@ async function load(fresh) {
   for (const x of Object.values(c)) {
     if (x?.type === "sync") SYNC[x.pid] = x;
     else if (x?.coder && x?.pid && x?.task) {
-      x.segs ||= []; x.pins ||= [];
+      x.segs ||= []; x.pins ||= []; x.turns ||= {}; x.start ||= { hyp: null, note: "" };
       for (const g of x.segs) { for (const m of g.marks || []) x.pins.push({ id: uid(), t: g.t0, kind: m, note: "" }); delete g.marks; }
       // nodes used to be segments: turn them into pins, giving their span to the previous segment
       x.segs = x.segs.filter((g, i, l) => {
@@ -539,7 +679,7 @@ function openSession(pid, task, fromUrl) {
   const list = sessionsFor(pid);
   state.pid = pid;
   state.task = list.find((s) => s.task === task)?.task || list[0]?.task || "";
-  state.sel = null;
+  state.sel = null; state.selTurn = null;
   syncUrl();
   renderSide();
   const v = D.videos[pid];
@@ -581,6 +721,8 @@ function renderAll() {
   renderSegPane();
   renderEvPane();
   renderTr(true);
+  renderCompare();
+  renderTurns();
   updatePlayhead();
 }
 
@@ -589,11 +731,11 @@ function renderPalette() {
   const node = (x) => `<button class="nodeb" style="--c:${x.c};${x.ink ? `--ink:${x.ink}` : ""}" data-n="${x.n}"${dis} title="${esc(x.name)} — node: pins a moment · type ${x.n}"><i>${x.n}</i>${esc(x.name)}</button>`;
   const arr = (x) => `<button class="arrb" style="--c:${x.c}" data-n="${x.n}"${dis} title="${esc(x.name)} — process: starts a segment · type ${x.n}"><i>${x.n}</i>${esc(x.name)} <b>→</b></button>`;
   const cell = (loop, nodes) => `<div class="cell">${STAGES.filter((x) => x.loop === loop && !!x.node === nodes).map(nodes ? node : arr).join("")}</div>`;
-  $("palette").innerHTML = `<div class="pgrid">
+  $("palette").innerHTML = (state.mode === "turns" ? `<div class="pgrid" style="grid-template-columns:auto 1fr">` : `<div class="pgrid">
       <span></span><span class="ph">Foraging loop</span><span class="ph">Sensemaking loop</span>
       <span class="ph">Nodes <small>· pin</small></span>${cell("F", true)}${cell("S", true)}
-      <span class="ph">Arrows <small>· segment</small></span>${cell("F", false)}${cell("S", false)}
-      <span class="ph">Markers <small>· pin</small></span><div class="cell" style="grid-column:span 2">` +
+      <span class="ph">Arrows <small>· segment</small></span>${cell("F", false)}${cell("S", false)}`) +
+      `<span class="ph">Markers <small>· pin</small></span><div class="cell" style="grid-column:span 2">` +
     MARKS.map(([m, k]) => `<button class="pinb" data-pin="${esc(m)}"${dis} title="Pin “${esc(m)}” at the playhead — key ${k.toUpperCase()}"><i>${k.toUpperCase()}</i>${esc(m)}</button>`).join("") +
     `<button class="pinb" data-pin="other"${dis} title="Pin a custom marker at the playhead; name it in the editor"><i>+</i>other</button></div></div>`;
 }
@@ -657,12 +799,12 @@ function renderTimeline() {
   const pinEl = (p) =>
     `<div class="pinm${p.stage ? " node" : ""}${p.id === state.selPin ? " sel" : ""}" data-pin="${p.id}" style="left:${pct(p.t, w)}%;${p.stage ? `--c:${ST[p.stage].c};${ST[p.stage].ink ? `--ink:${ST[p.stage].ink}` : ""}` : ""}" title="${esc(`${fmt(p.t)} · ${pinLabel(p)}${p.note ? "\n" + p.note : ""}`)}"><span>${p.stage ? `${p.stage} ${esc(ST[p.stage].name.toLowerCase())}${byParticipant(p) ? " · P" : nodeArt(p) != null ? " · a" + nodeArt(p) : ""}` : esc(p.kind)}</span></div>`;
   const inView = state.coder ? pins().filter((p) => p.t >= w[0] && p.t <= w[1]) : [];
-  $("tlPins").innerHTML = inView.filter((p) => !isMarker(p)).map(pinEl).join("");
+  $("tlPins").innerHTML = state.mode === "turns" ? "" : inView.filter((p) => !isMarker(p)).map(pinEl).join("");
   $("tlMarks").innerHTML = inView.filter(isMarker).map(pinEl).join("");
-  $("tlSegs").innerHTML = state.coder ? segEls(segs(), w, true) : `<div style="font-size:11px;color:var(--muted);padding:7px">Enter a coder name to annotate.</div>`;
+  $("tlSegs").innerHTML = state.mode === "turns" ? chunkBands(w) : state.coder ? segEls(segs(), w, true) : `<div style="font-size:11px;color:var(--muted);padding:7px">Enter a coder name to annotate.</div>`;
   // other coders
   let o = "";
-  if (state.compare) for (const [c, r] of Object.entries(CODES[`${state.pid}|${state.task}`] || {})) {
+  if (state.compare && state.mode === "timeline") for (const [c, r] of Object.entries(CODES[`${state.pid}|${state.task}`] || {})) {
     if (c === state.coder || !r.segs?.length) continue;
     o += `<div class="tlrow orow" title="${esc(c)}">${segEls(r.segs, w, false)}</div>`;
   }
@@ -677,6 +819,8 @@ function updatePlayhead() {
   const w = viewWindow(), p = pct(t, w);
   $("playhead").style.display = p >= 0 && p <= 100 ? "" : "none";
   $("playhead").style.left = p + "%";
+  const cph = document.querySelector("#cmpboard .cb-ph");
+  if (cph) { cph.style.display = p >= 0 && p <= 100 ? "" : "none"; cph.style.left = `calc(94px + (100% - 94px) * ${p / 100})`; }
   $("play").textContent = vid.paused ? "▶︎" : "❚❚";
 }
 
@@ -720,6 +864,527 @@ document.addEventListener("mouseup", () => {
 document.querySelectorAll(".tlbar [data-view]").forEach((b) => b.addEventListener("click", () => {
   state.view = b.dataset.view; lsSet("pr-view", state.view); renderTimeline(); renderPlot(); updatePlayhead();
 }));
+
+// ---- turns view ----------------------------------------------------------------------------
+// Each prompt is one turn, chunked automatically from the logs:
+//   ① intent  = typing the prompt + the reflection overlay about it (from when the overlay opened,
+//               or an estimate when only its close is logged) until the reply is visible,
+//   ② node    = the artifact (or, text condition, the AI reply) as it appears,
+//   ③ engage  = from then until the next turn's intent starts.
+// Reflection Q1/Q2 look back at the previous artifact, so the next overlay is offered as a
+// "look-back" clip in ③. Coders tag: one intent edge (+ possible alternatives), the node and who
+// led to it, and the engagement steps (edges, plus participant-led nodes for the edge case of a
+// hypothesis formed while engaging). Stored per coder in r.turns, keyed by the prompt's log time.
+const NODE_STAGES = STAGES.filter((x) => x.node), EDGE_STAGES = STAGES.filter((x) => !x.node);
+function deriveTurns(s = cur(), rec = mine()) {
+  if (!s) return [];
+  const w = taskWindow(s);
+  const chats = (s.turns || []).map((t) => ({ ...t, R: vt(t.ts, s.pid) })).filter((t) => t.R != null).sort((a, b) => a.R - b.R);
+  const arts = (s.artifacts || []).map((a) => ({ ...a, t: vt(a.ts, s.pid) })).filter((a) => a.t != null);
+  const refl = (s.reflections || []).filter((r) => r.type === "artifact_reflection_shown").map((r) => ({ ...r, C: vt(r.ts, s.pid) })).filter((r) => r.C != null);
+  const turns = chats.map((c, k) => ({ k: k + 1, key: c.ts, prompt: c.user, R: c.R, art: arts.filter((a) => Math.abs(a.t - c.R) < 25).sort((a, b) => Math.abs(a.t - c.R) - Math.abs(b.t - c.R))[0] || null, refl: null }));
+  // a reflection belongs to the prompt it was shown for: the turn whose reply time is nearest,
+  // between the previous and next replies
+  for (const r of refl.filter((x) => !x.endTask)) {
+    let best = null;
+    turns.forEach((t, i) => {
+      const lo = i ? turns[i - 1].R : -Infinity, hi = turns[i + 1]?.R ?? Infinity;
+      if (r.C > lo && r.C < hi && (!best || Math.abs(r.C - t.R) < Math.abs(r.C - best.R))) best = t;
+    });
+    if (best && !best.refl) best.refl = { O: r.dur ? r.C - r.dur / 1000 : null, C: r.C, exact: !!r.dur };
+  }
+  const endRefl = refl.filter((x) => x.endTask).sort((a, b) => a.C - b.C)[0];
+  turns.forEach((t, i) => {
+    t.N = Math.max(t.art?.t ?? t.R, t.refl?.C ?? -Infinity); // visible once the reply is in and the overlay closed
+    const est = t.refl ? (t.refl.O ?? Math.min(t.refl.C, t.R) - 60) : t.R - 30;
+    t.S0 = Math.max(est, i ? turns[i - 1].N + 1 : w[0]);
+    t.exact = !!t.refl?.exact;
+  });
+  turns.forEach((t, i) => {
+    const adj = rec?.turns?.[t.key]?.adj || 0;
+    t.S = Math.min(t.N - 1, t.S0 + adj);
+  });
+  turns.forEach((t, i) => {
+    const next = turns[i + 1];
+    t.E = next ? next.S : endRefl ? (endRefl.dur ? endRefl.C - endRefl.dur / 1000 : endRefl.C) : Math.max(w[1], t.N + 30);
+    t.back = next?.refl ? [next.refl.O ?? next.S, next.refl.C] : endRefl ? [endRefl.dur ? endRefl.C - endRefl.dur / 1000 : endRefl.C - 60, endRefl.C] : null;
+  });
+  return turns;
+}
+const isText = () => (cur()?.cond || COND[state.pid?.[0]]) === "text";
+const blankTurn = () => ({ intent: { stage: null, alts: [], note: "" }, node: { stage: null, led: null, note: "" }, eng: [], adj: null });
+function turnRec(key, create) {
+  const r = mine(create);
+  if (!r) return null;
+  r.turns ||= {};
+  if (!r.turns[key] && create) r.turns[key] = blankTurn();
+  return r.turns[key] || null;
+}
+// play just one chunk of the video
+let clipEnd = null;
+function playClip(a, b) { clipEnd = b; seek(a); vid.play(); renderTurnsPlaying(); }
+vid.addEventListener("timeupdate", () => { if (clipEnd != null && vid.currentTime >= clipEnd) { vid.pause(); clipEnd = null; renderTurnsPlaying(); } });
+function renderTurnsPlaying() {
+  document.querySelectorAll("#turnboard .play").forEach((b) => b.classList.toggle("on", clipEnd != null && +b.dataset.b === clipEnd && !vid.paused));
+}
+const nodeName = (stage) => (ST[stage] ? ST[stage].name.toLowerCase() : "?");
+function turnNodeLabel(t, x) {
+  const led = x?.node?.led;
+  const src = isText() ? "AI reply" : t.art ? `artifact ${t.art.seq}` : "reply";
+  return `${nodeName(x?.node?.stage)} (${src}${led ? ` · ${led === "user" ? "user-led" : led === "ai" ? "AI-led" : "artifact-led"}` : ""})`;
+}
+// the coded sequence as items, for the strip, copy, compare and CSV
+function turnItems(r, turns) {
+  const out = [];
+  if (r?.start?.hyp) out.push({ k: "n", stage: 13, label: "hypothesis (participant)", turn: 0 });
+  for (const t of turns) {
+    const x = r?.turns?.[t.key];
+    if (!x) continue;
+    if (x.intent?.stage) out.push({ k: "e", stage: x.intent.stage, label: nodeName(x.intent.stage), turn: t.k });
+    if (x.node?.stage) out.push({ k: "n", stage: x.node.stage, label: turnNodeLabel(t, x), turn: t.k });
+    for (const e of x.eng || []) if (e.stage) out.push({ k: e.k, stage: e.stage, label: e.k === "n" ? `${nodeName(e.stage)} (participant)` : nodeName(e.stage), turn: t.k });
+  }
+  return out;
+}
+function turnSeqHtml(items) {
+  let lastTurn = null;
+  return items.map((it) => {
+    const s = ST[it.stage] || { c: "#999" };
+    const sep = it.turn !== lastTurn ? `<span class="tsep">${it.turn ? "T" + it.turn : "start"}</span>` : "";
+    lastTurn = it.turn;
+    return sep + (it.k === "n"
+      ? `<div class="nd" style="--c:${s.c};${s.ink ? `--ink:${s.ink}` : ""}"><span class="nb">${esc(it.label)}</span><span class="nm">${it.stage}</span></div>`
+      : `<div class="pr" style="--c:${s.c}"><span class="pl">${esc(it.label)}</span><span class="pa"></span><span class="nm">${it.stage}</span></div>`);
+  }).join("");
+}
+const turnSeqText = (r, turns) => turnItems(r, turns).map((it) => it.label).join(" → ");
+// edit distance between two step lists (by stage + kind), normalized to a 0–1 similarity
+function seqSim(a, b) {
+  const x = a.map((e) => e.k + e.stage), y = b.map((e) => e.k + e.stage);
+  if (!x.length && !y.length) return 1;
+  const d = Array.from({ length: x.length + 1 }, (_, i) => [i, ...Array(y.length).fill(0)]);
+  for (let j = 1; j <= y.length; j++) d[0][j] = j;
+  for (let i = 1; i <= x.length; i++) for (let j = 1; j <= y.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+  return 1 - d[x.length][y.length] / Math.max(x.length, y.length);
+}
+function chunkBands(w) {
+  if (!D || !state.pid) return "";
+  let h = "";
+  for (const t of deriveTurns()) {
+    const band = (a, b, cls, label) => { const l = pct(a, w), r = pct(b, w); if (r < 0 || l > 100) return ""; const L = Math.max(0, l); return `<div class="chunkband ${cls}" data-t="${a}" style="left:${L}%;width:${Math.max(0.2, Math.min(100, r) - L)}%" title="${esc(label)}">${esc(label)}</div>`; };
+    h += band(t.S, t.N, "i", `T${t.k} intent`) + band(t.N, t.E, "e", `T${t.k} engagement`);
+    if (t.N >= w[0] && t.N <= w[1]) h += `<div class="chunknode" style="left:${pct(t.N, w)}%"><span>${isText() ? "reply" : t.art ? "a" + t.art.seq : "reply"}</span></div>`;
+  }
+  return h;
+}
+function renderTurns() {
+  const on = state.mode === "turns" && D && state.pid;
+  $("center").classList.toggle("turns", !!on);
+  document.querySelectorAll(".tlbar [data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === state.mode));
+  if (!on) { $("turnboard").innerHTML = ""; return; }
+  const turns = deriveTurns(), r = mine(), y = $("turnboard").scrollTop;
+  const others = state.compare ? Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([c, o]) => c !== state.coder && (Object.keys(o.turns || {}).length || o.start?.hyp != null)) : [];
+  const dis = !state.coder ? " disabled" : "";
+  const stageOpts = (list, cur, ph) => `<option value="">${ph}</option>` + list.map((x) => `<option value="${x.n}"${cur === x.n ? " selected" : ""}>${x.n} · ${esc(x.name)}</option>`).join("");
+  const mk = (r?.pins || []).filter(isMarker);
+  let h = "";
+  if (!turns.length) h += '<div class="empty">No prompts logged for this session (or the recording isn\'t synced yet — Events & sync tab).</div>';
+  if (!state.coder) h += '<div class="banner">Enter your coder name in the header to code turns.</div>';
+  // coded sequence (mine, then others in compare mode)
+  const strip = (who, rr) => `<div class="tseq"><span class="who">${esc(who)}</span>${turnSeqHtml(turnItems(rr, turns)) || '<span class="muted" style="font-size:11px">nothing coded yet</span>'}</div>`;
+  if (state.coder) h += strip(`Sequence · ${state.coder}`, r) + `<div style="margin:-4px 0 8px"><button class="b" id="copyTurns">copy sequence</button></div>`;
+  for (const [c, o] of others) h += strip(c, o);
+  // compare summary
+  if (others.length && r) {
+    for (const [c, o] of others) {
+      const both = turns.filter((t) => r.turns?.[t.key] && o.turns?.[t.key]);
+      const pc = (f) => (both.length ? Math.round((100 * both.filter(f).length) / both.length) + "%" : "—");
+      const A = (t) => r.turns[t.key], B = (t) => o.turns[t.key];
+      const sim = both.length ? Math.round((100 * both.reduce((acc, t) => acc + seqSim(A(t).eng || [], B(t).eng || []), 0)) / both.length) + "%" : "—";
+      h += `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${esc(state.coder)} vs ${esc(c)}</b>${both.length} turns both coded</div>
+        <div><b>${pc((t) => A(t).intent.stage && A(t).intent.stage === B(t).intent.stage)}</b>same intent edge</div>
+        <div><b>${pc((t) => A(t).node.stage && A(t).node.stage === B(t).node.stage)}</b>same node</div>
+        <div><b>${pc((t) => A(t).node.led && A(t).node.led === B(t).node.led)}</b>same led-by</div>
+        <div><b>${sim}</b>engagement similarity</div>
+        <div><b>${r.start?.hyp == null || o.start?.hyp == null ? "—" : r.start.hyp === o.start.hyp ? "same" : "differ"}</b>starting hypothesis</div></div>`;
+    }
+  }
+  // starting point
+  if (turns.length) {
+    const st = r?.start || {};
+    h += `<div class="tcard"><div class="startc"><b>Start</b><span class="muted">Did they come in with a hypothesis?</span>
+      ${draftBadge(st, "start")}<span class="led" style="margin:0">${[[true, "yes → 13 hypothesis (participant)"], [false, "no"]].map(([v, l]) => `<button data-start="${v}"${dis} class="${st.hyp === v ? "on" : ""}">${l}</button>`).join("")}</span>
+      <input class="nt" data-startnote style="flex:1;margin:0;min-width:160px" placeholder="evidence (e.g. what they said before the first prompt)" value="${esc(st.note || "")}"${dis} />
+      ${others.map(([c, o]) => `<span class="${o.start?.hyp === st.hyp ? "ok" : "no"}" style="font-size:11px">${esc(c)}: ${o.start?.hyp == null ? "—" : o.start.hyp ? "yes" : "no"}</span>`).join("")}</div></div>`;
+  }
+  for (const t of turns) {
+    const x = r?.turns?.[t.key] || blankTurn();
+    const nodeSrc = isText() ? "AI reply" : t.art ? `Artifact ${t.art.seq}` : "Reply (no artifact)";
+    const ledOpts = isText() ? [["user", "user"], ["ai", "AI reply"]] : [["user", "user"], ["artifact", "artifact"]];
+    const marks = mk.filter((p) => p.t >= t.S && p.t < t.E);
+    h += `<div class="tcard${state.selTurn?.key === t.key ? " seltc" : ""}" data-key="${esc(t.key)}">
+      <div class="th"><b>Turn ${t.k}</b><span class="tm" style="font:11px ui-monospace,Menlo,monospace;color:var(--muted)">${fmt(t.S)}</span>
+        <span class="pr-text" title="click to expand">“${esc(t.prompt || "")}”</span></div>
+      <div class="tslots">
+        <div class="slot intent${x.intent.auto ? " auto" : ""}${x.intent.flag ? " flagged" : ""}"><div class="sh"><span class="sel-me" data-sel="intent" title="Select: screenshot, boxes, note, flag (right panel)">① Intent</span>${flagBtn(x.intent, "intent")}${draftBadge(x.intent, "intent")}
+            <button class="play" data-a="${t.S}" data-b="${t.N}" title="Prompt + reflection about it">▶ ${fmt(t.S)}–${fmt(t.N)}</button>
+            <button class="nudge" data-adj="-15"${dis} title="Start 15 s earlier">−15s</button><button class="nudge" data-adj="15"${dis} title="Start 15 s later">+15s</button>
+            ${t.exact ? "" : '<span class="tm" title="Only the overlay\'s close is logged for this session, so the start is estimated — nudge if needed">≈</span>'}</div>
+          <select data-f="intent"${dis}>${stageOpts(EDGE_STAGES, x.intent.stage, "edge…")}</select>
+          <div class="alts">possible: ${(x.intent.alts || []).map((a) => `<span class="alt" data-alt="${a}" title="remove">${a} ${esc(ST[a].name)}</span>`).join("")}
+            <select data-f="alt"${dis}><option value="">+</option>${EDGE_STAGES.filter((s2) => s2.n !== x.intent.stage && !(x.intent.alts || []).includes(s2.n)).map((s2) => `<option value="${s2.n}">${s2.n} · ${esc(s2.name)}</option>`).join("")}</select></div>
+          <input class="nt" data-note="intent" placeholder="why (what they said)" value="${esc(x.intent.note)}"${dis} /></div>
+        <div class="slot node${x.node.auto ? " auto" : ""}${x.node.flag ? " flagged" : ""}"><div class="sh"><span class="sel-me" data-sel="node" title="Select: screenshot, boxes, note, flag (right panel)">② ${esc(nodeSrc)}</span>${flagBtn(x.node, "node")}${draftBadge(x.node, "node")} <button class="play" data-a="${t.N}" data-b="${Math.min(t.E, t.N + 45)}" title="First 45 s after it appears">▶ ${fmt(t.N)}</button></div>
+          <select data-f="node"${dis}>${stageOpts(NODE_STAGES, x.node.stage, "node…")}</select>
+          <div class="led">led by ${ledOpts.map(([v, l]) => `<button data-led="${v}"${dis} class="${x.node.led === v ? "on" : ""}">${l}</button>`).join("")}</div>
+          <input class="nt" data-note="node" placeholder="evidence" value="${esc(x.node.note)}"${dis} /></div>
+        <div class="slot eng${x.engAuto ? " auto" : ""}"><div class="sh">③ Engagement${draftBadge({ auto: x.engAuto, unsure: x.engUnsure }, "eng")} <button class="play" data-a="${t.N}" data-b="${t.E}">▶ ${fmt(t.N)}–${fmt(t.E)}</button>
+            ${t.back ? `<button class="play" data-a="${t.back[0]}" data-b="${t.back[1]}" title="Reflection Q1/Q2 about this ${isText() ? "reply" : "artifact"} (shown before the next prompt)">▶ look-back</button>` : ""}</div>
+          <div class="engl">${(x.eng || []).map((e, i) => `<div class="eitem ${e.k}${e.flag ? " flagged" : ""}" data-i="${i}"><span class="k sel-me" data-sel="eng" title="${e.k === "n" ? "node (participant-led)" : "edge"} — click to select (screenshot, boxes, note, flag)" style="cursor:pointer">${e.k === "n" ? "●" : "→"}</span>
+              <select data-f="eng"${dis}>${stageOpts(e.k === "n" ? NODE_STAGES : EDGE_STAGES, e.stage, e.k === "n" ? "node…" : "edge…")}</select>
+              <span class="t" data-stamp title="Stamp the current video time (click to jump there)">${e.t != null ? fmt(e.t) : "⏱"}</span>
+              <input data-note="eng" placeholder="note" value="${esc(e.note)}"${dis} />
+              ${flagBtn(e, "eng")}<button data-mv="-1" title="up"${dis}>↑</button><button data-mv="1" title="down"${dis}>↓</button><button data-del title="remove"${dis}>×</button></div>`).join("")}</div>
+          <div class="eadd"><button data-add="e"${dis}>+ edge</button><button class="n" data-add="n"${dis} title="A node the participant reaches while engaging (e.g. a hypothesis) — follow it with an edge">+ node (participant)</button></div></div>
+      </div>
+      ${marks.length ? `<div class="tmarks">markers ${marks.map((m) => `<span class="pinchip" title="${esc(m.note || "")}">${esc(m.kind)} <small>${fmt(m.t)}</small></span>`).join("")}</div>` : ""}
+      ${others.map(([c, o]) => {
+        const ox = o.turns?.[t.key];
+        if (!ox) return `<div class="tcmp"><div class="row"><b>${esc(c)}</b><span class="muted">not coded</span></div></div>`;
+        const okI = ox.intent.stage === x.intent.stage, okN = ox.node.stage === x.node.stage && ox.node.led === x.node.led;
+        const sim = Math.round(100 * seqSim(x.eng || [], ox.eng || []));
+        return `<div class="tcmp"><div class="row"><b>${esc(c)}</b>
+          <span class="${okI ? "ok" : "no"}">${ox.intent.stage ? `${ox.intent.stage} ${esc(ST[ox.intent.stage].name)}` : "—"}${ox.intent.alts?.length ? ` <span class="muted">(possible ${ox.intent.alts.join(", ")})</span>` : ""}</span>
+          <span class="${okN ? "ok" : "no"}">${ox.node.stage ? `${ox.node.stage} ${esc(nodeName(ox.node.stage))}` : "—"}${ox.node.led ? ` · ${esc(ox.node.led)}-led` : ""}</span>
+          <span class="${sim === 100 ? "ok" : sim < 50 ? "no" : ""}">${(ox.eng || []).map((e) => (e.k === "n" ? `●${e.stage}` : `→${e.stage}`)).join(" ") || "—"} <span class="muted">(${sim}% similar)</span></span></div></div>`;
+      }).join("")}
+    </div>`;
+  }
+  $("turnboard").innerHTML = h;
+  $("turnboard").scrollTop = y;
+  renderTurnsPlaying();
+}
+// Drafted slots (from the coder's timeline codes) show grey with a badge; clicking the badge, or
+// editing the slot, confirms it.
+const flagBtn = (o, slot) => `<button class="flagb${o?.flag ? " on" : ""}" data-flag="${slot}" title="${o?.flag ? esc("Uncertain: " + (o.flagNote || "flagged") + " — click to clear") : "Flag as uncertain / to discuss"}">🚩</button>`;
+const draftBadge = (o, slot) => (o?.auto ? ` <span class="draft${o.unsure ? " unsure" : ""}" data-confirm="${slot}" title="Drafted from timeline codes${o.unsure ? " — unsure, please check" : ""}. Click to confirm as is.">${o.unsure ? "unsure" : "draft"} ✓</span>` : "");
+function clearDraft(tr, slot) {
+  if (!tr) return;
+  if (slot === "intent") { delete tr.intent.auto; delete tr.intent.unsure; }
+  if (slot === "node") { delete tr.node.auto; delete tr.node.unsure; }
+  if (slot === "eng") { delete tr.engAuto; delete tr.engUnsure; }
+}
+// Turns drafted from a record's timeline codes (segments + node pins), for the turn structure of
+// its session. Per turn:
+//   intent = the arrow segment covering most of the intent window (others ≥25 % become "possible");
+//   node   = the node pin nearest to when the artifact/reply appeared (−30 s … +90 s);
+//   engage = arrow segments starting in the engagement window, in order (repeats merged), plus
+//            any other node pins there as participant-led nodes.
+// Unsure (grey "unsure") when nothing or no clear majority covers a slot, or no node pin is near.
+// Led-by didn't exist on the timeline, so it is left empty. Start = yes only if a hypothesis pin
+// precedes the first turn; otherwise left unset.
+function draftTurns(r, s) {
+  const turns = deriveTurns(s, r), sg = (r.segs || []).slice().sort((a, b) => a.t0 - b.t0);
+  const nodes = (r.pins || []).filter((p) => !isMarker(p)).sort((a, b) => a.t - b.t);
+  const w = taskWindow(s);
+  const spans = sg.map((g, i) => ({ stage: g.stage, a: g.t0, b: effEnd(sg, i) ?? w[1], g }));
+  const used = new Set();
+  const out = {};
+  for (const t of turns) {
+    // intent: overlap of each arrow stage with [S, N)
+    const ov = {};
+    for (const x of spans) { const o = Math.min(x.b, t.N) - Math.max(x.a, t.S); if (o > 0 && x.stage) ov[x.stage] = (ov[x.stage] || 0) + o; }
+    const len = Math.max(1, t.N - t.S), ranked = Object.entries(ov).sort((a, b) => b[1] - a[1]);
+    const top = ranked[0];
+    const intent = { stage: top ? +top[0] : null, alts: ranked.slice(1).filter(([, v]) => v / len >= 0.25).map(([k]) => +k), note: "", auto: true };
+    if (!top || top[1] / len < 0.5 || intent.alts.length) intent.unsure = true;
+    // node: nearest node pin around the appearance
+    const near = nodes.filter((p) => !used.has(p.id) && p.t >= t.N - 30 && p.t <= t.N + 90).sort((a, b) => Math.abs(a.t - t.N) - Math.abs(b.t - t.N))[0];
+    if (near) used.add(near.id);
+    const ev = (o) => (o ? { shot: o.shot ?? null, boxes: o.boxes || [], focus: o.focus || "" } : {});
+    const node = { stage: near?.stage ?? null, led: near && byParticipant(near) ? "user" : null, note: near?.note || "", auto: true, ...ev(near), ...(near ? {} : { unsure: true }) };
+    // engagement: arrows starting in [N, E), other node pins there as participant nodes
+    const eng = [];
+    for (const x of spans) if (x.a >= t.N - 5 && x.a < t.E && x.stage && eng.at(-1)?.stage !== x.stage) eng.push({ k: "e", stage: x.stage, t: r1(x.a), note: x.g.note || "", ...ev(x.g) });
+    for (const p of nodes) if (!used.has(p.id) && p.t >= t.N && p.t < t.E) { used.add(p.id); eng.push({ k: "n", stage: p.stage, t: r1(p.t), note: p.note || "", ...ev(p) }); }
+    eng.sort((a, b) => a.t - b.t);
+    // the arrow that was already running when the artifact appeared continues into engagement
+    const running = spans.find((x) => x.a < t.N - 5 && x.b > t.N + 20);
+    if (running && eng[0]?.stage !== running.stage) eng.unshift({ k: "e", stage: running.stage, t: r1(t.N), note: "" });
+    out[t.key] = { intent, node, eng, engAuto: true, ...(eng.length ? {} : { engUnsure: true }), adj: null };
+  }
+  const first = turns[0];
+  const pre = first ? nodes.find((p) => p.stage === 13 && p.t < first.S) : null;
+  const start = pre ? { hyp: true, note: pre.note || "", auto: true } : { hyp: null, note: "" };
+  return { turns: out, start };
+}
+function turnChanged(rerender = true) {
+  if (rerender) { renderTurns(); renderSegPane(); }
+  renderTimeline();
+  save();
+}
+$("turnboard").addEventListener("click", (e) => {
+  const pl = e.target.closest(".play");
+  if (pl) { if (pl.classList.contains("on")) { vid.pause(); clipEnd = null; renderTurnsPlaying(); } else playClip(+pl.dataset.a, +pl.dataset.b); return; }
+  const pt = e.target.closest(".pr-text");
+  if (pt) { pt.classList.toggle("open"); return; }
+  if (e.target.id === "copyTurns") {
+    navigator.clipboard.writeText(turnSeqText(mine(), deriveTurns())).then(() => { e.target.textContent = "copied ✓"; setTimeout(() => (e.target.textContent = "copy sequence"), 1500); });
+    return;
+  }
+  if (!state.coder) return;
+  const fl = e.target.closest("[data-flag]");
+  if (fl) {
+    const tr = turnRec(fl.closest(".tcard").dataset.key, true);
+    const o = fl.dataset.flag === "intent" ? tr.intent : fl.dataset.flag === "node" ? tr.node : tr.eng[+fl.closest(".eitem").dataset.i];
+    o.flag = !o.flag; if (!o.flag) delete o.flagNote;
+    return turnChanged();
+  }
+  const sm = e.target.closest("[data-sel]");
+  if (sm) { const it = sm.closest(".eitem"); return selectTurnItem(sm.closest(".tcard").dataset.key, sm.dataset.sel, it ? +it.dataset.i : null, true); }
+  const cf = e.target.closest("[data-confirm]");
+  if (cf) {
+    if (cf.dataset.confirm === "start") { const r = mine(true); delete r.start.auto; delete r.start.unsure; }
+    else clearDraft(turnRec(cf.closest(".tcard").dataset.key, true), cf.dataset.confirm);
+    return turnChanged();
+  }
+  const sb = e.target.closest("[data-start]");
+  if (sb) { const r = mine(true); r.start ||= { hyp: null, note: "" }; const v = sb.dataset.start === "true"; r.start.hyp = r.start.hyp === v ? null : v; delete r.start.auto; return turnChanged(); }
+  const card = e.target.closest(".tcard[data-key]");
+  if (!card) return;
+  const key = card.dataset.key, x = () => turnRec(key, true);
+  const adj = e.target.closest("[data-adj]");
+  if (adj) { const tr = x(); tr.adj = (tr.adj || 0) + +adj.dataset.adj; return turnChanged(); }
+  const led = e.target.closest("[data-led]");
+  if (led) { const tr = x(); tr.node.led = tr.node.led === led.dataset.led ? null : led.dataset.led; clearDraft(tr, "node"); return turnChanged(); }
+  const alt = e.target.closest("[data-alt]");
+  if (alt) { const tr = x(); tr.intent.alts = tr.intent.alts.filter((a) => a !== +alt.dataset.alt); clearDraft(tr, "intent"); return turnChanged(); }
+  const add = e.target.closest("[data-add]");
+  if (add) { const tr = x(); tr.eng.push({ k: add.dataset.add, stage: null, t: null, note: "" }); clearDraft(tr, "eng"); return turnChanged(); }
+  const it = e.target.closest(".eitem");
+  if (it) {
+    const tr = x(), i = +it.dataset.i;
+    if (e.target.closest("[data-del], [data-mv]")) clearDraft(tr, "eng");
+    if (e.target.closest("[data-del]")) { tr.eng.splice(i, 1); return turnChanged(); }
+    const mv = e.target.closest("[data-mv]");
+    if (mv) { const j = i + +mv.dataset.mv; if (j >= 0 && j < tr.eng.length) [tr.eng[i], tr.eng[j]] = [tr.eng[j], tr.eng[i]]; return turnChanged(); }
+    if (e.target.closest("[data-stamp]")) {
+      const el = tr.eng[i];
+      if (el.t != null && !e.shiftKey) seek(el.t); else { el.t = r1(vid.currentTime); turnChanged(); }
+    }
+  }
+});
+$("turnboard").addEventListener("change", (e) => {
+  if (!state.coder) return;
+  const card = e.target.closest(".tcard[data-key]");
+  if (!card) return;
+  const tr = turnRec(card.dataset.key, true), f = e.target.dataset.f, v = e.target.value === "" ? null : +e.target.value;
+  if (f === "intent") { tr.intent.stage = v; tr.intent.alts = tr.intent.alts.filter((a) => a !== v); clearDraft(tr, "intent"); }
+  else if (f === "alt" && v) { tr.intent.alts.push(v); clearDraft(tr, "intent"); }
+  else if (f === "node") { tr.node.stage = v; clearDraft(tr, "node"); }
+  else if (f === "eng") { tr.eng[+e.target.closest(".eitem").dataset.i].stage = v; clearDraft(tr, "eng"); }
+  else return;
+  turnChanged();
+});
+// notes save as you type, without re-rendering (keeps focus)
+$("turnboard").addEventListener("input", (e) => {
+  if (!state.coder) return;
+  if (e.target.matches("[data-startnote]")) { const r = mine(true); r.start ||= { hyp: null, note: "" }; r.start.note = e.target.value; return turnChanged(false); }
+  const n = e.target.dataset.note;
+  if (!n) return;
+  const tr = turnRec(e.target.closest(".tcard").dataset.key, true);
+  if (n === "intent") tr.intent.note = e.target.value;
+  else if (n === "node") tr.node.note = e.target.value;
+  else if (n === "eng") tr.eng[+e.target.closest(".eitem").dataset.i].note = e.target.value;
+  turnChanged(false);
+});
+document.querySelectorAll(".tlbar [data-mode]").forEach((b) => b.addEventListener("click", () => {
+  state.mode = b.dataset.mode; lsSet("pr-mode", state.mode); state.selTurn = null;
+  if (state.mode === "turns" && state.tab === "cmp") document.querySelector('.tabs [data-tab="segs"]').click();
+  renderAll();
+}));
+$("csvTurns").addEventListener("click", () => {
+  const rows = [["coder", "pid", "cond", "task", "turn", "prompt_logged", "slot", "step", "kind", "stage_num", "stage", "led_by", "possible", "video_s", "note", "prompt"]];
+  for (const [k, m] of Object.entries(CODES)) for (const r of Object.values(m)) {
+    if (!Object.keys(r.turns || {}).length && r.start?.hyp == null) continue;
+    const s = D.sessions.find((x) => x.pid === r.pid && x.task === r.task);
+    const turns = s ? deriveTurns(s, r) : [];
+    const cond = s?.cond || COND[r.pid[0]] || "";
+    if (r.start?.hyp != null) rows.push([r.coder, r.pid, cond, r.task, 0, "", "start", 0, r.start.hyp ? "node" : "", r.start.hyp ? 13 : "", r.start.hyp ? "Hypothesis" : "(none)", r.start.hyp ? "participant" : "", "", "", r.start.note, ""]);
+    for (const t of turns) {
+      const x = r.turns?.[t.key];
+      if (!x) continue;
+      const base = [r.coder, r.pid, cond, r.task, t.k, t.key];
+      rows.push([...base, "intent", 0, "edge", x.intent.stage ?? "", ST[x.intent.stage]?.name ?? "", "", (x.intent.alts || []).join(" "), Math.round(t.S), x.intent.note, t.prompt]);
+      rows.push([...base, "node", 0, "node", x.node.stage ?? "", ST[x.node.stage]?.name ?? "", x.node.led ?? "", "", Math.round(t.N), x.node.note, ""]);
+      (x.eng || []).forEach((e, i) => rows.push([...base, "engagement", i + 1, e.k === "n" ? "node" : "edge", e.stage ?? "", ST[e.stage]?.name ?? "", e.k === "n" ? "participant" : "", "", e.t ?? "", e.note, ""]));
+    }
+  }
+  const cell = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const url = URL.createObjectURL(new Blob([rows.map((r) => r.map(cell).join(",")).join("\n")], { type: "text/csv" }));
+  Object.assign(document.createElement("a"), { href: url, download: `process-turns-${new Date().toISOString().slice(0, 10)}.csv` }).click();
+  URL.revokeObjectURL(url);
+});
+
+// ---- compare board ----
+// Every coder of this session on one time axis: a lane each (nodes · process segments · markers),
+// with an agreement strip under each other coder showing, second by second, whether their stage
+// matches the reference coder's (you, or the first coder). Details + disagreements: Compare tab.
+const cmpCoders = () => {
+  const all = Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([, r]) => r.segs?.length || r.pins?.length);
+  return all.sort(([a], [b]) => (a === state.coder ? -1 : b === state.coder ? 1 : a.localeCompare(b)));
+};
+// The span a coder actually coded: first code to the end of their last segment (an open last
+// segment runs to the end of the task window).
+function coverage(r, wEnd) {
+  const ts = [...(r.segs || []).map((g) => g.t0), ...(r.pins || []).map((p) => p.t)];
+  if (!ts.length) return null;
+  const sg = r.segs || [];
+  const last = sg.length ? (sg.at(-1).t1 ?? wEnd) : Math.max(...ts);
+  return [Math.min(...ts), Math.max(last, ...ts)];
+}
+function stageAt(r, t, wEnd) {
+  const sg = r.segs || [];
+  for (let i = sg.length - 1; i >= 0; i--) {
+    if (sg[i].t0 > t) continue;
+    const end = effEnd(sg, i) ?? wEnd;
+    return t < end ? sg[i].stage : null;
+  }
+  return null;
+}
+// Per-second comparison of two coders over the time both coded. Returns runs of
+// same / loop (same loop, different stage) / diff / gap (one of them has no segment there).
+function agreeRuns(A, B, w) {
+  const ca = coverage(A, w[1]), cb = coverage(B, w[1]);
+  if (!ca || !cb) return { runs: [], n: 0, same: 0, loop: 0, kappa: null };
+  const a0 = Math.max(ca[0], cb[0]), a1 = Math.min(ca[1], cb[1]);
+  const runs = [], pairs = [];
+  let same = 0, loop = 0, n = 0;
+  for (let t = Math.floor(a0); t < a1; t++) {
+    const x = stageAt(A, t + 0.5, w[1]), y = stageAt(B, t + 0.5, w[1]);
+    const k = x == null || y == null ? "gap" : x === y ? "same" : ST[x]?.loop === ST[y]?.loop ? "loop" : "diff";
+    if (k !== "gap") { n++; if (k === "same") same++; if (k !== "diff") loop++; pairs.push([x, y]); }
+    const lastRun = runs.at(-1);
+    if (lastRun && lastRun.k === k && lastRun.t1 === t && lastRun.x === x && lastRun.y === y) lastRun.t1 = t + 1;
+    else runs.push({ k, t0: t, t1: t + 1, x, y });
+  }
+  // Cohen's kappa over the per-second stage labels
+  let kappa = null;
+  if (pairs.length) {
+    const po = same / pairs.length, fa = {}, fb = {};
+    for (const [x, y] of pairs) { fa[x] = (fa[x] || 0) + 1; fb[y] = (fb[y] || 0) + 1; }
+    const pe = Object.keys({ ...fa, ...fb }).reduce((acc, k) => acc + ((fa[k] || 0) / pairs.length) * ((fb[k] || 0) / pairs.length), 0);
+    kappa = pe < 1 ? (po - pe) / (1 - pe) : 1;
+  }
+  return { runs, n, same, loop, kappa, span: [a0, a1] };
+}
+// Nodes (or markers) of two coders matched greedily: same stage (or marker kind) within ±tol s.
+function matchPins(A, B, isMark, tol = 20) {
+  const pa = (A.pins || []).filter((p) => isMarker(p) === isMark), pb = (B.pins || []).filter((p) => isMarker(p) === isMark).map((p) => ({ p, used: false }));
+  let m = 0;
+  for (const p of pa) {
+    const hit = pb.filter((q) => !q.used && (isMark ? q.p.kind === p.kind : q.p.stage === p.stage) && Math.abs(q.p.t - p.t) <= tol)
+      .sort((u, v) => Math.abs(u.p.t - p.t) - Math.abs(v.p.t - p.t))[0];
+    if (hit) { hit.used = true; m++; }
+  }
+  return { matched: m, a: pa.length, b: pb.length };
+}
+let cmpSel = null; // index of the highlighted disagreement
+let cmpTabShown = false; // open the Compare tab once when compare mode starts (incl. from a ?compare=1 link)
+function renderCompare() {
+  const on = state.compare && D && state.pid && state.mode === "timeline";
+  $("center").classList.toggle("cmp", !!on);
+  $("tabCmp").style.display = state.compare && state.mode === "timeline" ? "" : "none";
+  if (!on) { $("cmpboard").innerHTML = ""; $("pCmp").innerHTML = ""; cmpTabShown = false; return; }
+  if (!cmpTabShown) { cmpTabShown = true; if (state.tab !== "cmp") setTimeout(() => document.querySelector('.tabs [data-tab="cmp"]').click()); }
+  const w = viewWindow(), coders = cmpCoders();
+  const width = $("cmpboard").clientWidth - 110 || 700;
+  const step = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].find((x) => (x / (w[1] - w[0])) * width >= 70) || 3600;
+  let ruler = "";
+  for (let t = Math.ceil(w[0] / step) * step; t <= w[1]; t += step) ruler += `<span style="left:${pct(t, w)}%">${fmt(t)}</span>`;
+  const s = cur();
+  let ev = "";
+  for (const t of s?.turns || []) { const x = vt(t.ts); if (x != null && x >= w[0] && x <= w[1]) ev += `<div class="ev turn" style="left:${pct(x, w)}%" data-t="${x}" title="${esc(fmt(x) + " · prompt:\n" + t.user)}"></div>`; }
+  for (const a of s?.artifacts || []) { const x = vt(a.ts); if (x != null && x >= w[0] && x <= w[1]) ev += `<div class="ev art" style="left:${pct(x, w)}%" data-t="${x}" title="${esc(`${fmt(x)} · artifact ${a.seq}: ${a.title || ""}`)}">${a.seq}</div>`; }
+  const pinEl = (p) => `<div class="pinm${p.stage ? " node" : ""}" data-t="${p.t}" style="left:${pct(p.t, w)}%;${p.stage ? `--c:${ST[p.stage].c};${ST[p.stage].ink ? `--ink:${ST[p.stage].ink}` : ""}` : ""}" title="${esc(fmt(p.t) + " · " + pinLabel(p) + (p.note ? "\n" + p.note : ""))}"><span>${p.stage ? `${p.stage} ${esc(ST[p.stage].name.toLowerCase())}` : esc(p.kind)}</span></div>`;
+  const inW = (p) => p.t >= w[0] && p.t <= w[1];
+  const ref = coders[0]?.[1];
+  const stats = [];
+  let h = `<div class="cb-head"><span>View</span>${[["task", "this task"], ["full", "whole video"], ["zoom", "10 min"]].map(([v, l]) => `<button class="b${state.view === v ? " on" : ""}" data-cview="${v}">${l}</button>`).join("")}
+    <span class="grow"></span><span class="cb-legend"><span><i style="background:#5aae5e"></i>same stage</span><span><i style="background:#e0b84a"></i>same loop</span><span><i style="background:#e05a4f"></i>different loop</span><span><i style="background:#e9e4da"></i>not both coded</span></span></div>`;
+  if (!coders.length) h += '<div class="empty" style="padding:10px">Nobody has coded this session yet.</div>';
+  h += `<div class="cb-grid"><div></div><div class="cb-ruler">${ruler}</div><div class="lbl" style="font-weight:400;color:var(--muted)">events</div><div class="cb-ev">${ev}</div>`;
+  coders.forEach(([c, r], i) => {
+    h += `<div class="lbl" style="padding-top:8px">${esc(c)}${c === state.coder ? "<small>you</small>" : ""}${r.label ? `<small>${esc(LABELS.find(([k]) => k === r.label)?.[1] || r.label)}</small>` : ""}</div>
+      <div class="cb-coder${c === state.coder ? " me" : ""}">
+        <div class="cb-nodes">${(r.pins || []).filter((p) => !isMarker(p) && inW(p)).map(pinEl).join("")}</div>
+        <div class="cb-segs">${segEls(r.segs || [], w, false).replace(/<div class="seg([^"]*)" data-id="[^"]*" style="([^"]*)"\s+title="([^"]*)">/g, (m0, cls, st, ti) => `<div class="seg${cls}" style="${st}" title="${ti}">`)}</div>
+        <div class="cb-marks">${(r.pins || []).filter((p) => isMarker(p) && inW(p)).map(pinEl).join("")}</div>
+      </div>`;
+    if (i > 0 && ref) {
+      const ag = agreeRuns(ref, r, w);
+      stats.push({ c, ag, nodes: matchPins(ref, r, false), marks: matchPins(ref, r, true) });
+      h += `<div class="lbl" style="font-weight:400;font-size:10px;color:var(--muted)">vs ${esc(coders[0][0])}</div><div class="cb-agree">${ag.runs.filter((x) => x.t1 > w[0] && x.t0 < w[1]).map((x) =>
+        `<i class="${x.k}" data-t="${x.t0}" style="left:${Math.max(0, pct(x.t0, w))}%;width:${Math.max(0.1, Math.min(100, pct(x.t1, w)) - Math.max(0, pct(x.t0, w)))}%" title="${esc(`${fmt(x.t0)}–${fmt(x.t1)} · ${coders[0][0]}: ${x.x ? x.x + " " + ST[x.x].name : "—"} · ${c}: ${x.y ? x.y + " " + ST[x.y].name : "—"}`)}"></i>`).join("")}</div>`;
+    }
+  });
+  for (const a of s?.artifacts || []) {
+    const x = vt(a.ts);
+    if (x == null || x < w[0] || x > w[1]) continue;
+    h += `<div class="cb-art" style="left:calc(94px + (100% - 94px) * ${pct(x, w) / 100})" title="${esc(`artifact ${a.seq}: ${a.title || ""}`)}"><span>a${a.seq}</span></div>`;
+  }
+  h += '<div class="cb-ph"></div></div>';
+  $("cmpboard").innerHTML = h;
+  // per-segment labels: number + short name when it fits
+  $("cmpboard").querySelectorAll(".cb-segs .seg").forEach((el) => { const m = el.title.match(/^(\d+) ([^\n·]+)/); if (m) el.textContent = `${m[1]} ${m[2].trim()}`; });
+
+  // Compare tab: agreement numbers + disagreements to discuss
+  let p = "";
+  if (coders.length < 2) p = `<div class="empty">Only ${coders.length ? esc(coders[0][0]) : "nobody"} has coded ${esc(state.pid)} · ${esc(TASK_SHORT[state.task] || state.task)} so far. Once a second coder codes it, agreement shows here.</div>`;
+  for (const st of stats) {
+    const { ag, nodes, marks } = st;
+    const pctOf = (x) => (ag.n ? Math.round((100 * x) / ag.n) : 0);
+    p += `<h4>${esc(coders[0][0])} vs ${esc(st.c)}</h4>
+      <div class="kpi"><div><b>${pctOf(ag.same)}%</b><span>same stage (of ${fmt(ag.n)} both coded)</span></div>
+        <div><b>${ag.kappa == null ? "—" : ag.kappa.toFixed(2)}</b><span>Cohen's κ (per second)</span></div>
+        <div><b>${pctOf(ag.loop)}%</b><span>same loop (foraging / sensemaking)</span></div>
+        <div><b>${nodes.matched}/${Math.max(nodes.a, nodes.b)}</b><span>nodes matched (same node ±20s)</span></div></div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Markers matched: ${marks.matched}/${Math.max(marks.a, marks.b)} (same kind ±20s)</div>`;
+    const dis = ag.runs.filter((x) => (x.k === "diff" || x.k === "loop") && x.t1 - x.t0 >= 3);
+    p += `<h4>Disagreements · ${dis.length} <span style="text-transform:none;letter-spacing:0;font-weight:400">(≥3 s, click to jump)</span></h4>` +
+      (dis.map((x, j) => `<div class="dis${x.k === "loop" ? " loop" : ""}${cmpSel === `${st.c}:${j}` ? " on" : ""}" data-t="${x.t0}" data-k="${st.c}:${j}">
+        <span class="tm">${fmt(x.t0)}<br>${fmt(x.t1 - x.t0)}</span>
+        <span class="c"><b>${esc(coders[0][0])}</b><span class="sw" style="background:${ST[x.x].c}"></span>${x.x} ${esc(ST[x.x].name)}</span>
+        <span class="c"><b>${esc(st.c)}</b><span class="sw" style="background:${ST[x.y].c}"></span>${x.y} ${esc(ST[x.y].name)}</span></div>`).join("") || '<div class="muted" style="font-size:12px">No stage disagreements where both coded.</div>');
+  }
+  // each coder's sequence, drawn and grouped like the sequence panel (same group-by setting)
+  if (coders.length) p += `<h4 style="display:flex;align-items:center;gap:6px">Sequences <span class="grow"></span>
+      <label style="text-transform:none;letter-spacing:0;font-weight:400;display:flex;gap:4px;align-items:center">group by
+        <select id="cmpGroup" style="font:12px inherit;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:#fff">${[["art", "artifact"], ["loop", "loop"], ["none", "none"]].map(([v, l]) => `<option value="${v}"${groupBy === v ? " selected" : ""}>${l}</option>`).join("")}</select></label></h4>` +
+    coders.map(([c, r]) => `<div class="seqrow${groupBy !== "none" ? " grouped" : ""}"><span class="who">${esc(c)}${c === state.coder ? " (you)" : ""}</span>${seqHtml(r, false) || '<span class="muted">—</span>'}${markersHtml(r, false)}</div>`).join("");
+  $("pCmp").innerHTML = p;
+}
+$("cmpboard").addEventListener("click", (e) => {
+  const v = e.target.closest("[data-cview]");
+  if (v) { state.view = v.dataset.cview; lsSet("pr-view", state.view); renderAll(); return; }
+  const t = e.target.closest("[data-t]");
+  if (t) { seek(+t.dataset.t); return; }
+  // click on empty lane space = seek to that time
+  const lane = e.target.closest(".cb-coder, .cb-ruler, .cb-ev, .cb-agree");
+  if (lane) { const r = lane.getBoundingClientRect(), w = viewWindow(); seek(w[0] + ((e.clientX - r.left) / r.width) * (w[1] - w[0])); }
+});
+$("pCmp").addEventListener("change", (e) => {
+  if (e.target.id !== "cmpGroup") return;
+  groupBy = e.target.value; lsSet("pr-group", groupBy); $("groupBy").value = groupBy;
+  renderSeq(); renderCompare();
+});
+$("pCmp").addEventListener("click", (e) => {
+  const d = e.target.closest(".dis");
+  if (!d) return;
+  cmpSel = d.dataset.k;
+  $("pCmp").querySelectorAll(".dis").forEach((x) => x.classList.toggle("on", x === d));
+  seek(+d.dataset.t);
+});
 
 // ---- sequence + step plot ----
 let groupBy = lsGet("pr-group") || "none";
@@ -939,7 +1604,8 @@ function deleteSel() {
   changed();
 }
 function changed() {
-  renderTimeline(); renderSeq(); renderPlot(); renderSegPane(); renderSide();
+  renderTimeline(); renderSeq(); renderPlot(); renderSegPane(); renderSide(); renderCompare();
+  if (state.mode === "turns") renderTurns();
   save();
 }
 let saveT = null;
@@ -1004,7 +1670,7 @@ function fillThumbs(root) {
   });
 }
 function captureNow() {
-  const g = segs().find((x) => x.id === state.sel) || pins().find((x) => x.id === state.selPin && !isMarker(x));
+  const g = selObj();
   if (!g) return;
   g.shot = r1(vid.currentTime || 0);
   try {
@@ -1018,8 +1684,8 @@ function captureNow() {
 
 // ---- focus boxes on the screenshot ----
 // Boxes are stored as fractions of the video frame ({x, y, w, h} in 0–1), so they line up at any size.
-const selObj = () => segs().find((x) => x.id === state.sel) || pins().find((x) => x.id === state.selPin && !isMarker(x)) || null;
-const shotT = (o) => o.shot ?? (o.t0 ?? o.t) + 0.5;
+const selObj = () => (state.mode === "turns" ? turnSel()?.o : null) || segs().find((x) => x.id === state.sel) || pins().find((x) => x.id === state.selPin && !isMarker(x)) || null;
+const shotT = (o) => o.shot ?? (o.t0 ?? o.t ?? o.__t ?? 0) + 0.5;
 function shotHtml(o, W = 480) {
   const ar = vid.videoWidth && vid.videoHeight ? `${vid.videoWidth}/${vid.videoHeight}` : "16/9";
   return `<div class="shotwrap" style="aspect-ratio:${ar}" title="Drag to box the part of the artifact they focus on"><img data-t="${shotT(o)}" data-w="${W}" alt="" />` +
@@ -1033,7 +1699,7 @@ function renderZoom() {
   const o = selObj();
   if (!state.zoom || !o) { $("zoom").classList.remove("open"); state.zoom = false; return; }
   $("zoom").classList.add("open");
-  $("zoomBox").innerHTML = `<div class="r" style="margin-top:0"><b>${esc(stageLabel(o))}</b><span class="muted">frame @ ${fmt(shotT(o))} · drag to add a box, × to remove</span>
+  $("zoomBox").innerHTML = `<div class="r" style="margin-top:0"><b>${esc(o.__label || stageLabel(o))}</b><span class="muted">frame @ ${fmt(shotT(o))} · drag to add a box, × to remove</span>
     <span class="grow"></span><button class="b" id="zClose">done (Esc)</button></div>${shotHtml(o, 1600)}${focusRow(o, "zFocus")}`;
   fillThumbs($("zoomBox"));
 }
@@ -1071,15 +1737,122 @@ document.addEventListener("mouseup", () => {
   if (state.zoom) renderZoom();
 });
 
+// ---- turns: the selected slot/step, its evidence editor, and the list ----
+// state.selTurn = { key, slot: "intent" | "node" | "eng", i } — the coded object it points at gets
+// the same evidence tools as timeline codes: screenshot, focus boxes, focus text, note, plus a flag.
+function turnSel() {
+  const st = state.selTurn;
+  if (!st || state.mode !== "turns") return null;
+  const t = deriveTurns().find((x) => x.key === st.key), tr = turnRec(st.key);
+  if (!t || !tr) return null;
+  const o = st.slot === "intent" ? tr.intent : st.slot === "node" ? tr.node : tr.eng[st.i];
+  if (!o) return null;
+  const at = st.slot === "intent" ? t.S : st.slot === "node" ? t.N : o.t ?? t.N;
+  const label = `Turn ${t.k} · ${st.slot === "intent" ? "① intent" : st.slot === "node" ? "② node" : `③ step ${st.i + 1}`}: ${o.stage ? `${o.stage} ${ST[o.stage].name}` : "(no code yet)"}`;
+  // non-enumerable, so never saved: the default screenshot time and the editor's title
+  Object.defineProperty(o, "__t", { value: at, configurable: true, enumerable: false });
+  Object.defineProperty(o, "__label", { value: label, configurable: true, enumerable: false });
+  return { t, tr, o, at, label };
+}
+function selectTurnItem(key, slot, i, doSeek) {
+  if (!state.coder) return;
+  turnRec(key, true);
+  state.selTurn = { key, slot, i: i ?? null };
+  const sel = turnSel();
+  if (doSeek && sel) seek(sel.o.shot ?? sel.at);
+  if (state.tab !== "segs") document.querySelector('.tabs [data-tab="segs"]').click();
+  renderSegPane(); renderTurns();
+}
+function turnPaneHtml() {
+  const turns = deriveTurns(), r = mine(), sel = turnSel();
+  let h = "";
+  if (sel) {
+    const o = sel.o;
+    h += `<div class="ed" style="border-color:${o.stage ? ST[o.stage].c : "var(--line)"}">
+      <div class="r"><b style="font-size:12px">${esc(sel.label)}</b><span class="grow"></span><button class="b" id="tDesel" title="Close (Esc)">✕</button></div>
+      <div class="r"><button class="b${o.flag ? " on" : ""}" id="tFlag" title="Mark this code as uncertain / to discuss">🚩 ${o.flag ? "uncertain" : "flag as uncertain"}</button>
+        ${o.flag ? `<input type="text" id="tFlagNote" value="${esc(o.flagNote || "")}" placeholder="why unsure / what to discuss" style="flex:1" />` : ""}</div>
+      ${shotHtml(o)}${shotButtons(o)}${focusRow(o, "eFocus")}
+      <textarea id="tNote" rows="3" placeholder="Evidence for this code (what they said / did)">${esc(o.note || "")}</textarea>
+    </div>`;
+  } else if (state.coder) h += '<div class="muted" style="font-size:12px;margin:10px 0 4px">Click a code below (or a slot title on the left) to add a screenshot, focus boxes, a note or a 🚩 flag.</div>';
+  const row = (key, slot, i, o, at, label, c) => {
+    const on = state.selTurn && state.selTurn.key === key && state.selTurn.slot === slot && (slot !== "eng" || state.selTurn.i === i);
+    return `<div class="srow${on ? " sel" : ""}" data-tkey="${esc(key)}" data-tslot="${slot}"${i != null ? ` data-ti="${i}"` : ""}><img data-t="${o.shot ?? at + 0.5}" alt="" />
+      <div style="min-width:0"><div class="st" style="--c:${c}"><i>${o.stage ?? "?"}</i>${esc(label)}${o.flag ? ' <span class="flg" title="' + esc(o.flagNote || "flagged") + '">🚩</span>' : ""}</div>
+      <div class="tm">${fmt(at)}${o.note ? ` · <span class="muted">${esc(o.note.slice(0, 50))}</span>` : ""}</div>${focusLine(o)}</div></div>`;
+  };
+  h += '<div class="slist">';
+  for (const t of turns) {
+    const x = r?.turns?.[t.key];
+    if (!x) continue;
+    h += `<div class="srow tsep-row">Turn ${t.k}</div>`;
+    if (x.intent.stage || x.intent.note || x.intent.flag) h += row(t.key, "intent", null, x.intent, t.S, `① ${x.intent.stage ? ST[x.intent.stage].name : "intent"}`, ST[x.intent.stage]?.c || "#999");
+    if (x.node.stage || x.node.note || x.node.flag) h += row(t.key, "node", null, x.node, t.N, `② ${x.node.stage ? turnNodeLabel(t, x) : "node"}`, ST[x.node.stage]?.c || "#999");
+    (x.eng || []).forEach((e, i) => { h += row(t.key, "eng", i, e, e.t ?? t.N, `③ ${e.stage ? (e.k === "n" ? nodeName(e.stage) + " (participant)" : ST[e.stage].name) : e.k === "n" ? "node" : "edge"}`, ST[e.stage]?.c || "#999"); });
+  }
+  return h + "</div>";
+}
+$("pSegs").addEventListener("click", (e) => {
+  if (state.mode !== "turns") return;
+  const row = e.target.closest("[data-tkey]");
+  if (row) return selectTurnItem(row.dataset.tkey, row.dataset.tslot, row.dataset.ti != null ? +row.dataset.ti : null, true);
+  const sel = turnSel();
+  if (e.target.id === "tDesel") { state.selTurn = null; renderSegPane(); renderTurns(); return; }
+  if (!sel) return;
+  if (e.target.id === "tFlag") { sel.o.flag = !sel.o.flag; if (!sel.o.flag) delete sel.o.flagNote; changed(); return; }
+  if (e.target.id === "eShot") captureNow();
+});
+$("pSegs").addEventListener("input", (e) => {
+  const sel = turnSel();
+  if (!sel) return;
+  if (e.target.id === "tNote") { sel.o.note = e.target.value; save(); renderTurns(); }
+  if (e.target.id === "tFlagNote") { sel.o.flagNote = e.target.value; save(); }
+});
+
+// ---- reference figure: Pirolli & Card's sensemaking loop, redrawn with this tool's colors ----
+function figureSvg(W = 330) {
+  const nodes = [1, 4, 7, 10, 13, 16], bw = 128, bh = 30, dx = 106, dy = 60, H = 6 * dy + 40, ox = 104;
+  const pos = (j) => ({ x: ox + j * dx, y: H - 44 - j * dy });
+  let g = "";
+  nodes.forEach((n, j) => {
+    if (j === nodes.length - 1) return;
+    const a = pos(j), b = pos(j + 1), up = n + 1, down = n + 2; // e.g. 1 →2→ 4 and 4 →3→ 1
+    // forward: right side of the lower box → up into the upper box
+    g += `<path d="M${a.x + bw} ${a.y + 12} H${b.x + 70} V${b.y + bh + 2}" fill="none" stroke="${ST[up].c}" stroke-width="2" marker-end="url(#ah)"/>
+      <text x="${b.x + 75}" y="${a.y + 4}" font-size="9.5" fill="${ST[up].c}" font-weight="700">${up}. ${esc(ST[up].name)}</text>`;
+    // back: left side of the upper box → down into the lower box
+    g += `<path d="M${b.x} ${b.y + 20} H${a.x + 30} V${a.y - 2}" fill="none" stroke="${ST[down].c}" stroke-width="2" marker-end="url(#ah)"/>
+      <text x="${a.x + 26}" y="${b.y + 34}" font-size="9.5" fill="${ST[down].c}" font-weight="700" text-anchor="end">${down}. ${esc(ST[down].name)}</text>`;
+  });
+  // 16 → 15 → 13 (reevaluate) loops back from presentation
+  nodes.forEach((n, j) => {
+    const p = pos(j), s = ST[n];
+    g += `<rect x="${p.x}" y="${p.y}" width="${bw}" height="${bh}" rx="3" fill="${s.c}"/><text x="${p.x + bw / 2}" y="${p.y + 19}" font-size="10.5" font-weight="700" fill="${s.ink || "#fff"}" text-anchor="middle">${n}. ${esc(s.name)}</text>`;
+  });
+  g += `<text x="${pos(1).x + bw + 70}" y="${H - 12}" font-size="11" font-style="italic" fill="#8a857c">foraging loop (1 → 7)</text>
+    <text x="${pos(4).x + 20}" y="${pos(1).y + 20}" font-size="11" font-style="italic" fill="#8a857c">sensemaking loop (7 → 16)</text>`;
+  const vw = ox + 5 * dx + bw + 70;
+  return `<svg viewBox="0 0 ${vw} ${H}" width="100%" style="max-width:${W}px;display:block;margin:auto" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#555"/></marker></defs>${g}</svg>`;
+}
+const figureHtml = () => `<div class="figref" id="figRef" title="Click to enlarge"><div class="cap">Reference: sensemaking loop (Pirolli &amp; Card 2005), redrawn · click to enlarge</div>${figureSvg(330)}</div>`;
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#figRef")) { $("figzBox").innerHTML = figureSvg(1060) + '<div class="muted" style="font-size:12px;margin-top:6px;text-align:center">Nodes (boxes) are data structures; numbered arrows are processes. Climbing = more structure, more effort. Click anywhere to close.</div>'; $("figz").classList.add("open"); return; }
+  if (e.target.closest("#figz")) $("figz").classList.remove("open");
+});
+
 // ---- right panel: session + segment editor + segment list ----
 function renderSegPane() {
   const p = $("pSegs");
-  if (!D || !state.pid) { p.innerHTML = `<div class="empty">Pick a session on the left.</div>` + helpHtml(); return; }
+  $("tabSegs").textContent = state.mode === "turns" ? "Turns" : "Segments";
+  if (!D || !state.pid) { p.innerHTML = `<div class="empty">Pick a session on the left.</div>` + helpHtml() + figureHtml(); return; }
   const s = cur(), r = mine();
   let h = `<div class="sess"><div class="top"><b>${esc(state.pid)}</b><span class="pill ${esc(s?.cond)}">${esc(s?.cond)}</span><span class="pill">${esc(TASK_SHORT[state.task] || state.task)}</span><span id="saved"></span></div>`;
   if (!state.coder) h += `<div class="banner" style="margin:8px 0 0">Enter your <b>coder</b> name at the top to annotate. Each coder's annotations are saved separately.</div></div>`;
   else h += `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;font-size:12px"><span class="muted">Session</span><select id="sLabel">${LABELS.map(([k, l]) => `<option value="${k}"${(r?.label || "") === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
     <textarea id="sNote" rows="2" placeholder="Session memo (e.g. narrowing factor, overall pattern)…">${esc(r?.note || "")}</textarea></div>`;
+  if (state.mode === "turns") { p.innerHTML = h + turnPaneHtml() + figureHtml(); fillThumbs(p); return; }
   const list = segs(), g = list.find((x) => x.id === state.sel), pn = pins().find((x) => x.id === state.selPin);
   const arts = cur()?.artifacts || [];
   const artSel = (id, cur) => `<select id="${id}"><option value="">— none</option>${arts.map((a) => `<option value="${a.seq}"${cur === a.seq ? " selected" : ""}>artifact ${a.seq}${a.title ? " · " + esc(a.title.slice(0, 40)) : ""}</option>`).join("")}</select>`;
@@ -1128,7 +1901,7 @@ function renderSegPane() {
     return `<div class="srow${x.id === state.sel ? " sel" : ""}" data-id="${x.id}"><img data-t="${x.shot ?? x.t0 + 0.5}" alt="" />
       <div style="min-width:0"><div class="st" style="--c:${s.c}"><i>${x.stage}</i>${esc(stageLabel(x))}</div>
       <div class="tm">${fmt(x.t0)} – ${e != null ? fmt(e) : "…"}${e != null ? ` (${fmt(e - x.t0)})` : ""}</div>${focusLine(x)}</div></div>`;
-  }).join("")}</div>` + helpHtml();
+  }).join("")}</div>` + helpHtml() + figureHtml();
   p.innerHTML = h;
   fillThumbs(p);
 }
@@ -1342,7 +2115,7 @@ $("pTr").addEventListener("change", (e) => {
 document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
   state.tab = b.dataset.tab;
   document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
-  for (const [k, id] of [["segs", "pSegs"], ["tr", "pTr"], ["ev", "pEv"]]) $(id).classList.toggle("on", k === state.tab);
+  for (const [k, id] of [["segs", "pSegs"], ["tr", "pTr"], ["ev", "pEv"], ["cmp", "pCmp"]]) $(id).classList.toggle("on", k === state.tab);
   if (state.tab === "ev") scaleThumbs($("pEv"));
   if (state.tab === "tr") { lastCue = -1; renderTr(false); }
 }));
@@ -1385,7 +2158,7 @@ let lastSlow = 0;
   }
   requestAnimationFrame(tick);
 })(0);
-vid.addEventListener("seeked", () => { drawClock(); updatePlayhead(); if (state.view === "zoom") renderTimeline(); renderPlot(); renderTr(false); });
+vid.addEventListener("seeked", () => { drawClock(); updatePlayhead(); if (state.view === "zoom") { renderTimeline(); renderCompare(); } renderPlot(); renderTr(false); });
 setInterval(() => { if (state.pid && !vid.paused) lsSet(`pr-pos-${state.pid}-${state.task}`, vid.currentTime.toFixed(1)); }, 5000);
 window.addEventListener("resize", () => { renderTimeline(); renderPlot(); scaleThumbs($("pEv")); });
 
@@ -1396,6 +2169,10 @@ document.addEventListener("keydown", (e) => {
   if (e.target.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
   if (!D || !state.pid) return;
   const k = e.code === "BracketRight" ? "]" : e.code === "BracketLeft" ? "[" : e.key;
+  if (state.mode === "turns" && (/^\d$/.test(k) || ["[", "]", "ArrowUp", "ArrowDown", "Backspace", "Delete"].includes(k))) {
+    if (k === "Backspace" || k === "Delete") { if (state.selPin) { e.preventDefault(); deleteSel(); } }
+    return;
+  }
   if (/^\d$/.test(k)) {
     // "1" waits briefly for a second digit (10–16); any other digit is a stage on its own.
     e.preventDefault();
@@ -1415,7 +2192,7 @@ document.addEventListener("keydown", (e) => {
     x: captureNow, X: captureNow,
     ...Object.fromEntries(MARKS.flatMap(([m, k]) => [[k, () => addPin(m)], [k.toUpperCase(), () => addPin(m)]])),
     Backspace: deleteSel, Delete: deleteSel,
-    Escape: () => { if (state.zoom) { state.zoom = false; renderZoom(); return; } state.sel = null; state.selPin = null; renderTimeline(); renderSeq(); renderPlot(); renderSegPane(); },
+    Escape: () => { if (state.zoom) { state.zoom = false; renderZoom(); return; } state.sel = null; state.selPin = null; state.selTurn = null; renderTimeline(); renderSeq(); renderPlot(); renderSegPane(); },
     "-": () => setSpeed(SPEEDS[Math.max(0, SPEEDS.indexOf(vid.playbackRate) - 1)] ?? 1),
     "=": () => setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(vid.playbackRate) + 1)] ?? 1),
   };
@@ -1434,7 +2211,13 @@ $("coder").addEventListener("change", () => {
   syncUrl(); renderSide(); renderAll();
 });
 $("compare").checked = state.compare;
-$("compare").addEventListener("change", () => { state.compare = $("compare").checked; syncUrl(); renderAll(); });
+$("compare").addEventListener("change", () => {
+  state.compare = $("compare").checked;
+  syncUrl();
+  // the compare board replaces the timeline + sequence; its details live in the Compare tab
+  if (!state.compare && state.tab === "cmp") document.querySelector('.tabs [data-tab="segs"]').click();
+  renderAll();
+});
 $("refresh").addEventListener("click", () => load(true));
 
 // ---- export ----

@@ -141,6 +141,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS process_codes (id TEXT PRIMARY KEY, data TEX
 export function getProcessCodes() {
   return Object.fromEntries(db.prepare("SELECT * FROM process_codes").all().map((r) => [r.id, JSON.parse(r.data || "{}")]));
 }
+export function getProcessCode(id) {
+  return getProcessCodes()[String(id)] || null;
+}
+export function updateProcessCode(id, fields) {
+  const cur = getProcessCode(id);
+  if (cur) setProcessCode(id, { ...cur, ...fields });
+}
 export function setProcessCode(id, data) {
   db.prepare(
     `INSERT INTO process_codes (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data`

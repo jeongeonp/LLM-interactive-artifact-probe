@@ -337,6 +337,18 @@ export async function getProcessCodes() {
     return onReadError(e, {});
   }
 }
+export async function getProcessCode(id) {
+  try {
+    const d = await processCol.doc(String(id ?? "").replace(/[/#]/g, "_")).get();
+    return d.exists ? d.data() : null;
+  } catch (e) {
+    return onReadError(e, null);
+  }
+}
+// Update only the given fields of an existing doc (other fields untouched).
+export async function updateProcessCode(id, fields) {
+  await processCol.doc(String(id ?? "").replace(/[/#]/g, "_")).update({ ...fields, updated: new Date().toISOString() });
+}
 export async function setProcessCode(id, data) {
   await processCol.doc(String(id ?? "").replace(/[/#]/g, "_")).set({ ...data, updated: new Date().toISOString() });
 }
