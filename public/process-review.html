@@ -367,6 +367,8 @@
       <span class="time" id="time">0:00 / 0:00</span>
       <select id="speed" title="Playback speed (- / =)"></select>
       <button class="b" id="cc" title="Show transcript captions on the video">CC</button>
+      <button class="b" id="localBtn" title="Play this session's recording from your computer instead of Drive (pick the .mp4, and optionally its .vtt transcript)">📂 local file</button>
+      <input type="file" id="localIn" accept="video/*,.mp4,.mov,.m4v,.vtt" multiple style="display:none" />
       <button class="b" id="mute" title="Mute / unmute">🔊</button>
       <input type="range" id="vol" min="0" max="1" step="0.05" title="Volume" style="width:80px;accent-color:var(--accent)" />
       <span class="sep"></span>
@@ -691,16 +693,8 @@ function openSession(pid, task, fromUrl) {
   };
   if (pid !== prevPid || !vid.src) {
     $("vmsg").style.display = "flex";
-    $("vmsg").textContent = "Loading video from Drive…";
-    vid.src = videoSrc(v);
-    $("grab").src = vid.src;
-    for (const t of [...vid.querySelectorAll("track")]) t.remove();
-    if (v.vttId) {
-      const tr = document.createElement("track");
-      Object.assign(tr, { kind: "captions", label: "Transcript", srclang: "en", src: `/api/drive/${v.vttId}` });
-      vid.appendChild(tr);
-      tr.track.mode = ccOn ? "showing" : "hidden";
-    }
+    $("vmsg").textContent = LOCAL[pid]?.video ? "Loading local video…" : "Loading video from Drive…";
+    setVideoSource(pid);
     vid.addEventListener("loadedmetadata", () => { goStart(); renderAll(); }, { once: true });
     loadVtt(pid);
   } else goStart();
@@ -2056,13 +2050,73 @@ async function setSync(ms, extra) {
   } catch (e) { alert("Saving the sync failed: " + e.message); }
 }
 
-// ---- right panel: transcript (the recording's .vtt from Drive) ----
+// ---- local recordings: play a session from the coder's own computer instead of Drive ----
+// (Drive caps downloads per day; when it refuses, coders download the file themselves and pick it here.)
+// Kept for this page visit only; a recording shared by two pids (T4/T5) is set for both.
+const LOCAL = {}; // pid -> { video: objectURL, name, vttUrl }
+const pidsOfFile = (name) => [...String(name).matchAll(/([IST])0*(\d+)-[a-z]+/gi)].map((m) => m[1].toUpperCase() + m[2]);
+function setVideoSource(pid, keepTime) {
+  const v = D.videos[pid] || {};
+  // keep the position when swapping sources; if nothing had loaded yet, start at this task
+  const t = vid.readyState && vid.currentTime ? vid.currentTime : taskWindow()[0];
+  vid.src = LOCAL[pid]?.video || videoSrc(v);
+  $("grab").src = vid.src;
+  for (const tr of [...vid.querySelectorAll("track")]) tr.remove();
+  const vttSrc = LOCAL[pid]?.vttUrl || (v.vttId ? `/api/drive/${v.vttId}` : null);
+  if (vttSrc) {
+    const tr = document.createElement("track");
+    Object.assign(tr, { kind: "captions", label: "Transcript", srclang: "en", src: vttSrc });
+    vid.appendChild(tr);
+    tr.track.mode = ccOn ? "showing" : "hidden";
+  }
+  if (keepTime) vid.addEventListener("loadedmetadata", () => { seek(t); renderAll(); }, { once: true });
+  $("localBtn").classList.toggle("on", !!LOCAL[pid]?.video);
+  $("localBtn").title = LOCAL[pid]?.video ? `Playing local file: ${LOCAL[pid].name} (click to pick another)` : "Play this session's recording from your computer instead of Drive (pick the .mp4, and optionally its .vtt transcript)";
+}
+$("localBtn").addEventListener("click", () => { if (!state.pid) return alert("Pick a session on the left first."); $("localIn").value = ""; $("localIn").click(); });
+$("localIn").addEventListener("change", async () => {
+  const pid = state.pid, shared = D.videos[pid]?.sharedWith || [];
+  for (const f of $("localIn").files) {
+    const named = pidsOfFile(f.name);
+    if (named.length && !named.includes(pid) && !confirm(`"${f.name}" looks like ${named.join("/")}, but the open session is ${pid}. Use it for ${pid} anyway?`)) continue;
+    for (const p of [pid, ...shared]) {
+      LOCAL[p] ||= {};
+      if (/\.vtt$/i.test(f.name)) { LOCAL[p].vttUrl = URL.createObjectURL(f); VTT[p] = parseVtt(await f.text()); }
+      else { LOCAL[p].video = URL.createObjectURL(f); LOCAL[p].name = f.name; }
+    }
+  }
+  $("vmsg").style.display = "flex"; $("vmsg").textContent = "Loading local video…";
+  setVideoSource(pid, true);
+  renderTr(true);
+});
+// Drive refused or failed: tell the coder how to keep going
+vid.addEventListener("error", () => {
+  if (!state.pid || LOCAL[state.pid]?.video) return;
+  $("vmsg").style.display = "flex";
+  $("vmsg").innerHTML = `<div style="max-width:440px;line-height:1.5">Couldn't load this recording from Drive (it may have hit Drive's daily download limit).<br><br>Download <b>${esc(D.videos[state.pid]?.name || state.pid + " recording")}</b> from the shared Drive folder with your own Google account, then click <b>📂 local file</b> below and pick it (optionally with its <b>.vtt</b> transcript).</div>`;
+});
+
+// ---- right panel: transcript (the recording's .vtt from Drive, or a local .vtt) ----
+function parseVtt(txt) {
+  const toS = (s) => { const [h, m, x] = s.trim().split(":"); return +h * 3600 + +m * 60 + parseFloat(x); };
+  return txt.split(/\r?\n\r?\n/).map((b) => {
+    const lines = b.trim().split(/\r?\n/);
+    const i = lines.findIndex((l) => l.includes("-->"));
+    if (i < 0) return null;
+    const [a, z] = lines[i].split("-->");
+    const text = lines.slice(i + 1).join(" ");
+    const m = text.match(/^([^:]{1,40}):\s*(.*)$/);
+    return { t0: toS(a), t1: toS(z.split(" ").filter(Boolean)[0]), sp: m ? m[1] : "", text: m ? m[2] : text };
+  }).filter(Boolean);
+}
 async function loadVtt(pid) {
   const v = D.videos[pid];
-  if (!v?.vttId || VTT[pid]) return;
+  if (!v?.vttId || VTT[pid] || LOCAL[pid]?.vttUrl) return;
   VTT[pid] = [];
   try {
-    const txt = await (await fetch(`/api/drive/${v.vttId}`)).text();
+    const r = await fetch(`/api/drive/${v.vttId}`);
+    if (!r.ok) throw new Error(r.status);
+    const txt = await r.text();
     const toS = (s) => { const [h, m, x] = s.trim().split(":"); return +h * 3600 + +m * 60 + parseFloat(x); };
     VTT[pid] = txt.split(/\r?\n\r?\n/).map((b) => {
       const lines = b.trim().split(/\r?\n/);
@@ -2084,8 +2138,8 @@ function renderTr(full) {
   if (full) {
     const bar = `<div class="trbar"><input type="search" id="trQ" placeholder="Search transcript…" value="${esc(trQuery)}" />
       <label><input type="checkbox" id="trTask"${trTaskOnly ? " checked" : ""}/> this task</label><label><input type="checkbox" id="trFollow"${trFollow ? " checked" : ""}/> follow</label></div>`;
-    if (!D.videos[state.pid]?.vttId) { p.innerHTML = `<div class="empty">No transcript (.vtt) in Drive for ${esc(state.pid)}.</div>`; return; }
-    if (cues == null) { p.innerHTML = `<div class="empty">Could not load the transcript.</div>`; return; }
+    if (!D.videos[state.pid]?.vttId && !LOCAL[state.pid]?.vttUrl) { p.innerHTML = `<div class="empty">No transcript (.vtt) in Drive for ${esc(state.pid)}.</div>`; return; }
+    if (cues == null) { p.innerHTML = `<div class="empty">Could not load the transcript from Drive. Download the session's <b>.vtt</b> from the Drive folder and add it with <b>📂 local file</b> (above the timeline).</div>`; return; }
     if (!cues.length) { p.innerHTML = bar + `<div class="empty">Loading transcript…</div>`; return; }
     const [a, b] = taskWindow(), qq = trQuery.toLowerCase();
     p.innerHTML = bar + cues.map((c, i) => {
@@ -2143,7 +2197,6 @@ applyCc();
 vid.addEventListener("loadeddata", () => ($("vmsg").style.display = "none"));
 vid.addEventListener("play", updatePlayhead);
 vid.addEventListener("pause", () => { updatePlayhead(); drawClock(); });
-vid.addEventListener("error", () => { $("vmsg").style.display = "flex"; $("vmsg").textContent = "Could not load the video from Drive."; });
 // While playing: move the playhead every frame; redraw the open segment, plot and transcript ~2×/s.
 let lastSlow = 0;
 (function tick(ts) {
