@@ -261,6 +261,42 @@
   /* ---- turns view: each prompt is a turn = ① intent edge → ② artifact node → ③ engagement ---- */
   #turnboard { display:none; flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--soft); padding:8px 12px 30px; }
   #center.turns #turnboard { display:block; }
+  #markboard { display:none; flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--soft); padding:8px 12px 30px; }
+  #center.mk #turnboard { display:none; }
+  #center.mk #markboard { display:block; }
+  #v2board { display:none; flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--soft); padding:8px 12px 30px; }
+  #center.v2 #turnboard { display:none; }
+  #center.v2 #v2board { display:block; }
+  .v2grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
+  .v2grid > div { padding:6px 9px 8px; border-right:1px solid var(--line); min-width:0; font-size:12px; }
+  .v2grid > div:last-child { border-right:0; }
+  .v2head { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-bottom:4px; display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
+  .v2row1 > div:nth-child(1) { background:#f6f3fb; } .v2row1 > div:nth-child(2) { background:#fff8ef; } .v2row1 > div:nth-child(3) { background:#f2f8f3; }
+  .v2row1.auto > div { background:repeating-linear-gradient(135deg,#f3f2ef,#f3f2ef 6px,#eceae5 6px,#eceae5 12px); }
+  .v2nodes { grid-column:2 / 4; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); padding:0 !important; border-right:0 !important; }
+  .v2nodes > div { padding:6px 9px 8px; min-width:0; }
+  .v2nodes > div:first-child { border-right:1px solid var(--line); background:#fff8ef; }
+  .v2nodes > div:last-child { background:#f2f8f3; }
+  .v2n { display:flex; align-items:center; gap:4px; min-height:26px; margin-bottom:3px; }
+  .v2n select { flex:1; min-width:0; font-size:12px; padding:2px 4px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .chips { display:inline-flex; gap:2px; flex-wrap:wrap; }
+  .chips button { border:1px solid var(--line); background:#fff; border-radius:9px; padding:0 7px; font-size:10.5px; cursor:pointer; color:#5a564e; line-height:18px; }
+  .chips button.on { background:#2a2725; border-color:#2a2725; color:#fff; }
+  .chips button.on.read, .chips button.on.confirm { background:#2f7a3a; border-color:#2f7a3a; }
+  .chips button.on.skimmed, .chips button.on.narrows, .chips button.on.narrowed { background:#e0b84a; border-color:#e0b84a; color:#2a2725; }
+  .chips button.on.ignored, .chips button.on.no, .chips button.on.nochange { background:#9a948a; border-color:#9a948a; }
+  .chips button.on.counter, .chips button.on.changed { background:#c0392b; border-color:#c0392b; }
+  .chips button.on.expanded { background:#3d7fc4; border-color:#3d7fc4; }
+  .v2eng { display:flex; align-items:center; min-height:26px; margin-bottom:3px; }
+  .hyps { border-top:1px dashed #d8cfc0; }
+  .hyps .hh { display:flex; align-items:center; gap:8px; padding:4px 9px; font-size:11px; font-weight:700; color:#a5321f; }
+  .hrow { border-top:1px solid #f1ebe2; }
+  .hrow > div { background:#fdf7f6; }
+  .hrow .lbl { width:100%; font:11.5px inherit; padding:2px 6px; border:1px solid var(--line); border-radius:5px; margin-top:4px; }
+  .hrow .sub { font-size:10.5px; color:var(--muted); margin:4px 0 2px; }
+  .addhyp { border:1px dashed #e0a49a; background:none; border-radius:6px; font-size:11px; padding:1px 8px; cursor:pointer; color:#a5321f; }
+  .flowto { font-size:10.5px; color:var(--muted); padding:2px 9px 5px; text-align:right; }
+  .pinchip.diff { background:#fff; color:#a5321f; border:1px dashed #c0392b; }
   #center.turns #seqpanel { display:none; }
   #center.turns #vwrap { flex:0 0 34%; min-height:150px; }
   #center.turns #ctlHint { display:none; }
@@ -279,7 +315,42 @@
   .slot:last-child { border-right:0; }
   .slot .sh { display:flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-bottom:5px; flex-wrap:wrap; }
   .slot .sh .tm { font:10.5px ui-monospace,Menlo,monospace; text-transform:none; letter-spacing:0; font-weight:400; }
-  .slot.intent { background:#f6f3fb; } .slot.node { background:#fff8ef; } .slot.eng { background:#f2f8f3; }
+  .slot.intent { background:#f6f3fb; } .slot.node { background:#fff8ef; } .slot.eng { background:#f2f8f3; } .slot.nodes { background:#fbf8f2; }
+  .tslots.t2 { grid-template-columns:1fr 2.6fr; }
+  .ncols { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin:0 0 3px; padding:0 7px; }
+  .nrow { border:1px solid #eadfce; border-radius:8px; background:#fff; padding:5px 7px 6px; margin-bottom:6px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:start; }
+  .nleft { min-width:0; }
+  .nrow.auto { background:repeating-linear-gradient(135deg,#f6f5f2,#f6f5f2 6px,#efede8 6px,#efede8 12px); }
+  .nrow.flagged { box-shadow:inset 3px 0 0 #d0342c; }
+  .nrow.selrow, .echip.selrow { outline:2px solid var(--accent); }
+  .nhead { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+  .nhead .k, .echip .sel-me { cursor:pointer; color:var(--muted); font-size:11px; }
+  .lv { display:inline-flex; gap:2px; }
+  .lv button { border:1px solid var(--line); background:#fff; border-radius:9px; padding:0 7px; font-size:10.5px; cursor:pointer; color:#5a564e; }
+  .lv button.on.deep { background:#2f7a3a; border-color:#2f7a3a; color:#fff; }
+  .lv button.on.skim { background:#e0b84a; border-color:#e0b84a; color:#2a2725; }
+  .lv button.on.none { background:#9a948a; border-color:#9a948a; color:#fff; }
+  .nrow .x, .echip .x { border:0; background:none; cursor:pointer; color:var(--muted); font-size:12px; padding:0 2px; }
+  .edges { display:flex; flex-direction:column; gap:3px; align-items:stretch; border-left:2px solid #cfe2d4; padding-left:7px; min-height:24px; }
+  .echip { display:flex; align-items:center; gap:3px; background:#f2f8f3; border:1px solid #cfe2d4; border-radius:7px; padding:1px 4px; }
+  .echip select { flex:1; min-width:0; max-width:none; }
+  .addedge { align-self:flex-start; }
+  .echip.flagged { box-shadow:inset 3px 0 0 #d0342c; }
+  .echip select { font-size:11px; padding:1px 2px; }
+  .echip .t { font:10px ui-monospace,Menlo,monospace; color:var(--muted); cursor:pointer; }
+  .addedge, .addnode { border:1px dashed #b9c9bd; background:none; border-radius:6px; font-size:11px; padding:1px 7px; cursor:pointer; color:#3f6b4a; }
+  .addnode { border-color:#e6b97f; color:#9a5a12; margin-top:2px; }
+  .legacy { margin-top:6px; font-size:11px; color:var(--muted); }
+  .legacy button { border:1px solid var(--line); background:#fff; border-radius:8px; font-size:10.5px; padding:0 6px; cursor:pointer; }
+  .tcmp .row.t2 { grid-template-columns:70px 1fr 2.1fr; }
+  /* markers tab */
+  .mkbtns { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px; }
+  .mkrow2 { display:grid; grid-template-columns:52px 1fr auto; gap:4px 6px; align-items:center; padding:5px 4px; border-bottom:1px solid #f0ede6; font-size:12px; }
+  .mkrow2.sel { background:#fbf1e4; }
+  .mkrow2 .tm { font:11px ui-monospace,Menlo,monospace; color:var(--accent); cursor:pointer; }
+  .mkrow2 input { font:12px inherit; padding:2px 5px; border:1px solid var(--line); border-radius:5px; min-width:0; width:100%; }
+  .mkrow2 .note { grid-column:2 / 4; }
+  .mkrow2 button { border:0; background:none; cursor:pointer; color:var(--muted); }
   .slot select { font:12px inherit; padding:2px 4px; border:1px solid var(--line); border-radius:6px; background:#fff; max-width:100%; }
   .slot input.nt { width:100%; margin-top:5px; font:11.5px inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; background:#fff; }
   .play { border:1px solid var(--line); background:#fff; border-radius:10px; padding:0 7px; font-size:10.5px; cursor:pointer; color:var(--text); text-transform:none; letter-spacing:0; font-weight:600; }
@@ -353,6 +424,7 @@
   <button class="linkbtn" id="csvSeg" title="One row per node, process segment and marker, every coder">⭳ segments CSV</button>
   <button class="linkbtn" id="csvSeq" title="One row per (coder, session): the derived sequence">⭳ sequences CSV</button>
   <button class="linkbtn" id="csvTurns" title="One row per turn slot (intent / node / engagement step), every coder">⭳ turns CSV</button>
+  <button class="linkbtn" id="csvV2" title="turns v2: one row per intent, node and hypothesis, every coder">⭳ v2 CSV</button>
   <button class="linkbtn" id="refresh" title="Re-read sessions and the Drive folder">↻ refresh</button>
   <a href="/artifact-review">Artifact review →</a>
 </header>
@@ -381,6 +453,8 @@
       <div class="tlbar">
         <button class="b" data-mode="turns" title="Code each turn: intent → artifact → engagement">turns</button>
         <button class="b" data-mode="timeline" title="Code on the timeline (segments and pins)">timeline</button>
+        <button class="b" data-mode="markers" title="Marker analysis: starting hypothesis and markers, turn by turn">markers</button>
+        <button class="b" data-mode="v2" title="Per turn: intent edge · artifact nodes · engagement, plus hypothesis rows">turns v2</button>
         <span class="sep" style="width:1px;height:16px;background:var(--line)"></span>
         <span>View</span>
         <button class="b" data-view="task">this task</button>
@@ -401,6 +475,8 @@
     </div>
     <div id="cmpboard"></div>
     <div id="turnboard"></div>
+    <div id="markboard"></div>
+    <div id="v2board"></div>
     <div id="seqpanel">
       <div class="seqhd">Sequence <button class="b" id="copySeq" style="text-transform:none;letter-spacing:0;font-weight:400">copy</button>
         <label style="text-transform:none;letter-spacing:0;font-weight:400;display:flex;gap:4px;align-items:center">group by
@@ -449,7 +525,10 @@ const STAGES = [
 ];
 const ST = Object.fromEntries(STAGES.map((s) => [s.n, s]));
 // Marker pins (independent of stage segments). key = keyboard shortcut.
-const MARKS = [["narrowing", "n"], ["revisiting artifact", "r"], ["cross-checking", "c"], ["backtracking", "b"], ["comparing", "m"]];
+// Markers: moments independent of the process codes (shown on the timeline and in the Markers tab).
+// (older kinds such as cross-checking / backtracking stay valid on existing markers)
+const MARKS = [["expressing a hypothesis", "h"], ["narrowing", "n"], ["widening", "w"], ["changing direction", "d"],
+  ["revisiting artifact", "r"], ["comparing", "m"]];
 const LABELS = [["", "— unlabeled", "#d8d3c9"], ["good", "Good / strong", "#5aae5e"], ["average", "Average / mediocre", "#e0b84a"], ["poor", "Non-informative", "#e57373"]];
 const LABEL_C = Object.fromEntries(LABELS.map(([k, , c]) => [k, c]));
 const COND = { I: "interactive", S: "static", T: "text" };
@@ -717,6 +796,8 @@ function renderAll() {
   renderTr(true);
   renderCompare();
   renderTurns();
+  renderMarkBoard();
+  renderV2();
   updatePlayhead();
 }
 
@@ -725,7 +806,7 @@ function renderPalette() {
   const node = (x) => `<button class="nodeb" style="--c:${x.c};${x.ink ? `--ink:${x.ink}` : ""}" data-n="${x.n}"${dis} title="${esc(x.name)} — node: pins a moment · type ${x.n}"><i>${x.n}</i>${esc(x.name)}</button>`;
   const arr = (x) => `<button class="arrb" style="--c:${x.c}" data-n="${x.n}"${dis} title="${esc(x.name)} — process: starts a segment · type ${x.n}"><i>${x.n}</i>${esc(x.name)} <b>→</b></button>`;
   const cell = (loop, nodes) => `<div class="cell">${STAGES.filter((x) => x.loop === loop && !!x.node === nodes).map(nodes ? node : arr).join("")}</div>`;
-  $("palette").innerHTML = (state.mode === "turns" ? `<div class="pgrid" style="grid-template-columns:auto 1fr">` : `<div class="pgrid">
+  $("palette").innerHTML = (state.mode !== "timeline" ? `<div class="pgrid" style="grid-template-columns:auto 1fr">` : `<div class="pgrid">
       <span></span><span class="ph">Foraging loop</span><span class="ph">Sensemaking loop</span>
       <span class="ph">Nodes <small>· pin</small></span>${cell("F", true)}${cell("S", true)}
       <span class="ph">Arrows <small>· segment</small></span>${cell("F", false)}${cell("S", false)}`) +
@@ -793,9 +874,9 @@ function renderTimeline() {
   const pinEl = (p) =>
     `<div class="pinm${p.stage ? " node" : ""}${p.id === state.selPin ? " sel" : ""}" data-pin="${p.id}" style="left:${pct(p.t, w)}%;${p.stage ? `--c:${ST[p.stage].c};${ST[p.stage].ink ? `--ink:${ST[p.stage].ink}` : ""}` : ""}" title="${esc(`${fmt(p.t)} · ${pinLabel(p)}${p.note ? "\n" + p.note : ""}`)}"><span>${p.stage ? `${p.stage} ${esc(ST[p.stage].name.toLowerCase())}${byParticipant(p) ? " · P" : nodeArt(p) != null ? " · a" + nodeArt(p) : ""}` : esc(p.kind)}</span></div>`;
   const inView = state.coder ? pins().filter((p) => p.t >= w[0] && p.t <= w[1]) : [];
-  $("tlPins").innerHTML = state.mode === "turns" ? "" : inView.filter((p) => !isMarker(p)).map(pinEl).join("");
+  $("tlPins").innerHTML = state.mode !== "timeline" ? "" : inView.filter((p) => !isMarker(p)).map(pinEl).join("");
   $("tlMarks").innerHTML = inView.filter(isMarker).map(pinEl).join("");
-  $("tlSegs").innerHTML = state.mode === "turns" ? chunkBands(w) : state.coder ? segEls(segs(), w, true) : `<div style="font-size:11px;color:var(--muted);padding:7px">Enter a coder name to annotate.</div>`;
+  $("tlSegs").innerHTML = state.mode !== "timeline" ? chunkBands(w) : state.coder ? segEls(segs(), w, true) : `<div style="font-size:11px;color:var(--muted);padding:7px">Enter a coder name to annotate.</div>`;
   // other coders
   let o = "";
   if (state.compare && state.mode === "timeline") for (const [c, r] of Object.entries(CODES[`${state.pid}|${state.task}`] || {})) {
@@ -906,7 +987,29 @@ function deriveTurns(s = cur(), rec = mine()) {
   return turns;
 }
 const isText = () => (cur()?.cond || COND[state.pid?.[0]]) === "text";
-const blankTurn = () => ({ intent: { stage: null, alts: [], note: "" }, node: { stage: null, led: null, note: "" }, eng: [], adj: null });
+// Turn model: ① intent edge (+ possible alternatives); ② one or more nodes the artifact/reply
+// represents, each with how deeply they engaged with it and the edge actions they took from it.
+//   tr.nodes = [{ stage, level: "deep"|"skim"|"none"|null, edges: [{ stage, t, note, …evidence }], note, …evidence }]
+// Older records (single tr.node + tr.eng list) are read through getNodes() and converted on first edit;
+// their participant-led nodes (hypotheses formed while engaging) belong to markers now.
+const LEVELS = [["deep", "deeply engaged"], ["skim", "skimmed"], ["none", "did not engage"]];
+const blankTurn = () => ({ intent: { stage: null, alts: [], note: "" }, nodes: [], adj: null });
+function getNodes(tr) {
+  if (!tr) return [];
+  if (Array.isArray(tr.nodes)) return tr.nodes;
+  if (!tr.node?.stage && !(tr.eng || []).some((e) => e.k !== "n")) return [];
+  const ev = (o) => ({ shot: o?.shot ?? null, boxes: o?.boxes || [], focus: o?.focus || "", ...(o?.flag ? { flag: true, flagNote: o.flagNote || "" } : {}) });
+  const auto = tr.node?.auto || tr.engAuto, unsure = tr.node?.unsure || tr.engUnsure;
+  return [{ stage: tr.node?.stage ?? null, level: null, note: tr.node?.note || "", ...ev(tr.node),
+    edges: (tr.eng || []).filter((e) => e.k !== "n").map((e) => ({ stage: e.stage, t: e.t ?? null, note: e.note || "", ...ev(e) })),
+    ...(auto ? { auto: true } : {}), ...(unsure ? { unsure: true } : {}) }];
+}
+// make tr.nodes real (editable) — called before any edit to a turn's nodes
+function ensureNodes(tr) {
+  if (!Array.isArray(tr.nodes)) tr.nodes = JSON.parse(JSON.stringify(getNodes(tr)));
+  return tr.nodes;
+}
+const legacyHyps = (tr) => (Array.isArray(tr?.eng) ? tr.eng.map((e, i) => ({ ...e, i })).filter((e) => e.k === "n" && e.stage) : []);
 function turnRec(key, create) {
   const r = mine(create);
   if (!r) return null;
@@ -922,21 +1025,22 @@ function renderTurnsPlaying() {
   document.querySelectorAll("#turnboard .play").forEach((b) => b.classList.toggle("on", clipEnd != null && +b.dataset.b === clipEnd && !vid.paused));
 }
 const nodeName = (stage) => (ST[stage] ? ST[stage].name.toLowerCase() : "?");
-function turnNodeLabel(t, x) {
-  const led = x?.node?.led;
-  const src = isText() ? "AI reply" : t.art ? `artifact ${t.art.seq}` : "reply";
-  return `${nodeName(x?.node?.stage)} (${src}${led ? ` · ${led === "user" ? "user-led" : led === "ai" ? "AI-led" : "artifact-led"}` : ""})`;
+const srcName = (t) => (isText() ? "AI reply" : t.art ? `artifact ${t.art.seq}` : "reply");
+const levelShort = { deep: "deep", skim: "skimmed", none: "not engaged" };
+function turnNodeLabel(t, n) {
+  return `${nodeName(n.stage)} (${srcName(t)}${n.level ? ` · ${levelShort[n.level]}` : ""})`;
 }
 // the coded sequence as items, for the strip, copy, compare and CSV
 function turnItems(r, turns) {
   const out = [];
-  if (r?.start?.hyp) out.push({ k: "n", stage: 13, label: "hypothesis (participant)", turn: 0 });
   for (const t of turns) {
     const x = r?.turns?.[t.key];
     if (!x) continue;
     if (x.intent?.stage) out.push({ k: "e", stage: x.intent.stage, label: nodeName(x.intent.stage), turn: t.k });
-    if (x.node?.stage) out.push({ k: "n", stage: x.node.stage, label: turnNodeLabel(t, x), turn: t.k });
-    for (const e of x.eng || []) if (e.stage) out.push({ k: e.k, stage: e.stage, label: e.k === "n" ? `${nodeName(e.stage)} (participant)` : nodeName(e.stage), turn: t.k });
+    for (const n of getNodes(x)) {
+      if (n.stage) out.push({ k: "n", stage: n.stage, label: turnNodeLabel(t, n), turn: t.k, level: n.level });
+      for (const e of n.edges || []) if (e.stage) out.push({ k: "e", stage: e.stage, label: nodeName(e.stage), turn: t.k });
+    }
   }
   return out;
 }
@@ -973,7 +1077,10 @@ function chunkBands(w) {
 }
 function renderTurns() {
   const on = state.mode === "turns" && D && state.pid;
-  $("center").classList.toggle("turns", !!on);
+  // turns and markers share the chunked layout (small video, turn bands, markers palette)
+  $("center").classList.toggle("turns", !!(state.mode !== "timeline" && D && state.pid));
+  $("center").classList.toggle("mk", state.mode === "markers");
+  $("center").classList.toggle("v2", state.mode === "v2");
   document.querySelectorAll(".tlbar [data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === state.mode));
   if (!on) { $("turnboard").innerHTML = ""; return; }
   const turns = deriveTurns(), r = mine(), y = $("turnboard").scrollTop;
@@ -981,45 +1088,39 @@ function renderTurns() {
   const dis = !state.coder ? " disabled" : "";
   const stageOpts = (list, cur, ph) => `<option value="">${ph}</option>` + list.map((x) => `<option value="${x.n}"${cur === x.n ? " selected" : ""}>${x.n} · ${esc(x.name)}</option>`).join("");
   const mk = (r?.pins || []).filter(isMarker);
+  const isSel = (key, slot, i, j) => { const q = state.selTurn; return q && q.key === key && q.slot === slot && (i == null || q.i === i) && (j == null || q.j === j); };
   let h = "";
   if (!turns.length) h += '<div class="empty">No prompts logged for this session (or the recording isn\'t synced yet — Events & sync tab).</div>';
   if (!state.coder) h += '<div class="banner">Enter your coder name in the header to code turns.</div>';
-  // coded sequence (mine, then others in compare mode)
   const strip = (who, rr) => `<div class="tseq"><span class="who">${esc(who)}</span>${turnSeqHtml(turnItems(rr, turns)) || '<span class="muted" style="font-size:11px">nothing coded yet</span>'}</div>`;
   if (state.coder) h += strip(`Sequence · ${state.coder}`, r) + `<div style="margin:-4px 0 8px"><button class="b" id="copyTurns">copy sequence</button></div>`;
   for (const [c, o] of others) h += strip(c, o);
   // compare summary
-  if (others.length && r) {
-    for (const [c, o] of others) {
-      const both = turns.filter((t) => r.turns?.[t.key] && o.turns?.[t.key]);
-      const pc = (f) => (both.length ? Math.round((100 * both.filter(f).length) / both.length) + "%" : "—");
-      const A = (t) => r.turns[t.key], B = (t) => o.turns[t.key];
-      const sim = both.length ? Math.round((100 * both.reduce((acc, t) => acc + seqSim(A(t).eng || [], B(t).eng || []), 0)) / both.length) + "%" : "—";
-      h += `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${esc(state.coder)} vs ${esc(c)}</b>${both.length} turns both coded</div>
-        <div><b>${pc((t) => A(t).intent.stage && A(t).intent.stage === B(t).intent.stage)}</b>same intent edge</div>
-        <div><b>${pc((t) => A(t).node.stage && A(t).node.stage === B(t).node.stage)}</b>same node</div>
-        <div><b>${pc((t) => A(t).node.led && A(t).node.led === B(t).node.led)}</b>same led-by</div>
-        <div><b>${sim}</b>engagement similarity</div>
-        <div><b>${r.start?.hyp == null || o.start?.hyp == null ? "—" : r.start.hyp === o.start.hyp ? "same" : "differ"}</b>starting hypothesis</div></div>`;
-    }
-  }
-  // starting point
-  if (turns.length) {
-    const st = r?.start || {};
-    h += `<div class="tcard"><div class="startc"><b>Start</b><span class="muted">Did they come in with a hypothesis?</span>
-      ${draftBadge(st, "start")}<span class="led" style="margin:0">${[[true, "yes → 13 hypothesis (participant)"], [false, "no"]].map(([v, l]) => `<button data-start="${v}"${dis} class="${st.hyp === v ? "on" : ""}">${l}</button>`).join("")}</span>
-      <input class="nt" data-startnote style="flex:1;margin:0;min-width:160px" placeholder="evidence (e.g. what they said before the first prompt)" value="${esc(st.note || "")}"${dis} />
-      ${others.map(([c, o]) => `<span class="${o.start?.hyp === st.hyp ? "ok" : "no"}" style="font-size:11px">${esc(c)}: ${o.start?.hyp == null ? "—" : o.start.hyp ? "yes" : "no"}</span>`).join("")}</div></div>`;
+  if (others.length && r) for (const [c, o] of others) {
+    const both = turns.filter((t) => r.turns?.[t.key] && o.turns?.[t.key]);
+    const A = (t) => r.turns[t.key], B = (t) => o.turns[t.key];
+    const pc = (f) => (both.length ? Math.round((100 * both.filter(f).length) / both.length) + "%" : "—");
+    const mean = (f) => (both.length ? Math.round((100 * both.reduce((acc, t) => acc + f(t), 0)) / both.length) + "%" : "—");
+    const set = (x) => new Set(getNodes(x).map((n) => n.stage).filter(Boolean));
+    const jac = (t) => { const a = set(A(t)), b = set(B(t)); const u = new Set([...a, ...b]); return u.size ? [...a].filter((v) => b.has(v)).length / u.size : 1; };
+    const lv = [];
+    for (const t of both) for (const n of getNodes(A(t))) { const m = getNodes(B(t)).find((z) => z.stage === n.stage); if (n.stage && m && n.level && m.level) lv.push(n.level === m.level); }
+    const flat = (x) => getNodes(x).flatMap((n) => [{ k: "n", stage: n.stage }, ...(n.edges || []).map((e) => ({ k: "e", stage: e.stage }))]);
+    h += `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${esc(state.coder)} vs ${esc(c)}</b>${both.length} turns both coded</div>
+      <div><b>${pc((t) => A(t).intent.stage && A(t).intent.stage === B(t).intent.stage)}</b>same intent edge</div>
+      <div><b>${mean(jac)}</b>node overlap</div>
+      <div><b>${lv.length ? Math.round((100 * lv.filter(Boolean).length) / lv.length) + "%" : "—"}</b>same engagement level</div>
+      <div><b>${mean((t) => seqSim(flat(A(t)), flat(B(t))))}</b>nodes + edges similarity</div></div>`;
   }
   for (const t of turns) {
     const x = r?.turns?.[t.key] || blankTurn();
-    const nodeSrc = isText() ? "AI reply" : t.art ? `Artifact ${t.art.seq}` : "Reply (no artifact)";
-    const ledOpts = isText() ? [["user", "user"], ["ai", "AI reply"]] : [["user", "user"], ["artifact", "artifact"]];
+    const nodes = getNodes(x), shown = nodes.length ? nodes : [{ stage: null, level: null, edges: [], note: "" }];
     const marks = mk.filter((p) => p.t >= t.S && p.t < t.E);
+    const hyps = legacyHyps(x);
     h += `<div class="tcard${state.selTurn?.key === t.key ? " seltc" : ""}" data-key="${esc(t.key)}">
       <div class="th"><b>Turn ${t.k}</b><span class="tm" style="font:11px ui-monospace,Menlo,monospace;color:var(--muted)">${fmt(t.S)}</span>
         <span class="pr-text" title="click to expand">“${esc(t.prompt || "")}”</span></div>
-      <div class="tslots">
+      <div class="tslots t2">
         <div class="slot intent${x.intent.auto ? " auto" : ""}${x.intent.flag ? " flagged" : ""}"><div class="sh"><span class="sel-me" data-sel="intent" title="Select: screenshot, boxes, note, flag (right panel)">① Intent</span>${flagBtn(x.intent, "intent")}${draftBadge(x.intent, "intent")}
             <button class="play" data-a="${t.S}" data-b="${t.N}" title="Prompt + reflection about it">▶ ${fmt(t.S)}–${fmt(t.N)}</button>
             <button class="nudge" data-adj="-15"${dis} title="Start 15 s earlier">−15s</button><button class="nudge" data-adj="15"${dis} title="Start 15 s later">+15s</button>
@@ -1028,29 +1129,35 @@ function renderTurns() {
           <div class="alts">possible: ${(x.intent.alts || []).map((a) => `<span class="alt" data-alt="${a}" title="remove">${a} ${esc(ST[a].name)}</span>`).join("")}
             <select data-f="alt"${dis}><option value="">+</option>${EDGE_STAGES.filter((s2) => s2.n !== x.intent.stage && !(x.intent.alts || []).includes(s2.n)).map((s2) => `<option value="${s2.n}">${s2.n} · ${esc(s2.name)}</option>`).join("")}</select></div>
           <input class="nt" data-note="intent" placeholder="why (what they said)" value="${esc(x.intent.note)}"${dis} /></div>
-        <div class="slot node${x.node.auto ? " auto" : ""}${x.node.flag ? " flagged" : ""}"><div class="sh"><span class="sel-me" data-sel="node" title="Select: screenshot, boxes, note, flag (right panel)">② ${esc(nodeSrc)}</span>${flagBtn(x.node, "node")}${draftBadge(x.node, "node")} <button class="play" data-a="${t.N}" data-b="${Math.min(t.E, t.N + 45)}" title="First 45 s after it appears">▶ ${fmt(t.N)}</button></div>
-          <select data-f="node"${dis}>${stageOpts(NODE_STAGES, x.node.stage, "node…")}</select>
-          <div class="led">led by ${ledOpts.map(([v, l]) => `<button data-led="${v}"${dis} class="${x.node.led === v ? "on" : ""}">${l}</button>`).join("")}</div>
-          <input class="nt" data-note="node" placeholder="evidence" value="${esc(x.node.note)}"${dis} /></div>
-        <div class="slot eng${x.engAuto ? " auto" : ""}"><div class="sh">③ Engagement${draftBadge({ auto: x.engAuto, unsure: x.engUnsure }, "eng")} <button class="play" data-a="${t.N}" data-b="${t.E}">▶ ${fmt(t.N)}–${fmt(t.E)}</button>
+        <div class="slot nodes"><div class="sh">${esc(srcName(t)[0].toUpperCase() + srcName(t).slice(1))}
+            <button class="play" data-a="${t.N}" data-b="${Math.min(t.E, t.N + 45)}" title="First 45 s after it appears">▶ ${fmt(t.N)}</button>
+            <button class="play" data-a="${t.N}" data-b="${t.E}" title="Whole engagement">▶ ${fmt(t.N)}–${fmt(t.E)}</button>
             ${t.back ? `<button class="play" data-a="${t.back[0]}" data-b="${t.back[1]}" title="Reflection Q1/Q2 about this ${isText() ? "reply" : "artifact"} (shown before the next prompt)">▶ look-back</button>` : ""}</div>
-          <div class="engl">${(x.eng || []).map((e, i) => `<div class="eitem ${e.k}${e.flag ? " flagged" : ""}" data-i="${i}"><span class="k sel-me" data-sel="eng" title="${e.k === "n" ? "node (participant-led)" : "edge"} — click to select (screenshot, boxes, note, flag)" style="cursor:pointer">${e.k === "n" ? "●" : "→"}</span>
-              <select data-f="eng"${dis}>${stageOpts(e.k === "n" ? NODE_STAGES : EDGE_STAGES, e.stage, e.k === "n" ? "node…" : "edge…")}</select>
-              <span class="t" data-stamp title="Stamp the current video time (click to jump there)">${e.t != null ? fmt(e.t) : "⏱"}</span>
-              <input data-note="eng" placeholder="note" value="${esc(e.note)}"${dis} />
-              ${flagBtn(e, "eng")}<button data-mv="-1" title="up"${dis}>↑</button><button data-mv="1" title="down"${dis}>↓</button><button data-del title="remove"${dis}>×</button></div>`).join("")}</div>
-          <div class="eadd"><button data-add="e"${dis}>+ edge</button><button class="n" data-add="n"${dis} title="A node the participant reaches while engaging (e.g. a hypothesis) — follow it with an edge">+ node (participant)</button></div></div>
+          <div class="ncols"><span>② Node (what it represents)</span><span>③ Engagement · level + actions taken</span></div>
+          ${shown.map((n, i) => `<div class="nrow${n.auto ? " auto" : ""}${n.flag ? " flagged" : ""}${isSel(t.key, "node", i) ? " selrow" : ""}" data-n="${i}">
+            <div class="nleft"><div class="nhead"><span class="k sel-me" data-sel="node" title="Select this node: screenshot, boxes, note, flag">●</span>
+              <select data-f="node"${dis}>${stageOpts(NODE_STAGES, n.stage, "node…")}</select>
+              ${flagBtn(n, "node")}${draftBadge(n, "node")}${nodes.length > 1 ? `<button class="x" data-delnode title="remove this node"${dis}>×</button>` : ""}</div>
+            <input class="nt" data-note="node" placeholder="evidence: what they did with this part" value="${esc(n.note || "")}"${dis} /></div>
+            <div class="edges"><span class="lv">${LEVELS.map(([v, l]) => `<button data-level="${v}"${dis} class="${n.level === v ? "on " + v : ""}" title="${l}">${l}</button>`).join("")}</span>
+${(n.edges || []).map((e, j) => `<span class="echip${e.flag ? " flagged" : ""}${isSel(t.key, "edge", i, j) ? " selrow" : ""}" data-e="${j}"><span class="sel-me" data-sel="edge" title="Select this edge: screenshot, boxes, note, flag">→</span>
+                <select data-f="edge"${dis}>${stageOpts(EDGE_STAGES, e.stage, "edge…")}</select>
+                <span class="t" data-stamp title="Stamp the current video time (click to jump there)">${e.t != null ? fmt(e.t) : "⏱"}</span>${flagBtn(e, "edge")}<button class="x" data-deledge title="remove"${dis}>×</button></span>`).join("")}
+              <button class="addedge" data-addedge${dis} title="An action they took from this node">+ edge</button></div></div>`).join("")}
+          <button class="addnode" data-addnode${dis} title="Another thing this ${isText() ? "reply" : "artifact"} represents (e.g. schema and hypothesis)">+ node</button>
+          ${hyps.length ? `<div class="legacy">earlier coding: ${hyps.map((e) => `<span>● ${e.stage} ${esc(nodeName(e.stage))} (participant)${e.t != null ? " @ " + fmt(e.t) : ""} <button data-tomarker="${e.i}"${dis} title="Hypotheses are coded as markers now">→ make marker</button></span>`).join(" ")}</div>` : ""}
+        </div>
       </div>
       ${marks.length ? `<div class="tmarks">markers ${marks.map((m) => `<span class="pinchip" title="${esc(m.note || "")}">${esc(m.kind)} <small>${fmt(m.t)}</small></span>`).join("")}</div>` : ""}
       ${others.map(([c, o]) => {
         const ox = o.turns?.[t.key];
         if (!ox) return `<div class="tcmp"><div class="row"><b>${esc(c)}</b><span class="muted">not coded</span></div></div>`;
-        const okI = ox.intent.stage === x.intent.stage, okN = ox.node.stage === x.node.stage && ox.node.led === x.node.led;
-        const sim = Math.round(100 * seqSim(x.eng || [], ox.eng || []));
-        return `<div class="tcmp"><div class="row"><b>${esc(c)}</b>
+        const mine2 = new Map(getNodes(x).map((n) => [n.stage, n]));
+        const okI = ox.intent.stage === x.intent.stage;
+        return `<div class="tcmp"><div class="row t2"><b>${esc(c)}</b>
           <span class="${okI ? "ok" : "no"}">${ox.intent.stage ? `${ox.intent.stage} ${esc(ST[ox.intent.stage].name)}` : "—"}${ox.intent.alts?.length ? ` <span class="muted">(possible ${ox.intent.alts.join(", ")})</span>` : ""}</span>
-          <span class="${okN ? "ok" : "no"}">${ox.node.stage ? `${ox.node.stage} ${esc(nodeName(ox.node.stage))}` : "—"}${ox.node.led ? ` · ${esc(ox.node.led)}-led` : ""}</span>
-          <span class="${sim === 100 ? "ok" : sim < 50 ? "no" : ""}">${(ox.eng || []).map((e) => (e.k === "n" ? `●${e.stage}` : `→${e.stage}`)).join(" ") || "—"} <span class="muted">(${sim}% similar)</span></span></div></div>`;
+          <span>${getNodes(ox).map((n) => { const m = mine2.get(n.stage); const ok = m && (!n.level || !m.level || n.level === m.level);
+            return `<span class="${ok ? "ok" : "no"}">●${n.stage ?? "?"} ${esc(nodeName(n.stage))}${n.level ? " · " + levelShort[n.level] : ""}${(n.edges || []).length ? " → " + n.edges.map((e) => e.stage).join(" → ") : ""}</span>`; }).join(" &nbsp; ") || "—"}</span></div></div>`;
       }).join("")}
     </div>`;
   }
@@ -1062,55 +1169,43 @@ function renderTurns() {
 // editing the slot, confirms it.
 const flagBtn = (o, slot) => `<button class="flagb${o?.flag ? " on" : ""}" data-flag="${slot}" title="${o?.flag ? esc("Uncertain: " + (o.flagNote || "flagged") + " — click to clear") : "Flag as uncertain / to discuss"}">🚩</button>`;
 const draftBadge = (o, slot) => (o?.auto ? ` <span class="draft${o.unsure ? " unsure" : ""}" data-confirm="${slot}" title="Drafted from timeline codes${o.unsure ? " — unsure, please check" : ""}. Click to confirm as is.">${o.unsure ? "unsure" : "draft"} ✓</span>` : "");
-function clearDraft(tr, slot) {
+function clearDraft(tr, slot, i) {
   if (!tr) return;
   if (slot === "intent") { delete tr.intent.auto; delete tr.intent.unsure; }
-  if (slot === "node") { delete tr.node.auto; delete tr.node.unsure; }
-  if (slot === "eng") { delete tr.engAuto; delete tr.engUnsure; }
+  if (slot === "node" || slot === "edge") { const n = ensureNodes(tr)[i]; if (n) { delete n.auto; delete n.unsure; } }
 }
 // Turns drafted from a record's timeline codes (segments + node pins), for the turn structure of
 // its session. Per turn:
 //   intent = the arrow segment covering most of the intent window (others ≥25 % become "possible");
-//   node   = the node pin nearest to when the artifact/reply appeared (−30 s … +90 s);
-//   engage = arrow segments starting in the engagement window, in order (repeats merged), plus
-//            any other node pins there as participant-led nodes.
-// Unsure (grey "unsure") when nothing or no clear majority covers a slot, or no node pin is near.
-// Led-by didn't exist on the timeline, so it is left empty. Start = yes only if a hypothesis pin
+//   node   = the node pin nearest to when the artifact/reply appeared (−30 s … +90 s), with the arrow
+//            segments starting in the engagement window as its edges (repeats merged);
+// engagement level isn't on the timeline, so it is left empty. Unsure (grey) when nothing or no
+// clear majority covers a slot, or no node pin is near. Start = yes only if a hypothesis pin
 // precedes the first turn; otherwise left unset.
 function draftTurns(r, s) {
   const turns = deriveTurns(s, r), sg = (r.segs || []).slice().sort((a, b) => a.t0 - b.t0);
-  const nodes = (r.pins || []).filter((p) => !isMarker(p)).sort((a, b) => a.t - b.t);
+  const pinsN = (r.pins || []).filter((p) => !isMarker(p)).sort((a, b) => a.t - b.t);
   const w = taskWindow(s);
   const spans = sg.map((g, i) => ({ stage: g.stage, a: g.t0, b: effEnd(sg, i) ?? w[1], g }));
-  const used = new Set();
-  const out = {};
+  const used = new Set(), out = {};
+  const ev = (o) => (o ? { shot: o.shot ?? null, boxes: o.boxes || [], focus: o.focus || "" } : {});
   for (const t of turns) {
-    // intent: overlap of each arrow stage with [S, N)
     const ov = {};
     for (const x of spans) { const o = Math.min(x.b, t.N) - Math.max(x.a, t.S); if (o > 0 && x.stage) ov[x.stage] = (ov[x.stage] || 0) + o; }
-    const len = Math.max(1, t.N - t.S), ranked = Object.entries(ov).sort((a, b) => b[1] - a[1]);
-    const top = ranked[0];
+    const len = Math.max(1, t.N - t.S), ranked = Object.entries(ov).sort((a, b) => b[1] - a[1]), top = ranked[0];
     const intent = { stage: top ? +top[0] : null, alts: ranked.slice(1).filter(([, v]) => v / len >= 0.25).map(([k]) => +k), note: "", auto: true };
     if (!top || top[1] / len < 0.5 || intent.alts.length) intent.unsure = true;
-    // node: nearest node pin around the appearance
-    const near = nodes.filter((p) => !used.has(p.id) && p.t >= t.N - 30 && p.t <= t.N + 90).sort((a, b) => Math.abs(a.t - t.N) - Math.abs(b.t - t.N))[0];
+    const near = pinsN.filter((p) => !used.has(p.id) && p.t >= t.N - 30 && p.t <= t.N + 90).sort((a, b) => Math.abs(a.t - t.N) - Math.abs(b.t - t.N))[0];
     if (near) used.add(near.id);
-    const ev = (o) => (o ? { shot: o.shot ?? null, boxes: o.boxes || [], focus: o.focus || "" } : {});
-    const node = { stage: near?.stage ?? null, led: near && byParticipant(near) ? "user" : null, note: near?.note || "", auto: true, ...ev(near), ...(near ? {} : { unsure: true }) };
-    // engagement: arrows starting in [N, E), other node pins there as participant nodes
-    const eng = [];
-    for (const x of spans) if (x.a >= t.N - 5 && x.a < t.E && x.stage && eng.at(-1)?.stage !== x.stage) eng.push({ k: "e", stage: x.stage, t: r1(x.a), note: x.g.note || "", ...ev(x.g) });
-    for (const p of nodes) if (!used.has(p.id) && p.t >= t.N && p.t < t.E) { used.add(p.id); eng.push({ k: "n", stage: p.stage, t: r1(p.t), note: p.note || "", ...ev(p) }); }
-    eng.sort((a, b) => a.t - b.t);
-    // the arrow that was already running when the artifact appeared continues into engagement
+    const edges = [];
     const running = spans.find((x) => x.a < t.N - 5 && x.b > t.N + 20);
-    if (running && eng[0]?.stage !== running.stage) eng.unshift({ k: "e", stage: running.stage, t: r1(t.N), note: "" });
-    out[t.key] = { intent, node, eng, engAuto: true, ...(eng.length ? {} : { engUnsure: true }), adj: null };
+    if (running) edges.push({ stage: running.stage, t: r1(t.N), note: "" });
+    for (const x of spans) if (x.a >= t.N - 5 && x.a < t.E && x.stage && edges.at(-1)?.stage !== x.stage) edges.push({ stage: x.stage, t: r1(x.a), note: x.g.note || "", ...ev(x.g) });
+    out[t.key] = { intent, nodes: [{ stage: near?.stage ?? null, level: null, note: near?.note || "", ...ev(near), edges, auto: true, ...(near ? {} : { unsure: true }) }], adj: null };
   }
   const first = turns[0];
-  const pre = first ? nodes.find((p) => p.stage === 13 && p.t < first.S) : null;
-  const start = pre ? { hyp: true, note: pre.note || "", auto: true } : { hyp: null, note: "" };
-  return { turns: out, start };
+  const pre = first ? pinsN.find((p) => p.stage === 13 && p.t < first.S) : null;
+  return { turns: out, start: pre ? { hyp: true, note: pre.note || "", auto: true } : { hyp: null, note: "" } };
 }
 function turnChanged(rerender = true) {
   if (rerender) { renderTurns(); renderSegPane(); }
@@ -1127,45 +1222,49 @@ $("turnboard").addEventListener("click", (e) => {
     return;
   }
   if (!state.coder) return;
-  const fl = e.target.closest("[data-flag]");
-  if (fl) {
-    const tr = turnRec(fl.closest(".tcard").dataset.key, true);
-    const o = fl.dataset.flag === "intent" ? tr.intent : fl.dataset.flag === "node" ? tr.node : tr.eng[+fl.closest(".eitem").dataset.i];
-    o.flag = !o.flag; if (!o.flag) delete o.flagNote;
-    return turnChanged();
-  }
-  const sm = e.target.closest("[data-sel]");
-  if (sm) { const it = sm.closest(".eitem"); return selectTurnItem(sm.closest(".tcard").dataset.key, sm.dataset.sel, it ? +it.dataset.i : null, true); }
   const cf = e.target.closest("[data-confirm]");
-  if (cf) {
-    if (cf.dataset.confirm === "start") { const r = mine(true); delete r.start.auto; delete r.start.unsure; }
-    else clearDraft(turnRec(cf.closest(".tcard").dataset.key, true), cf.dataset.confirm);
-    return turnChanged();
-  }
+  if (cf && cf.dataset.confirm === "start") { const r = mine(true); delete r.start.auto; delete r.start.unsure; return turnChanged(); }
   const sb = e.target.closest("[data-start]");
   if (sb) { const r = mine(true); r.start ||= { hyp: null, note: "" }; const v = sb.dataset.start === "true"; r.start.hyp = r.start.hyp === v ? null : v; delete r.start.auto; return turnChanged(); }
   const card = e.target.closest(".tcard[data-key]");
   if (!card) return;
-  const key = card.dataset.key, x = () => turnRec(key, true);
+  const key = card.dataset.key, tr = turnRec(key, true);
+  const nr = e.target.closest(".nrow"), i = nr ? +nr.dataset.n : null;
+  const ec = e.target.closest(".echip"), j = ec ? +ec.dataset.e : null;
+  const node = () => { const ns = ensureNodes(tr); while (ns.length <= i) ns.push({ stage: null, level: null, edges: [], note: "" }); return ns[i]; };
+  if (cf) { clearDraft(tr, cf.dataset.confirm, i); return turnChanged(); }
+  const fl = e.target.closest("[data-flag]");
+  if (fl) {
+    const o = fl.dataset.flag === "intent" ? tr.intent : fl.dataset.flag === "node" ? node() : node().edges[j];
+    o.flag = !o.flag; if (!o.flag) delete o.flagNote;
+    return turnChanged();
+  }
+  const sm = e.target.closest("[data-sel]");
+  if (sm) { if (i != null) node(); return selectTurnItem(key, sm.dataset.sel, i, j, true); }
   const adj = e.target.closest("[data-adj]");
-  if (adj) { const tr = x(); tr.adj = (tr.adj || 0) + +adj.dataset.adj; return turnChanged(); }
-  const led = e.target.closest("[data-led]");
-  if (led) { const tr = x(); tr.node.led = tr.node.led === led.dataset.led ? null : led.dataset.led; clearDraft(tr, "node"); return turnChanged(); }
+  if (adj) { tr.adj = (tr.adj || 0) + +adj.dataset.adj; return turnChanged(); }
   const alt = e.target.closest("[data-alt]");
-  if (alt) { const tr = x(); tr.intent.alts = tr.intent.alts.filter((a) => a !== +alt.dataset.alt); clearDraft(tr, "intent"); return turnChanged(); }
-  const add = e.target.closest("[data-add]");
-  if (add) { const tr = x(); tr.eng.push({ k: add.dataset.add, stage: null, t: null, note: "" }); clearDraft(tr, "eng"); return turnChanged(); }
-  const it = e.target.closest(".eitem");
-  if (it) {
-    const tr = x(), i = +it.dataset.i;
-    if (e.target.closest("[data-del], [data-mv]")) clearDraft(tr, "eng");
-    if (e.target.closest("[data-del]")) { tr.eng.splice(i, 1); return turnChanged(); }
-    const mv = e.target.closest("[data-mv]");
-    if (mv) { const j = i + +mv.dataset.mv; if (j >= 0 && j < tr.eng.length) [tr.eng[i], tr.eng[j]] = [tr.eng[j], tr.eng[i]]; return turnChanged(); }
-    if (e.target.closest("[data-stamp]")) {
-      const el = tr.eng[i];
-      if (el.t != null && !e.shiftKey) seek(el.t); else { el.t = r1(vid.currentTime); turnChanged(); }
-    }
+  if (alt) { tr.intent.alts = tr.intent.alts.filter((a) => a !== +alt.dataset.alt); clearDraft(tr, "intent"); return turnChanged(); }
+  const lv = e.target.closest("[data-level]");
+  if (lv) { const n = node(); n.level = n.level === lv.dataset.level ? null : lv.dataset.level; clearDraft(tr, "node", i); return turnChanged(); }
+  if (e.target.closest("[data-addnode]")) { const ns = ensureNodes(tr); if (!ns.length) ns.push({ stage: null, level: null, edges: [], note: "" }); ns.push({ stage: null, level: null, edges: [], note: "" }); return turnChanged(); }
+  if (e.target.closest("[data-delnode]")) { ensureNodes(tr).splice(i, 1); state.selTurn = null; return turnChanged(); }
+  if (e.target.closest("[data-addedge]")) { node().edges.push({ stage: null, t: null, note: "" }); clearDraft(tr, "node", i); return turnChanged(); }
+  if (e.target.closest("[data-deledge]")) { node().edges.splice(j, 1); clearDraft(tr, "node", i); state.selTurn = null; return turnChanged(); }
+  if (e.target.closest("[data-stamp]")) {
+    const ed = node().edges[j];
+    if (ed.t != null && !e.shiftKey) seek(ed.t); else { ed.t = r1(vid.currentTime); turnChanged(); }
+    return;
+  }
+  const tm = e.target.closest("[data-tomarker]");
+  if (tm) { // an older participant-led node (a hypothesis formed while engaging) → a marker at its time
+    ensureNodes(tr);
+    const it = tr.eng[+tm.dataset.tomarker], t = deriveTurns().find((x) => x.key === key);
+    const r = mine(true);
+    (r.pins ||= []).push({ id: uid(), t: it.t ?? t?.N ?? r1(vid.currentTime), stage: null, art: null, kind: it.stage === 13 ? "expressing a hypothesis" : nodeName(it.stage), note: it.note || "", shot: it.shot ?? null });
+    r.pins.sort((a, b) => a.t - b.t);
+    tr.eng.splice(+tm.dataset.tomarker, 1);
+    return changed();
   }
 });
 $("turnboard").addEventListener("change", (e) => {
@@ -1173,10 +1272,12 @@ $("turnboard").addEventListener("change", (e) => {
   const card = e.target.closest(".tcard[data-key]");
   if (!card) return;
   const tr = turnRec(card.dataset.key, true), f = e.target.dataset.f, v = e.target.value === "" ? null : +e.target.value;
+  const nr = e.target.closest(".nrow"), i = nr ? +nr.dataset.n : null, ec = e.target.closest(".echip"), j = ec ? +ec.dataset.e : null;
+  const node = () => { const ns = ensureNodes(tr); while (ns.length <= i) ns.push({ stage: null, level: null, edges: [], note: "" }); return ns[i]; };
   if (f === "intent") { tr.intent.stage = v; tr.intent.alts = tr.intent.alts.filter((a) => a !== v); clearDraft(tr, "intent"); }
   else if (f === "alt" && v) { tr.intent.alts.push(v); clearDraft(tr, "intent"); }
-  else if (f === "node") { tr.node.stage = v; clearDraft(tr, "node"); }
-  else if (f === "eng") { tr.eng[+e.target.closest(".eitem").dataset.i].stage = v; clearDraft(tr, "eng"); }
+  else if (f === "node") { node().stage = v; clearDraft(tr, "node", i); }
+  else if (f === "edge") { node().edges[j].stage = v; clearDraft(tr, "node", i); }
   else return;
   turnChanged();
 });
@@ -1188,30 +1289,31 @@ $("turnboard").addEventListener("input", (e) => {
   if (!n) return;
   const tr = turnRec(e.target.closest(".tcard").dataset.key, true);
   if (n === "intent") tr.intent.note = e.target.value;
-  else if (n === "node") tr.node.note = e.target.value;
-  else if (n === "eng") tr.eng[+e.target.closest(".eitem").dataset.i].note = e.target.value;
+  else if (n === "node") { const ns = ensureNodes(tr), i = +e.target.closest(".nrow").dataset.n; while (ns.length <= i) ns.push({ stage: null, level: null, edges: [], note: "" }); ns[i].note = e.target.value; }
   turnChanged(false);
 });
 document.querySelectorAll(".tlbar [data-mode]").forEach((b) => b.addEventListener("click", () => {
   state.mode = b.dataset.mode; lsSet("pr-mode", state.mode); state.selTurn = null;
-  if (state.mode === "turns" && state.tab === "cmp") document.querySelector('.tabs [data-tab="segs"]').click();
+  if (state.mode !== "timeline" && state.tab === "cmp") document.querySelector('.tabs [data-tab="segs"]').click();
   renderAll();
 }));
 $("csvTurns").addEventListener("click", () => {
-  const rows = [["coder", "pid", "cond", "task", "turn", "prompt_logged", "slot", "step", "kind", "stage_num", "stage", "led_by", "possible", "video_s", "note", "prompt"]];
-  for (const [k, m] of Object.entries(CODES)) for (const r of Object.values(m)) {
+  const rows = [["coder", "pid", "cond", "task", "turn", "prompt_logged", "slot", "node_idx", "edge_idx", "stage_num", "stage", "engagement", "possible", "video_s", "flag", "note", "prompt"]];
+  for (const m of Object.values(CODES)) for (const r of Object.values(m)) {
     if (!Object.keys(r.turns || {}).length && r.start?.hyp == null) continue;
     const s = D.sessions.find((x) => x.pid === r.pid && x.task === r.task);
     const turns = s ? deriveTurns(s, r) : [];
     const cond = s?.cond || COND[r.pid[0]] || "";
-    if (r.start?.hyp != null) rows.push([r.coder, r.pid, cond, r.task, 0, "", "start", 0, r.start.hyp ? "node" : "", r.start.hyp ? 13 : "", r.start.hyp ? "Hypothesis" : "(none)", r.start.hyp ? "participant" : "", "", "", r.start.note, ""]);
+    if (r.start?.hyp != null) rows.push([r.coder, r.pid, cond, r.task, 0, "", "start", "", "", r.start.hyp ? 13 : "", r.start.hyp ? "Hypothesis" : "(none)", "", "", "", "", r.start.note, ""]);
     for (const t of turns) {
       const x = r.turns?.[t.key];
       if (!x) continue;
       const base = [r.coder, r.pid, cond, r.task, t.k, t.key];
-      rows.push([...base, "intent", 0, "edge", x.intent.stage ?? "", ST[x.intent.stage]?.name ?? "", "", (x.intent.alts || []).join(" "), Math.round(t.S), x.intent.note, t.prompt]);
-      rows.push([...base, "node", 0, "node", x.node.stage ?? "", ST[x.node.stage]?.name ?? "", x.node.led ?? "", "", Math.round(t.N), x.node.note, ""]);
-      (x.eng || []).forEach((e, i) => rows.push([...base, "engagement", i + 1, e.k === "n" ? "node" : "edge", e.stage ?? "", ST[e.stage]?.name ?? "", e.k === "n" ? "participant" : "", "", e.t ?? "", e.note, ""]));
+      rows.push([...base, "intent", "", "", x.intent.stage ?? "", ST[x.intent.stage]?.name ?? "", "", (x.intent.alts || []).join(" "), Math.round(t.S), x.intent.flag ? x.intent.flagNote || 1 : "", x.intent.note, t.prompt]);
+      getNodes(x).forEach((n, i) => {
+        rows.push([...base, "node", i + 1, "", n.stage ?? "", ST[n.stage]?.name ?? "", n.level ? levelShort[n.level] : "", "", Math.round(t.N), n.flag ? n.flagNote || 1 : "", n.note, ""]);
+        (n.edges || []).forEach((e, j) => rows.push([...base, "edge", i + 1, j + 1, e.stage ?? "", ST[e.stage]?.name ?? "", "", "", e.t ?? "", e.flag ? e.flagNote || 1 : "", e.note, ""]));
+      });
     }
   }
   const cell = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
@@ -1600,6 +1702,8 @@ function deleteSel() {
 function changed() {
   renderTimeline(); renderSeq(); renderPlot(); renderSegPane(); renderSide(); renderCompare();
   if (state.mode === "turns") renderTurns();
+  renderMarkBoard();
+  renderV2();
   save();
 }
 let saveT = null;
@@ -1739,19 +1843,22 @@ function turnSel() {
   if (!st || state.mode !== "turns") return null;
   const t = deriveTurns().find((x) => x.key === st.key), tr = turnRec(st.key);
   if (!t || !tr) return null;
-  const o = st.slot === "intent" ? tr.intent : st.slot === "node" ? tr.node : tr.eng[st.i];
+  const n = st.slot === "intent" ? null : getNodes(tr)[st.i];
+  const o = st.slot === "intent" ? tr.intent : st.slot === "node" ? n : n?.edges?.[st.j];
   if (!o) return null;
   const at = st.slot === "intent" ? t.S : st.slot === "node" ? t.N : o.t ?? t.N;
-  const label = `Turn ${t.k} · ${st.slot === "intent" ? "① intent" : st.slot === "node" ? "② node" : `③ step ${st.i + 1}`}: ${o.stage ? `${o.stage} ${ST[o.stage].name}` : "(no code yet)"}`;
+  const what = st.slot === "intent" ? "① intent" : st.slot === "node" ? `② node ${st.i + 1}` : `② node ${st.i + 1} · edge ${st.j + 1}`;
+  const label = `Turn ${t.k} · ${what}: ${o.stage ? `${o.stage} ${ST[o.stage].name}` : "(no code yet)"}`;
   // non-enumerable, so never saved: the default screenshot time and the editor's title
   Object.defineProperty(o, "__t", { value: at, configurable: true, enumerable: false });
   Object.defineProperty(o, "__label", { value: label, configurable: true, enumerable: false });
   return { t, tr, o, at, label };
 }
-function selectTurnItem(key, slot, i, doSeek) {
+function selectTurnItem(key, slot, i, j, doSeek) {
   if (!state.coder) return;
-  turnRec(key, true);
-  state.selTurn = { key, slot, i: i ?? null };
+  const tr = turnRec(key, true);
+  if (slot !== "intent") ensureNodes(tr);
+  state.selTurn = { key, slot, i: i ?? null, j: j ?? null };
   const sel = turnSel();
   if (doSeek && sel) seek(sel.o.shot ?? sel.at);
   if (state.tab !== "segs") document.querySelector('.tabs [data-tab="segs"]').click();
@@ -1769,10 +1876,10 @@ function turnPaneHtml() {
       ${shotHtml(o)}${shotButtons(o)}${focusRow(o, "eFocus")}
       <textarea id="tNote" rows="3" placeholder="Evidence for this code (what they said / did)">${esc(o.note || "")}</textarea>
     </div>`;
-  } else if (state.coder) h += '<div class="muted" style="font-size:12px;margin:10px 0 4px">Click a code below (or a slot title on the left) to add a screenshot, focus boxes, a note or a 🚩 flag.</div>';
-  const row = (key, slot, i, o, at, label, c) => {
-    const on = state.selTurn && state.selTurn.key === key && state.selTurn.slot === slot && (slot !== "eng" || state.selTurn.i === i);
-    return `<div class="srow${on ? " sel" : ""}" data-tkey="${esc(key)}" data-tslot="${slot}"${i != null ? ` data-ti="${i}"` : ""}><img data-t="${o.shot ?? at + 0.5}" alt="" />
+  } else if (state.coder) h += '<div class="muted" style="font-size:12px;margin:10px 0 4px">Click a code below (or ● / → on the left) to add a screenshot, focus boxes, a note or a 🚩 flag.</div>';
+  const row = (key, slot, i, j, o, at, label, c) => {
+    const q = state.selTurn, on = q && q.key === key && q.slot === slot && (i == null || q.i === i) && (j == null || q.j === j);
+    return `<div class="srow${on ? " sel" : ""}" data-tkey="${esc(key)}" data-tslot="${slot}"${i != null ? ` data-ti="${i}"` : ""}${j != null ? ` data-tj="${j}"` : ""}><img data-t="${o.shot ?? at + 0.5}" alt="" />
       <div style="min-width:0"><div class="st" style="--c:${c}"><i>${o.stage ?? "?"}</i>${esc(label)}${o.flag ? ' <span class="flg" title="' + esc(o.flagNote || "flagged") + '">🚩</span>' : ""}</div>
       <div class="tm">${fmt(at)}${o.note ? ` · <span class="muted">${esc(o.note.slice(0, 50))}</span>` : ""}</div>${focusLine(o)}</div></div>`;
   };
@@ -1781,16 +1888,18 @@ function turnPaneHtml() {
     const x = r?.turns?.[t.key];
     if (!x) continue;
     h += `<div class="srow tsep-row">Turn ${t.k}</div>`;
-    if (x.intent.stage || x.intent.note || x.intent.flag) h += row(t.key, "intent", null, x.intent, t.S, `① ${x.intent.stage ? ST[x.intent.stage].name : "intent"}`, ST[x.intent.stage]?.c || "#999");
-    if (x.node.stage || x.node.note || x.node.flag) h += row(t.key, "node", null, x.node, t.N, `② ${x.node.stage ? turnNodeLabel(t, x) : "node"}`, ST[x.node.stage]?.c || "#999");
-    (x.eng || []).forEach((e, i) => { h += row(t.key, "eng", i, e, e.t ?? t.N, `③ ${e.stage ? (e.k === "n" ? nodeName(e.stage) + " (participant)" : ST[e.stage].name) : e.k === "n" ? "node" : "edge"}`, ST[e.stage]?.c || "#999"); });
+    if (x.intent.stage || x.intent.note || x.intent.flag) h += row(t.key, "intent", null, null, x.intent, t.S, `① ${x.intent.stage ? ST[x.intent.stage].name : "intent"}`, ST[x.intent.stage]?.c || "#999");
+    getNodes(x).forEach((n, i) => {
+      h += row(t.key, "node", i, null, n, t.N, `② ${n.stage ? turnNodeLabel(t, n) : "node"}`, ST[n.stage]?.c || "#999");
+      (n.edges || []).forEach((e, j) => { h += row(t.key, "edge", i, j, e, e.t ?? t.N, `   → ${e.stage ? ST[e.stage].name : "edge"}`, ST[e.stage]?.c || "#999"); });
+    });
   }
   return h + "</div>";
 }
 $("pSegs").addEventListener("click", (e) => {
   if (state.mode !== "turns") return;
   const row = e.target.closest("[data-tkey]");
-  if (row) return selectTurnItem(row.dataset.tkey, row.dataset.tslot, row.dataset.ti != null ? +row.dataset.ti : null, true);
+  if (row) return selectTurnItem(row.dataset.tkey, row.dataset.tslot, row.dataset.ti != null ? +row.dataset.ti : null, row.dataset.tj != null ? +row.dataset.tj : null, true);
   const sel = turnSel();
   if (e.target.id === "tDesel") { state.selTurn = null; renderSegPane(); renderTurns(); return; }
   if (!sel) return;
@@ -1836,17 +1945,240 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#figz")) $("figz").classList.remove("open");
 });
 
+// ---- turns v2: per turn ① intent (top edge + note + inspiring node) · artifact nodes · engagement per
+// node (skimmed / read / ignored), plus any number of hypothesis rows linked to the turn.
+// Stored per coder in r.v2[turnKey]; until a coder edits a turn it is pre-filled (grey) from their turns coding.
+const V2_EDGES = [3, 6, 9, 12, 15].map((n) => ST[n]);   // the "top" (going back) edges
+const V2_ENG = [["skimmed", "skimmed"], ["read", "read"], ["ignored", "ignored"]];
+const H_OPTS = [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4+"]];
+const H_ART = [["confirm", "yes – confirm"], ["counter", "yes – counter"], ["no", "no"], ["narrows", "narrows"]];
+const H_ENG = [["changed", "changed"], ["narrowed", "narrowed"], ["expanded", "expanded"], ["nochange", "no change"]];
+const LEVEL_TO_V2 = { deep: "read", skim: "skimmed", none: "ignored" };
+function v2Draft(r, key) {
+  const x = r?.turns?.[key];
+  if (!x) return null;
+  const st = x.intent?.stage;
+  const ok = V2_EDGES.some((e) => e.n === st);
+  return { auto: true, intent: { stage: ok ? st : null, note: x.intent?.note || "", inspired: null, ...(st && !ok ? { was: st } : {}) },
+    nodes: getNodes(x).filter((n) => n.stage).map((n) => ({ stage: n.stage, eng: LEVEL_TO_V2[n.level] || null })), hyps: [] };
+}
+const v2Of = (r, key) => r?.v2?.[key] || v2Draft(r, key) || { intent: { stage: null, note: "", inspired: null }, nodes: [], hyps: [] };
+function v2Rec(key) {   // editable record (materializes the draft on first edit)
+  const r = mine(true);
+  r.v2 ||= {};
+  if (!r.v2[key]) { const d = JSON.parse(JSON.stringify(v2Of(r, key))); delete d.auto; r.v2[key] = d; }
+  return r.v2[key];
+}
+const chips = (list, cur, attr, dis) => `<span class="chips">${list.map(([v, l]) => `<button data-${attr}="${v}" class="${v.replace(/\s/g, "")}${cur === v ? " on" : ""}"${dis}>${l}</button>`).join("")}</span>`;
+function renderV2() {
+  const b = $("v2board");
+  if (state.mode !== "v2" || !D || !state.pid) { b.innerHTML = ""; return; }
+  const turns = deriveTurns(), r = mine(), y = b.scrollTop, dis = !state.coder ? " disabled" : "";
+  const others = state.compare ? Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([c, o]) => c !== state.coder && (Object.keys(o.v2 || {}).length || Object.keys(o.turns || {}).length)) : [];
+  const opts = (list, cur, ph) => `<option value="">${ph}</option>` + list.map((x) => `<option value="${x.n}"${cur === x.n ? " selected" : ""}>${x.n} · ${esc(x.name)}</option>`).join("");
+  let h = "";
+  if (!turns.length) h += '<div class="empty">No prompts logged for this session (or the recording isn\'t synced yet — Events & sync tab).</div>';
+  if (!state.coder) h += '<div class="banner">Enter your coder name in the header to code.</div>';
+  // compare summary
+  for (const [c, o] of others) {
+    const both = turns.filter((t) => r && (r.v2?.[t.key] || r.turns?.[t.key]) && (o.v2?.[t.key] || o.turns?.[t.key]));
+    const A = (t) => v2Of(r, t.key), B = (t) => v2Of(o, t.key);
+    const pc = (xs) => (xs.length ? Math.round((100 * xs.filter(Boolean).length) / xs.length) + "%" : "—");
+    const intent = both.filter((t) => A(t).intent.stage || B(t).intent.stage).map((t) => A(t).intent.stage === B(t).intent.stage);
+    const jac = both.map((t) => { const a = new Set(A(t).nodes.map((n) => n.stage)), bb = new Set(B(t).nodes.map((n) => n.stage)), u = new Set([...a, ...bb]); return u.size ? [...a].filter((v) => bb.has(v)).length / u.size : 1; });
+    const eng = []; for (const t of both) for (const n of A(t).nodes) { const m = B(t).nodes.find((z) => z.stage === n.stage); if (m && n.eng && m.eng) eng.push(n.eng === m.eng); }
+    const hc = both.map((t) => A(t).hyps.length === B(t).hyps.length);
+    h += `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${esc(state.coder)} vs ${esc(c)}</b>${both.length} turns both coded</div>
+      <div><b>${pc(intent)}</b>same intent edge</div><div><b>${jac.length ? Math.round((100 * jac.reduce((a, v) => a + v, 0)) / jac.length) + "%" : "—"}</b>node overlap</div>
+      <div><b>${pc(eng)}</b>same engagement</div><div><b>${pc(hc)}</b>same # hypotheses</div></div>`;
+  }
+  turns.forEach((t, ti) => {
+    const v = v2Of(r, t.key), auto = !!v.auto && !r?.v2?.[t.key];
+    const nodes = v.nodes.length ? v.nodes : [{ stage: null, eng: null }];
+    h += `<div class="tcard" data-key="${esc(t.key)}">
+      <div class="th"><b>Turn ${t.k}</b><span class="tm" style="font:11px ui-monospace,Menlo,monospace;color:var(--muted)">${fmt(t.S)}</span>
+        <span class="pr-text" title="click to expand">“${esc(t.prompt || "")}”</span>${auto ? ' <span class="draft" title="Pre-filled from your turns coding — editing confirms it">draft</span>' : ""}</div>
+      <div class="v2grid v2row1${auto ? " auto" : ""}">
+        <div><div class="v2head">① Intent <button class="play" data-a="${t.S}" data-b="${t.N}">▶ ${fmt(t.S)}–${fmt(t.N)}</button></div>
+          <select data-v="istage"${dis} style="width:100%;font-size:12px;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:#fff">${opts(V2_EDGES, v.intent.stage, "edge…")}</select>
+          ${v.intent.was ? `<div class="sub muted" style="font-size:10.5px">was coded ${v.intent.was} ${esc(ST[v.intent.was].name)} (not a top edge)</div>` : ""}
+          <input class="nt" data-v="inote" placeholder="note (optional)" value="${esc(v.intent.note || "")}"${dis} />
+          <div class="sub" style="font-size:10.5px;color:var(--muted);margin-top:4px">inspired by (optional)</div>
+          <select data-v="inspired"${dis} style="width:100%;font-size:11.5px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:#fff">${opts(NODE_STAGES, v.intent.inspired, "— node —")}</select></div>
+        <div class="v2nodes">
+          <div><div class="v2head">${esc(srcName(t)[0].toUpperCase() + srcName(t).slice(1))} · nodes <button class="play" data-a="${t.N}" data-b="${t.E}">▶ ${fmt(t.N)}–${fmt(t.E)}</button></div>
+            ${nodes.map((n, i) => `<div class="v2n" data-n="${i}"><select data-v="nstage"${dis}>${opts(NODE_STAGES, n.stage, "node…")}</select>${v.nodes.length > 1 ? `<button class="x" data-v2del${dis} style="border:0;background:none;cursor:pointer;color:var(--muted)">×</button>` : ""}</div>`).join("")}
+            <button class="addnode" data-v2addnode${dis}>+ node</button></div>
+          <div><div class="v2head">Engagement</div>
+            ${nodes.map((n, i) => `<div class="v2eng" data-n="${i}">${chips(V2_ENG, n.eng, "eng", dis)}</div>`).join("")}</div>
+        </div>
+      </div>
+      <div class="hyps">
+        <div class="hh">Hypotheses · ${v.hyps.length}<button class="addhyp" data-addhyp${dis}>+ hypothesis</button></div>
+        ${v.hyps.map((hy, j) => `<div class="v2grid hrow" data-h="${j}">
+          <div><div class="v2head">Intent <button class="x" data-delhyp${dis} style="margin-left:auto;border:0;background:none;cursor:pointer;color:var(--muted)" title="remove">×</button></div>
+            <div class="sub">hypothesis?</div>${chips([["yes", "yes"], ["no", "no"]], hy.has, "has", dis)}
+            <div class="sub">how many options?</div>${chips(H_OPTS, hy.options, "hopts", dis)}
+            <input class="lbl" data-v="hlabel" placeholder="label (optional, e.g. Hampden)" value="${esc(hy.label || "")}"${dis} /></div>
+          <div><div class="v2head">Artifact</div>${chips(H_ART, hy.art, "hart", dis)}</div>
+          <div><div class="v2head">Engagement</div>${chips(H_ENG, hy.eng, "heng", dis)}</div></div>`).join("")}
+      </div>
+      ${others.map(([c, o]) => { const ov = v2Of(o, t.key);
+        return `<div class="tcmp"><b style="font-size:11px;color:var(--muted)">${esc(c)}</b>
+          <span class="${ov.intent.stage === v.intent.stage ? "ok" : "no"}">${ov.intent.stage ? `${ov.intent.stage} ${esc(ST[ov.intent.stage].name)}` : "—"}</span> ·
+          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); return `<span class="${m && m.eng === n.eng ? "ok" : "no"}">●${n.stage ?? "?"} ${n.eng || ""}</span>`; }).join(" ") || "—"} ·
+          ${ov.hyps.length} hypothes${ov.hyps.length === 1 ? "is" : "es"}${ov.hyps.length ? ": " + ov.hyps.map((hy) => `[${hy.has || "?"} · ${hy.options === "4" ? "4+" : hy.options || "?"} · ${hy.art || "?"} · ${hy.eng || "?"}]`).join(" ") : ""}</div>`; }).join("")}
+      ${turns[ti + 1] ? `<div class="flowto">↓ into Turn ${turns[ti + 1].k} intent</div>` : ""}
+    </div>`;
+  });
+  b.innerHTML = h;
+  b.scrollTop = y;
+}
+$("v2board").addEventListener("click", (e) => {
+  const pl = e.target.closest(".play");
+  if (pl) { if (pl.classList.contains("on")) { vid.pause(); clipEnd = null; renderTurnsPlaying(); } else playClip(+pl.dataset.a, +pl.dataset.b); return; }
+  const pt = e.target.closest(".pr-text");
+  if (pt) { pt.classList.toggle("open"); return; }
+  if (!state.coder) return;
+  const card = e.target.closest(".tcard[data-key]");
+  if (!card) return;
+  const v = v2Rec(card.dataset.key);
+  const ni = e.target.closest("[data-n]") ? +e.target.closest("[data-n]").dataset.n : null;
+  const hj = e.target.closest("[data-h]") ? +e.target.closest("[data-h]").dataset.h : null;
+  const node = () => { while (v.nodes.length <= ni) v.nodes.push({ stage: null, eng: null }); return v.nodes[ni]; };
+  const tog = (o, k, val) => { o[k] = o[k] === val ? null : val; };
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.eng) tog(node(), "eng", b.dataset.eng);
+  else if (b.hasAttribute("data-v2addnode")) { if (!v.nodes.length) v.nodes.push({ stage: null, eng: null }); v.nodes.push({ stage: null, eng: null }); }
+  else if (b.hasAttribute("data-v2del")) v.nodes.splice(ni, 1);
+  else if (b.hasAttribute("data-addhyp")) v.hyps.push({ has: null, options: null, art: null, eng: null, label: "" });
+  else if (b.hasAttribute("data-delhyp")) v.hyps.splice(hj, 1);
+  else if (b.dataset.has) tog(v.hyps[hj], "has", b.dataset.has);
+  else if (b.dataset.hopts) tog(v.hyps[hj], "options", b.dataset.hopts);
+  else if (b.dataset.hart) tog(v.hyps[hj], "art", b.dataset.hart);
+  else if (b.dataset.heng) tog(v.hyps[hj], "eng", b.dataset.heng);
+  else return;
+  changed();
+});
+$("v2board").addEventListener("change", (e) => {
+  if (!state.coder) return;
+  const card = e.target.closest(".tcard[data-key]"), f = e.target.dataset.v;
+  if (!card || !f) return;
+  const v = v2Rec(card.dataset.key), val = e.target.value === "" ? null : +e.target.value;
+  if (f === "istage") { v.intent.stage = val; delete v.intent.was; }
+  else if (f === "inspired") v.intent.inspired = val;
+  else if (f === "nstage") { const i = +e.target.closest("[data-n]").dataset.n; while (v.nodes.length <= i) v.nodes.push({ stage: null, eng: null }); v.nodes[i].stage = val; }
+  else return;
+  changed();
+});
+$("v2board").addEventListener("input", (e) => {
+  if (!state.coder) return;
+  const card = e.target.closest(".tcard[data-key]"), f = e.target.dataset.v;
+  if (!card || (f !== "inote" && f !== "hlabel")) return;
+  const v = v2Rec(card.dataset.key);
+  if (f === "inote") v.intent.note = e.target.value;
+  else v.hyps[+e.target.closest("[data-h]").dataset.h].label = e.target.value;
+  save();
+});
+$("csvV2").addEventListener("click", () => {
+  const rows = [["coder", "pid", "cond", "task", "turn", "prompt_logged", "row", "idx", "intent_edge", "intent_inspired_by", "node", "engagement", "hyp_has", "hyp_options", "hyp_artifact", "hyp_engagement", "label_or_note", "draft"]];
+  for (const m of Object.values(CODES)) for (const r of Object.values(m)) {
+    if (!Object.keys(r.v2 || {}).length && !Object.keys(r.turns || {}).length) continue;
+    const s2 = D.sessions.find((x) => x.pid === r.pid && x.task === r.task);
+    const cond = s2?.cond || COND[r.pid[0]] || "";
+    for (const t of s2 ? deriveTurns(s2, r) : []) {
+      if (!r.v2?.[t.key] && !r.turns?.[t.key]) continue;
+      const v = v2Of(r, t.key), base = [r.coder, r.pid, cond, r.task, t.k, t.key], dr = r.v2?.[t.key] ? "" : "draft";
+      rows.push([...base, "intent", "", v.intent.stage ?? "", v.intent.inspired ?? "", "", "", "", "", "", "", v.intent.note, dr]);
+      v.nodes.forEach((n, i) => rows.push([...base, "node", i + 1, "", "", n.stage ?? "", n.eng ?? "", "", "", "", "", "", dr]));
+      v.hyps.forEach((hy, j) => rows.push([...base, "hypothesis", j + 1, "", "", "", "", hy.has ?? "", hy.options === "4" ? "4+" : hy.options ?? "", hy.art ?? "", hy.eng ?? "", hy.label, dr]));
+    }
+  }
+  const cell = (x) => { const t2 = String(x ?? ""); return /[",\n]/.test(t2) ? '"' + t2.replace(/"/g, '""') + '"' : t2; };
+  const url = URL.createObjectURL(new Blob([rows.map((x) => x.map(cell).join(",")).join("\n")], { type: "text/csv" }));
+  Object.assign(document.createElement("a"), { href: url, download: `process-turns-v2-${new Date().toISOString().slice(0, 10)}.csv` }).click();
+  URL.revokeObjectURL(url);
+});
+
+// ---- markers view: the marker analysis (starting hypothesis + markers, turn by turn) ----
+// Markers are moments independent of the turn coding; the turns here only give context.
+function renderMarkBoard() {
+  const b = $("markboard");
+  if (state.mode !== "markers" || !D || !state.pid) { b.innerHTML = ""; return; }
+  const turns = deriveTurns(), r = mine(), y = b.scrollTop, dis = !state.coder ? " disabled" : "";
+  const ms = (r?.pins || []).filter(isMarker).sort((a, b2) => a.t - b2.t);
+  const others = state.compare ? Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([c, o]) => c !== state.coder && ((o.pins || []).some(isMarker) || o.start?.hyp != null)) : [];
+  const counts = {};
+  for (const m of ms) counts[m.kind] = (counts[m.kind] || 0) + 1;
+  let h = "";
+  if (!state.coder) h += '<div class="banner">Enter your coder name in the header to tag markers.</div>';
+  const st = r?.start || {};
+  h += `<div class="tcard"><div class="startc"><b>Start</b><span class="muted">Did they come in with a hypothesis?</span>
+    ${draftBadge(st, "start")}<span class="led" style="margin:0">${[[true, "yes"], [false, "no"]].map(([v, l]) => `<button data-start="${v}"${dis} class="${st.hyp === v ? "on" : ""}">${l}</button>`).join("")}</span>
+    <input class="nt" data-startnote style="flex:1;margin:0;min-width:160px" placeholder="evidence (e.g. what they said before the first prompt)" value="${esc(st.note || "")}"${dis} />
+    ${others.map(([c, o]) => `<span class="${o.start?.hyp === st.hyp ? "ok" : "no"}" style="font-size:11px">${esc(c)}: ${o.start?.hyp == null ? "—" : o.start.hyp ? "yes" : "no"}</span>`).join("")}</div></div>`;
+  h += `<div class="mkbtns"><span class="muted" style="font-size:11px;align-self:center">Tag at the playhead (${fmt(vid.currentTime || 0)}):</span>
+    ${MARKS.map(([m, k]) => `<button class="pinb" data-mk="${esc(m)}"${dis} title="key ${k.toUpperCase()}"><i>${k.toUpperCase()}</i>${esc(m)}${counts[m] ? ` <span class="muted">${counts[m]}</span>` : ""}</button>`).join("")}
+    <button class="pinb" data-mk="other"${dis} title="name it in the list"><i>+</i>other</button></div>`;
+  // markers grouped by turn: before the first turn, then each turn's window
+  const groups = [{ label: "Before turn 1", a: -Infinity, b: turns[0]?.S ?? Infinity }, ...turns.map((t, i) => ({ label: `Turn ${t.k}`, t, a: t.S, b: turns[i + 1]?.S ?? Infinity }))];
+  const match = (m, list) => list.some((x) => x.kind === m.kind && Math.abs(x.t - m.t) <= 20);
+  for (const g of groups) {
+    const mine2 = ms.filter((m) => m.t >= g.a && m.t < g.b);
+    const oth = others.map(([c, o]) => [c, (o.pins || []).filter((m) => isMarker(m) && m.t >= g.a && m.t < g.b)]);
+    if (!g.t && !mine2.length && !oth.some(([, l]) => l.length)) continue;
+    h += `<div class="tcard"><div class="th"><b>${g.label}</b>${g.t ? `<span class="tm" style="font:11px ui-monospace,Menlo,monospace;color:var(--muted)">${fmt(g.t.S)}</span><span class="pr-text" title="click to expand">“${esc(g.t.prompt || "")}”</span>` : ""}</div>
+      <div style="padding:4px 8px 6px">${mine2.map((m) => `<div class="mkrow2${m.id === state.selPin ? " sel" : ""}" data-id="${m.id}">
+        <span class="tm" data-go title="jump there">${fmt(m.t)}</span>
+        <input data-kind list="mkKinds" value="${esc(m.kind)}"${dis} />
+        <button data-del title="delete"${dis}>🗑</button>
+        <input class="note" data-mnote placeholder="note (what they said)" value="${esc(m.note || "")}"${dis} />
+        ${others.length ? `<span class="${others.some(([, o]) => match(m, (o.pins || []).filter(isMarker))) ? "ok" : "no"}" style="grid-column:1/4;font-size:10.5px">${others.some(([, o]) => match(m, (o.pins || []).filter(isMarker))) ? "✓ also tagged by another coder (±20 s)" : "only you"}</span>` : ""}</div>`).join("") || '<div class="muted" style="font-size:12px;padding:2px 4px">no markers</div>'}
+        ${oth.filter(([, l]) => l.length).map(([c, l]) => `<div class="tcmp" style="margin:4px -8px -6px"><b style="font-size:11px;color:var(--muted)">${esc(c)}</b> ${l.map((m) => `<span class="pinchip${match(m, mine2) ? "" : " diff"}" title="${esc(m.note || "")}">${esc(m.kind)} <small>${fmt(m.t)}</small></span>`).join(" ")}</div>`).join("")}</div></div>`;
+  }
+  h += `<datalist id="mkKinds">${MARKS.map(([m]) => `<option value="${esc(m)}">`).join("")}</datalist>`;
+  b.innerHTML = h;
+  b.scrollTop = y;
+}
+$("markboard").addEventListener("click", (e) => {
+  const pt = e.target.closest(".pr-text");
+  if (pt) { pt.classList.toggle("open"); return; }
+  if (!state.coder) return;
+  const cf = e.target.closest('[data-confirm="start"]');
+  if (cf) { const r = mine(true); delete r.start.auto; delete r.start.unsure; return changed(); }
+  const sb = e.target.closest("[data-start]");
+  if (sb) { const r = mine(true); r.start ||= { hyp: null, note: "" }; const v = sb.dataset.start === "true"; r.start.hyp = r.start.hyp === v ? null : v; delete r.start.auto; return changed(); }
+  const mb = e.target.closest("[data-mk]");
+  if (mb) { addPin(mb.dataset.mk); if (mb.dataset.mk === "other") setTimeout(() => $("markboard").querySelector(`.mkrow2[data-id="${state.selPin}"] [data-kind]`)?.select(), 0); return; }
+  const row = e.target.closest(".mkrow2");
+  const m = row && pins().find((x) => x.id === row.dataset.id);
+  if (!m) return;
+  if (e.target.closest("[data-go]")) { state.selPin = m.id; seek(m.t); renderMarkBoard(); renderTimeline(); return; }
+  if (e.target.closest("[data-del]")) { const r = mine(); r.pins = r.pins.filter((x) => x.id !== m.id); changed(); }
+});
+$("markboard").addEventListener("change", (e) => {
+  const m = pins().find((x) => x.id === e.target.closest(".mkrow2")?.dataset.id);
+  if (m && e.target.matches("[data-kind]") && e.target.value.trim()) { m.kind = e.target.value.trim().toLowerCase(); changed(); }
+});
+$("markboard").addEventListener("input", (e) => {
+  if (!state.coder) return;
+  if (e.target.matches("[data-startnote]")) { const r = mine(true); r.start ||= { hyp: null, note: "" }; r.start.note = e.target.value; return save(); }
+  const m = pins().find((x) => x.id === e.target.closest(".mkrow2")?.dataset.id);
+  if (m && e.target.matches("[data-mnote]")) { m.note = e.target.value; save(); }
+});
+
 // ---- right panel: session + segment editor + segment list ----
 function renderSegPane() {
   const p = $("pSegs");
-  $("tabSegs").textContent = state.mode === "turns" ? "Turns" : "Segments";
+  $("tabSegs").textContent = state.mode !== "timeline" ? "Turns" : "Segments";
   if (!D || !state.pid) { p.innerHTML = `<div class="empty">Pick a session on the left.</div>` + helpHtml() + figureHtml(); return; }
   const s = cur(), r = mine();
   let h = `<div class="sess"><div class="top"><b>${esc(state.pid)}</b><span class="pill ${esc(s?.cond)}">${esc(s?.cond)}</span><span class="pill">${esc(TASK_SHORT[state.task] || state.task)}</span><span id="saved"></span></div>`;
   if (!state.coder) h += `<div class="banner" style="margin:8px 0 0">Enter your <b>coder</b> name at the top to annotate. Each coder's annotations are saved separately.</div></div>`;
   else h += `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;font-size:12px"><span class="muted">Session</span><select id="sLabel">${LABELS.map(([k, l]) => `<option value="${k}"${(r?.label || "") === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
     <textarea id="sNote" rows="2" placeholder="Session memo (e.g. narrowing factor, overall pattern)…">${esc(r?.note || "")}</textarea></div>`;
-  if (state.mode === "turns") { p.innerHTML = h + turnPaneHtml() + figureHtml(); fillThumbs(p); return; }
+  if (state.mode !== "timeline") { p.innerHTML = h + turnPaneHtml() + figureHtml(); fillThumbs(p); return; }
   const list = segs(), g = list.find((x) => x.id === state.sel), pn = pins().find((x) => x.id === state.selPin);
   const arts = cur()?.artifacts || [];
   const artSel = (id, cur) => `<select id="${id}"><option value="">— none</option>${arts.map((a) => `<option value="${a.seq}"${cur === a.seq ? " selected" : ""}>artifact ${a.seq}${a.title ? " · " + esc(a.title.slice(0, 40)) : ""}</option>`).join("")}</select>`;
@@ -2222,7 +2554,7 @@ document.addEventListener("keydown", (e) => {
   if (e.target.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
   if (!D || !state.pid) return;
   const k = e.code === "BracketRight" ? "]" : e.code === "BracketLeft" ? "[" : e.key;
-  if (state.mode === "turns" && (/^\d$/.test(k) || ["[", "]", "ArrowUp", "ArrowDown", "Backspace", "Delete"].includes(k))) {
+  if (state.mode !== "timeline" && (/^\d$/.test(k) || ["[", "]", "ArrowUp", "ArrowDown", "Backspace", "Delete"].includes(k))) {
     if (k === "Backspace" || k === "Delete") { if (state.selPin) { e.preventDefault(); deleteSel(); } }
     return;
   }

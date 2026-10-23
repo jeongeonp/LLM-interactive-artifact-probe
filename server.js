@@ -731,6 +731,12 @@ function cleanTurns(obj) {
       intent: { stage: st(x.intent?.stage), alts: (Array.isArray(x.intent?.alts) ? x.intent.alts : []).map(st).filter(Boolean).slice(0, 6), note: String(x.intent?.note ?? "").slice(0, 2000), ...flags(x.intent), ...evid(x.intent) },
       node: { stage: st(x.node?.stage), led: ["user", "artifact", "ai"].includes(x.node?.led) ? x.node.led : null, note: String(x.node?.note ?? "").slice(0, 2000), ...flags(x.node), ...evid(x.node) },
       eng: (Array.isArray(x.eng) ? x.eng : []).slice(0, 60).map((e) => ({ k: e?.k === "n" ? "n" : "e", stage: st(e?.stage), t: num(e?.t), note: String(e?.note ?? "").slice(0, 2000), ...evid(e) })),
+      // current format: the nodes the artifact/reply represents, each with engagement level + edges
+      ...(Array.isArray(x.nodes) ? { nodes: x.nodes.slice(0, 12).map((n) => ({
+        stage: st(n?.stage), level: ["deep", "skim", "none"].includes(n?.level) ? n.level : null,
+        note: String(n?.note ?? "").slice(0, 2000), ...flags(n), ...evid(n),
+        edges: (Array.isArray(n?.edges) ? n.edges : []).slice(0, 30).map((e) => ({ stage: st(e?.stage), t: num(e?.t), note: String(e?.note ?? "").slice(0, 2000), ...evid(e) })),
+      })) } : {}),
       ...(x.engAuto ? { engAuto: true } : {}), ...(x.engUnsure ? { engUnsure: true } : {}),
       adj: num(x.adj),
     };
@@ -787,7 +793,20 @@ app.post("/api/process-codes", safe(async (req, res) => {
   // starting point: did they come in with a hypothesis (true → a participant 13 opens the sequence)
   const startIn = b.start && typeof b.start === "object" ? b.start : b.turns ? {} : (await getProcessCode(`${b.coder}__${b.pid}__${b.task}`))?.start || {};
   const start = cleanStart(startIn);
-  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, turns, start, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
+  // turns v2 (intent top edge · nodes + engagement · hypothesis rows), keyed by turn; kept when an older page omits it
+  const v2In = b.v2 && typeof b.v2 === "object" ? b.v2 : (await getProcessCode(`${b.coder}__${b.pid}__${b.task}`))?.v2 || {};
+  const pick = (v, ok) => (ok.includes(v) ? v : null);
+  const v2 = {};
+  for (const [k, x] of Object.entries(v2In).slice(0, 300)) {
+    if (!x || typeof x !== "object") continue;
+    v2[String(k).slice(0, 40)] = {
+      intent: { stage: [3, 6, 9, 12, 15].includes(+x.intent?.stage) ? +x.intent.stage : null, note: String(x.intent?.note ?? "").slice(0, 2000), inspired: st(x.intent?.inspired) },
+      nodes: (Array.isArray(x.nodes) ? x.nodes : []).slice(0, 12).map((n) => ({ stage: st(n?.stage), eng: pick(n?.eng, ["skimmed", "read", "ignored"]) })),
+      hyps: (Array.isArray(x.hyps) ? x.hyps : []).slice(0, 30).map((h) => ({ has: pick(h?.has, ["yes", "no"]), options: pick(h?.options, ["1", "2", "3", "4"]),
+        art: pick(h?.art, ["confirm", "counter", "no", "narrows"]), eng: pick(h?.eng, ["changed", "narrowed", "expanded", "nochange"]), label: String(h?.label ?? "").slice(0, 200) })),
+    };
+  }
+  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, turns, start, v2, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
   await setProcessCode(`${data.coder}__${data.pid}__${data.task}`, data);
   res.json({ ok: true });
 }));
