@@ -34,6 +34,7 @@
   .tchip.on { box-shadow:0 0 0 2px var(--accent); border-color:var(--accent); background:#fff; }
   .tchip .dot { width:8px; height:8px; border-radius:50%; background:#d8d3c9; }
   .tchip .n { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .tchip .n.full { color:#2f7a3a; font-weight:700; }
   .legend { font-size:11px; color:var(--muted); margin-top:14px; line-height:1.8; }
   .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
 
@@ -267,6 +268,7 @@
   #v2board { display:none; flex:1 1 auto; min-height:0; overflow-y:auto; background:var(--soft); padding:8px 12px 30px; }
   #center.v2 #turnboard { display:none; }
   #center.v2 #v2board { display:block; }
+  #center.v2 #palette { display:none; }   /* markers are coded in the markers view, not in turns v2 */
   .v2grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
   .v2grid > div { padding:6px 9px 8px; border-right:1px solid var(--line); min-width:0; font-size:12px; }
   .v2grid > div:last-child { border-right:0; }
@@ -287,7 +289,10 @@
   .chips button.on.ignored, .chips button.on.no, .chips button.on.nochange { background:#9a948a; border-color:#9a948a; }
   .chips button.on.counter, .chips button.on.changed { background:#c0392b; border-color:#c0392b; }
   .chips button.on.expanded { background:#3d7fc4; border-color:#3d7fc4; }
-  .v2eng { display:flex; align-items:center; min-height:26px; margin-bottom:3px; }
+  .v2eng { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; min-height:26px; margin-bottom:3px; }
+  .v2eng .chips { flex-wrap:nowrap; }
+  .upsel { min-width:0; max-width:170px; flex:0 1 auto; font-size:11px; padding:1px 4px; border:1px solid var(--line); border-radius:9px; background:#fff; color:#5a564e; }
+  .upsel.on { background:var(--c); border-color:var(--c); color:#fff; }
   .hyps { border-top:1px dashed #d8cfc0; }
   .hyps .hh { display:flex; align-items:center; gap:8px; padding:4px 9px; font-size:11px; font-weight:700; color:#a5321f; }
   .hrow { border-top:1px solid #f1ebe2; }
@@ -306,6 +311,38 @@
   .v2cmp td.ok { background:#eef7ef; } .v2cmp td.no { background:#fdecea; } .v2cmp td.nc { background:#f6f5f2; }
   .v2cmp .hcell { padding:3px 0; border-bottom:1px dashed #eadfce; font-size:11.5px; line-height:1.45; }
   .v2cmp .hcell:last-child { border-bottom:0; }
+  .grey { opacity:.42; }
+  .sec, .hrow.sec > div { font-style:italic; }
+  .hrow.sec > div { background:#f7f5f1 !important; }
+  .tagsec { font-size:9.5px; font-style:normal; background:#e7e3db; color:#5a564e; border-radius:7px; padding:0 5px; }
+  .secl { display:inline-flex; align-items:center; gap:3px; text-transform:none; letter-spacing:0; font-weight:400; font-size:10.5px; color:#5a564e; cursor:pointer; }
+  .hrow > div.off { opacity:.45; }
+  .chips button:disabled { cursor:not-allowed; }
+  .upl { font-size:10.5px; color:#3f6b4a; margin-top:2px; }
+  .v2cmp th.agh { background:#e3eedf; }
+  .v2cmp td.agcell { background:#f6faf3; border-left:2px solid #9cc79f; }
+  .uses { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; }
+  .use { border:1px dashed #9cc79f; background:#fff; border-radius:8px; font-size:10px; padding:0 6px; cursor:pointer; color:#2f7a3a; }
+  .use:hover { background:#e3eedf; }
+  .b.agon { background:#2f7a3a; border-color:#2f7a3a; }
+  .banner.agban { background:#e9f4e7; border-color:#9cc79f; }
+  .srow.v2pr { cursor:pointer; }
+  #codebook { position:fixed; top:56px; right:12px; bottom:12px; width:380px; max-width:calc(100vw - 24px); overflow-y:auto; z-index:60; background:#fffdf8;
+    border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,.14); padding:4px 16px 14px; font-size:12.5px; line-height:1.45; color:var(--text); }
+  #codebook[hidden] { display:none; }
+  #codebook .cbh { position:sticky; top:0; background:#fffdf8; display:flex; justify-content:space-between; align-items:center; padding:10px 0 6px; border-bottom:1px solid var(--line); }
+  #codebook h4 { margin:14px 0 4px; font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:.03em; }
+  #codebook ul { margin:0; padding-left:17px; }
+  #codebook li { margin:3px 0; }
+  #codebook details { margin-top:14px; }
+  #codebook summary { cursor:pointer; font-size:12px; font-weight:600; color:var(--muted); }
+  .v2bds { display:flex; flex-wrap:wrap; gap:3px 10px; margin-top:3px; font-size:11.5px; }
+  .v2bd { display:inline-flex; align-items:center; gap:4px; }
+  .v2bd i { font-style:normal; font-size:10px; color:#fff; background:var(--c); border-radius:8px; padding:0 5px; }
+  .v2bd.grey { opacity:.45; }
+  .srow.hact { display:grid; grid-template-columns:22px 1fr; gap:6px; padding-left:8px; font-size:11.5px; border-left:3px solid #e0a49a; }
+  .srow.hact .hi { font-size:10px; font-weight:700; color:#a5321f; padding-top:2px; }
+  .srow.hact .tm { font:11px inherit; color:#5a564e; }
   .flowto { font-size:10.5px; color:var(--muted); padding:2px 9px 5px; text-align:right; }
   .pinchip.diff { background:#fff; color:#a5321f; border:1px dashed #c0392b; }
   #center.turns #seqpanel { display:none; }
@@ -439,6 +476,7 @@
   <button class="linkbtn" id="bkDown" title="Download all your coding (every session) as a backup file — includes copies kept in this browser">⭳ backup</button>
   <button class="linkbtn" id="bkUp" title="Restore coding from a backup file into the database (your coder name only)">⭱ restore</button>
   <input type="file" id="bkIn" accept=".json,application/json" style="display:none" />
+  <button class="linkbtn" id="cbBtn" title="Coding rules — keep open beside the coding">📖 codebook</button>
   <button class="linkbtn" id="refresh" title="Re-read sessions and the Drive folder">↻ refresh</button>
   <a href="/artifact-review">Artifact review →</a>
 </header>
@@ -513,6 +551,51 @@
 <!-- frame grabber: must stay rendered (not display:none) or Chrome may never decode its frames -->
 <video id="grab" preload="auto" muted playsinline style="position:fixed;left:0;bottom:0;width:4px;height:4px;opacity:.01;pointer-events:none"></video>
 
+<aside id="codebook" hidden>
+  <div class="cbh"><b>📖 Codebook</b><button id="cbClose" class="linkbtn" title="Close">✕</button></div>
+  <h4>Hypothesis (user)</h4>
+  <ul>
+    <li><b>Yes:</b> holds one option, or several but leans toward one.</li>
+    <li><b>Not a hypothesis:</b> several options with no lean (an option set).</li>
+    <li>Side beliefs (e.g. salary assumptions) → <i>optional secondary hypothesis</i>.</li>
+  </ul>
+  <h4>Hypothesis (artifact)</h4>
+  <ul>
+    <li><b>Yes:</b> explicitly pushes a decision: “X is best”, “A if X matters, B if Y”, or per-dimension winners.</li>
+    <li><b>No:</b> evidence summary, ranking with no verdict (= schema), or only ruling one option out.</li>
+    <li>In the chat text only and not read → node engagement <i>ignored</i>.</li>
+  </ul>
+  <h4>Artifact relation (hypothesis row)</h4>
+  <ul>
+    <li>Code only when the user has a hypothesis.</li>
+    <li><b>Options:</b> confirm / counter / no. Both = pick confirm + counter.</li>
+    <li><b>No</b> = neutral, or played no role (went with their prior).</li>
+    <li>Relation and outcome are coded separately. Options and outcome are coded even with no hypothesis.</li>
+  </ul>
+  <h4>Intent</h4>
+  <ul>
+    <li><b>Information:</b> broad (“tell me about these 4 cities”). Rare.</li>
+    <li><b>Relations:</b> one dimension (“compare on budget”). Several chained still = relations.</li>
+    <li><b>Evidence:</b> several criteria in one frame (“here’s my scenario, arrange them”).</li>
+    <li><b>Support:</b> leans toward one option; checks or pushes back on the LLM’s pick.</li>
+    <li>Code from the query; stated expectations break ties.</li>
+  </ul>
+  <h4>Schema vs. evidence file</h4>
+  <ul>
+    <li><b>Schema:</b> visual, spatial or relational structure (tables count), usually several dimensions.</li>
+    <li><b>Evidence file:</b> linear text, or a ranking on one dimension.</li>
+    <li>Can be both.</li>
+    <li>User ranking options in their head across queries = schematizing → ↑ arrow.</li>
+  </ul>
+  <details>
+    <summary>Examples (Chicago / Minneapolis / Philadelphia session)</summary>
+    <ul>
+      <li>“Toss-up” artifact → hypothesis, relation confirm + counter.</li>
+      <li>Hospital turn → search for support; artifact = schema + evidence; hypothesis in text only → ignored.</li>
+      <li>“Minneapolis is #1 currently” → hypothesis; artifact confirms.</li>
+    </ul>
+  </details>
+</aside>
 <script>
 // ---- codebook: Pirolli & Card (2005) sensemaking loop, numbered as in their figure ----------
 // node = a box in the figure (a data structure: 1, 4, 7, 10, 13, 16). Nodes are coded as PINS — a
@@ -634,9 +717,10 @@ async function load(fresh) {
     return;
   }
   D = d;
-  CODES = {}; SYNC = {};
+  CODES = {}; SYNC = {}; AGREED = {};
   for (const x of Object.values(c)) {
     if (x?.type === "sync") SYNC[x.pid] = x;
+    else if (x?.coder === CONSENSUS && x?.pid && x?.task) AGREED[`${x.pid}|${x.task}`] = x;   // agreed codes: not a coder
     else if (x?.coder && x?.pid && x?.task) {
       x.segs ||= []; x.pins ||= []; x.turns ||= {}; x.start ||= { hyp: null, note: "" };
       for (const g of x.segs) { for (const m of g.marks || []) x.pins.push({ id: uid(), t: g.t0, kind: m, note: "" }); delete g.marks; }
@@ -731,6 +815,13 @@ function viewWindow() {
 }
 
 // ---- sidebar ----
+// sidebar progress: turns this coder has coded in turns v2 (edited, with an intent, a node or an action) / all turns
+function v2Progress(s, r) {
+  const total = deriveTurns(s, r).length;
+  const done = Object.entries(r?.v2 || {}).filter(([, v]) => v && (v.intent?.stage || (v.nodes || []).some((n) => n.stage) || (v.hyps || []).length)).length;
+  if (!done && !total) return "";
+  return `<span class="n${total && done >= total ? " full" : ""}" title="turns v2: ${done} of ${total} turns coded">${done}/${total}</span>`;
+}
 function renderSide() {
   const byNum = (a, b) => a[0].localeCompare(b[0]) || +a.slice(1) - +b.slice(1);
   const pids = Object.keys(D.videos).sort(byNum);
@@ -749,11 +840,11 @@ function renderSide() {
         const others = Object.keys(CODES[`${pid}|${s.task}`] || {}).filter((c) => c !== state.coder).length;
         const on = pid === state.pid && s.task === state.task ? " on" : "";
         return `<span class="tchip${on}" data-pid="${pid}" data-task="${esc(s.task)}" title="${esc(s.task)}${others ? ` · ${others} other coder(s)` : ""}">
-          <span class="dot" style="background:${LABEL_C[r?.label || ""]}"></span>${esc(TASK_SHORT[s.task] || s.task)}${r?.segs?.length ? `<span class="n">${r.segs.length}</span>` : ""}</span>`;
+          <span class="dot" style="background:${LABEL_C[r?.label || ""]}"></span>${esc(TASK_SHORT[s.task] || s.task)}${v2Progress(s, r)}</span>`;
       }).join("") + "</div>";
     }
   }
-  h += `<div class="legend">${LABELS.map(([k, l, c]) => `<div><i style="background:${c}"></i>${esc(l)}</div>`).join("")}<div style="margin-top:4px">number = your segments</div></div>`;
+  h += `<div class="legend">${LABELS.map(([k, l, c]) => `<div><i style="background:${c}"></i>${esc(l)}</div>`).join("")}<div style="margin-top:4px">number = your turns v2 coded / turns</div></div>`;
   $("side").innerHTML = h;
 }
 $("side").addEventListener("click", (e) => {
@@ -774,7 +865,7 @@ function openSession(pid, task, fromUrl) {
   const list = sessionsFor(pid);
   state.pid = pid;
   state.task = list.find((s) => s.task === task)?.task || list[0]?.task || "";
-  state.sel = null; state.selTurn = null;
+  state.sel = null; state.selTurn = null; editAgreed = false;
   syncUrl();
   renderSide();
   const v = D.videos[pid];
@@ -1723,8 +1814,14 @@ function changed() {
 let saveT = null;
 // ---- safety: the page knows which save format it needs; every save is also kept in this browser ----
 const SCHEMA = 3;
+const bkSize = (r) => Object.keys(r?.v2 || {}).length + Object.keys(r?.turns || {}).length;
 function backupLocal(r) {
-  try { localStorage.setItem(`pr-bk:${r.coder}:${r.pid}:${r.task}`, JSON.stringify({ at: new Date().toISOString(), rec: r })); } catch {}
+  try {
+    const k = `pr-bk:${r.coder}:${r.pid}:${r.task}`, old = JSON.parse(localStorage.getItem(k) || "null");
+    // a reload from a server that dropped fields would overwrite the good copy, so the fuller one is also kept aside
+    if (old && bkSize(old.rec) > bkSize(r)) localStorage.setItem(k.replace("pr-bk:", "pr-bk-keep:"), JSON.stringify(old));
+    localStorage.setItem(k, JSON.stringify({ at: new Date().toISOString(), rec: r }));
+  } catch {}
 }
 let warned = false;
 function outdatedWarn() {
@@ -1899,6 +1996,46 @@ function selectTurnItem(key, slot, i, j, doSeek) {
   if (state.tab !== "segs") document.querySelector('.tabs [data-tab="segs"]').click();
   renderSegPane(); renderTurns();
 }
+// turns v2 in the right panel: per turn the intent, each node with its engagement, and each action;
+// click a row to jump the video there. Lists the agreed codes while "edit agreed" is on.
+function v2PaneHtml() {
+  const turns = deriveTurns(), r = v2Target();
+  const nm = (n) => (n ? ST[n].name : "");
+  const row = (at, stage, title, sub, cls = "") => `<div class="srow v2pr${cls}" data-seek="${at}"><img data-t="${at + 0.5}" alt="" />
+    <div style="min-width:0"><div class="st" style="--c:${ST[stage]?.c || "#b9b2a6"}"><i>${stage ?? "·"}</i>${title}</div><div class="tm">${fmt(at)}${sub ? ` · <span class="muted">${sub}</span>` : ""}</div></div></div>`;
+  let h = editAgreed ? '<div class="banner agban" style="margin:8px 0 4px">Showing the <b>agreed</b> codes.</div>' : "";
+  h += '<div class="slist">';
+  let any = false;
+  for (const t of turns) {
+    const v = v2Of(r, t.key);
+    const coded = v.intent.stage || v.intent.up.length || v.nodes.some((n) => n.stage) || v.hyps.length;
+    if (!coded) continue;
+    any = true;
+    h += `<div class="srow tsep-row">Turn ${t.k}${v.auto ? ' <span class="draft">draft</span>' : ""}</div>`;
+    if (v.intent.stage || v.intent.up.length) h += row(t.S, v.intent.stage, `① ${esc(nm(v.intent.stage) || "intent")}`,
+      [v.intent.up.map((u) => "↑ " + nm(u)).join(", "), v.intent.inspired ? `inspired by ${nm(v.intent.inspired)}` : "", esc(v.intent.note || "")].filter(Boolean).join(" · "));
+    // the artifact as one group: its nodes (with engagement), then the optional upward arrows
+    const ns = v.nodes.filter((x) => x.stage);
+    if (ns.length) {
+      const bd = (n, txt, grey) => `<span class="v2bd${grey ? " grey" : ""}"><i style="--c:${ST[n].c}">${n}</i>${txt}</span>`;
+      const ups = ns.flatMap((n) => n.up);
+      h += `<div class="srow v2pr v2grp" data-seek="${t.N}"><img data-t="${t.N + 0.5}" alt="" /><div style="min-width:0">
+        <div class="st">● ${esc(srcName(t))}</div>
+        <div class="v2bds">${ns.map((n) => bd(n.stage, `${esc(nm(n.stage).toLowerCase())}${n.eng.length ? ` <span class="muted">· ${n.eng.join(" + ")}</span>` : ""}`, n.eng.length === 1 && n.eng[0] === "ignored")).join("")}</div>
+        ${ups.length ? `<div class="v2bds">${ups.map((u) => bd(u, `↑ ${esc(nm(u))}`)).join("")}</div>` : ""}
+        <div class="tm">${fmt(t.N)}</div></div></div>`;
+    }
+    v.hyps.forEach((hy, j) => {
+      const art = hy.art.map((a) => H_ART.find(([k]) => k === a)?.[1] || a).join(" + "), out = hy.eng.map((a) => H_ENG.find(([k]) => k === a)?.[1] || a).join(" + ");
+      h += `<div class="srow v2pr hact${hy.has === "no" ? " grey" : ""}${hy.secondary ? " sec" : ""}" data-seek="${t.N}"><span class="hi">${j + 1}</span>
+        <div style="min-width:0"><div><b>${esc(hy.label || "action")}</b>${hy.secondary ? ' <span class="tagsec">secondary</span>' : ""} · hypothesis ${hy.has || "—"} · ${optLabel(hy.options)} → ${optLabel(hy.optsAfter)} options${hy.labelAfter ? ` (→ ${esc(hy.labelAfter)})` : ""}</div>
+          ${hy.hypText ? `<div class="tm">“${esc(hy.hypText)}”</div>` : ""}
+          <div class="tm">artifact: ${art || "—"}${hy.artNote ? ` — <i>${esc(hy.artNote)}</i>` : ""}</div><div class="tm">outcome: ${out || "—"}${hy.engNote ? ` — <i>${esc(hy.engNote)}</i>` : ""}</div></div></div>`;
+    });
+  }
+  if (!any) h += '<div class="muted" style="font-size:12px;padding:8px 2px">Nothing coded in turns v2 yet for this session.</div>';
+  return h + "</div>";
+}
 function turnPaneHtml() {
   const turns = deriveTurns(), r = mine(), sel = turnSel();
   let h = "";
@@ -1932,6 +2069,8 @@ function turnPaneHtml() {
   return h + "</div>";
 }
 $("pSegs").addEventListener("click", (e) => {
+  const sk = e.target.closest(".v2pr[data-seek]");
+  if (sk && state.mode === "v2") { seek(+sk.dataset.seek); return; }
   if (state.mode !== "turns") return;
   const row = e.target.closest("[data-tkey]");
   if (row) return selectTurnItem(row.dataset.tkey, row.dataset.tslot, row.dataset.ti != null ? +row.dataset.ti : null, row.dataset.tj != null ? +row.dataset.tj : null, true);
@@ -1980,95 +2119,150 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#figz")) $("figz").classList.remove("open");
 });
 
-// ---- turns v2: per turn ① intent (top edge + note + inspiring node) · artifact nodes · engagement per
-// node (skimmed / read / ignored), plus any number of hypothesis rows linked to the turn.
+// ---- turns v2: per turn ① intent (top edge + optional upward arrows + note + inspiring node) · artifact
+// nodes · engagement per node (skimmed / read / ignored, multi-select, + upward arrows), plus any number of
+// "actions" linked to the turn (hypothesis yes/no, options before & after, artifact relation, outcome).
 // Stored per coder in r.v2[turnKey]; until a coder edits a turn it is pre-filled (grey) from their turns coding.
 const V2_EDGES = [3, 6, 9, 12, 15].map((n) => ST[n]);   // the "top" (going back) edges
+const V2_UP = [2, 5, 8, 11, 14].map((n) => ST[n]);      // the upward (sensemaking-forward) arrows
 const V2_ENG = [["skimmed", "skimmed"], ["read", "read"], ["ignored", "ignored"]];
 const H_OPTS = [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4+"]];
-const H_ART = [["confirm", "yes – confirm"], ["counter", "yes – counter"], ["no", "no"], ["narrows", "narrows"]];
+const H_ART = [["confirm", "yes – confirm"], ["counter", "yes – counter"], ["no", "no"]];
 const H_ENG = [["changed", "changed"], ["narrowed", "narrowed"], ["expanded", "expanded"], ["nochange", "no change"]];
 const LEVEL_TO_V2 = { deep: "read", skim: "skimmed", none: "ignored" };
+const arr = (x) => (Array.isArray(x) ? x : x == null || x === "" ? [] : [x]);   // older single values → lists
+// one normalized shape for every stored or drafted record (older records had single-choice strings)
+function v2Norm(v) {
+  return {
+    ...(v.auto ? { auto: true } : {}),
+    intent: { stage: v.intent?.stage ?? null, up: arr(v.intent?.up).map(Number), note: v.intent?.note || "", inspired: v.intent?.inspired ?? null, ...(v.intent?.was ? { was: v.intent.was } : {}) },
+    nodes: (v.nodes || []).map((n) => ({ stage: n.stage ?? null, eng: arr(n.eng), up: arr(n.up).map(Number).slice(0, 1) })),
+    hyps: (v.hyps || []).map((h) => ({ has: h.has ?? null, options: h.options ?? null, optsAfter: h.optsAfter ?? null, art: arr(h.art).filter((a) => a !== "narrows"),
+      eng: arr(h.eng), secondary: !!h.secondary, label: h.label || "", labelAfter: h.labelAfter || "", hypText: h.hypText || "", artNote: h.artNote || "", engNote: h.engNote || "" })),
+  };
+}
 function v2Draft(r, key) {
   const x = r?.turns?.[key];
   if (!x) return null;
-  const st = x.intent?.stage;
-  const ok = V2_EDGES.some((e) => e.n === st);
-  return { auto: true, intent: { stage: ok ? st : null, note: x.intent?.note || "", inspired: null, ...(st && !ok ? { was: st } : {}) },
-    nodes: getNodes(x).filter((n) => n.stage).map((n) => ({ stage: n.stage, eng: LEVEL_TO_V2[n.level] || null })), hyps: [] };
+  const st = x.intent?.stage, ok = V2_EDGES.some((e) => e.n === st);
+  return { auto: true, intent: { stage: ok ? st : null, note: x.intent?.note || "", inspired: null, up: [], ...(st && !ok ? { was: st } : {}) },
+    nodes: getNodes(x).filter((n) => n.stage).map((n) => ({ stage: n.stage, eng: LEVEL_TO_V2[n.level] ? [LEVEL_TO_V2[n.level]] : [],
+      up: [...new Set((n.edges || []).map((e) => e.stage).filter((s2) => V2_UP.some((u) => u.n === s2)))] })), hyps: [] };
 }
-const v2Of = (r, key) => r?.v2?.[key] || v2Draft(r, key) || { intent: { stage: null, note: "", inspired: null }, nodes: [], hyps: [] };
-function v2Rec(key) {   // editable record (materializes the draft on first edit)
-  const r = mine(true);
+const v2Of = (r, key) => v2Norm(r?.v2?.[key] || v2Draft(r, key) || { intent: {}, nodes: [], hyps: [] });
+function v2Rec(key) {   // editable record (materializes the draft, and older single values, on first edit)
+  const r = v2Target(true);
   r.v2 ||= {};
-  if (!r.v2[key]) { const d = JSON.parse(JSON.stringify(v2Of(r, key))); delete d.auto; r.v2[key] = d; }
-  return r.v2[key];
+  const v = v2Of(r, key); delete v.auto;
+  r.v2[key] = v;
+  return v;
 }
-const chips = (list, cur, attr, dis) => `<span class="chips">${list.map(([v, l]) => `<button data-${attr}="${v}" class="${v.replace(/\s/g, "")}${cur === v ? " on" : ""}"${dis}>${l}</button>`).join("")}</span>`;
-let v2Layout = lsGet("pr-v2cmp") || "cards";   // compare layout: "cards" (inline under each turn) | "table" (side by side)
-// Side-by-side compare: one column per coder, one block per turn; a cell is green when every coder
-// who coded that turn agrees on it, red when they differ.
-function renderV2Table(b, turns, r) {
+const optLabel = (o) => (o === "4" ? "4+" : o || "—");
+const tagsOf = (list, vals) => (vals.length ? vals.map((v) => list.find(([k]) => k === v)?.[1] || v).join(" + ") : "—");
+const chips = (list, cur, attr, dis) => `<span class="chips">${list.map(([v, l]) => `<button data-${attr}="${v}" class="${v.replace(/\s/g, "")}${arr(cur).includes(v) ? " on" : ""}"${dis}>${l}</button>`).join("")}</span>`;
+let v2Layout = lsGet("pr-v2cmp") || "cards";
+// ---- agreed (consensus) codes: one shared record per session under a reserved name, filled in during the
+// coding meeting — never mixed with a coder's own record or counted in agreement.
+const CONSENSUS = "_agreed";
+let AGREED = {}, editAgreed = false, agreedT = null;
+function agreedRec(create) {
+  const k = `${state.pid}|${state.task}`;
+  if (!AGREED[k] && create) AGREED[k] = { type: "session", coder: CONSENSUS, pid: state.pid, task: state.task, segs: [], pins: [], turns: {}, v2: {}, start: { hyp: null, note: "" }, label: "", note: "" };
+  return AGREED[k] || null;
+}
+function saveAgreed() {
+  const r = agreedRec();
+  if (!r) return;
+  $("saved") && ($("saved").textContent = "saving agreed…");
+  clearTimeout(agreedT);
+  agreedT = setTimeout(async () => {
+    try {
+      backupLocal(r);
+      const res = await fetch("/api/process-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(r) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.schema !== SCHEMA) throw new Error(res.ok ? "server out of date" : res.status);
+      $("saved") && ($("saved").textContent = "agreed saved ✓");
+    } catch (e) { $("saved") && ($("saved").textContent = "⚠ agreed NOT saved — " + e.message); }
+  }, 500);
+}
+// the record the v2 cards edit: your own, or the agreed one while "edit agreed" is on
+const v2Target = (create) => (editAgreed ? agreedRec(create) : mine(create));
+function v2Changed() { if (editAgreed) { saveAgreed(); renderV2(); renderSegPane(); } else changed(); }   // compare layout: "cards" (inline under each turn) | "table" (side by side)
+// Side-by-side compare: one column per coder, one block per turn; a cell is green when every coder who coded
+// that turn agrees, red when they differ. Anything coded "no" is greyed out; secondary actions are shown in
+// italics and left out of the agreement.
+function renderV2Table(b, turns) {
   const coders = Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([, o]) => Object.keys(o.v2 || {}).length || Object.keys(o.turns || {}).length)
     .sort(([a], [c]) => (a === state.coder ? -1 : c === state.coder ? 1 : a.localeCompare(c)));
   const name = (n) => (n ? `${n} ${esc(ST[n].name)}` : "—");
-  const tag = (list, v) => (v ? (list.find(([k]) => k === v)?.[1] || v) : "—");
+  const ups = (u) => (u.length ? `<div class="upl">${u.map((x) => `↑ ${name(x)}`).join(" · ")}</div>` : "");
+  const main = (v) => v.hyps.filter((h) => !h.secondary);
   const fields = [
-    ["Intent edge", (v) => v.intent.stage ?? "", (v) => name(v.intent.stage)],
+    ["Intent edge", (v) => `${v.intent.stage ?? ""}|${v.intent.up.join(".")}`, (v) => name(v.intent.stage) + ups(v.intent.up)],
     ["Inspired by", (v) => v.intent.inspired ?? "", (v) => name(v.intent.inspired)],
-    ["Nodes · engagement", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}:${n.eng || ""}`).sort().join("|"),
-      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div>● ${name(n.stage)} <span class="muted">· ${n.eng || "—"}</span></div>`).join("") || "—"],
-    ["Hypotheses", (v) => v.hyps.map((h) => [h.has, h.options, h.art, h.eng].join(":")).sort().join("|"),
-      (v) => v.hyps.map((h) => `<div class="hcell"><b>${esc(h.label || "hypothesis")}</b> · ${h.has || "—"} · ${h.options === "4" ? "4+" : h.options || "—"} opt
-        <br>artifact: ${tag(H_ART, h.art)}${h.artNote ? ` — <i>${esc(h.artNote)}</i>` : ""}<br>engagement: ${tag(H_ENG, h.eng)}${h.engNote ? ` — <i>${esc(h.engNote)}</i>` : ""}</div>`).join("") || "<span class=\"muted\">0</span>"],
+    ["Nodes · engagement", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}:${n.eng.slice().sort().join("+")}:${n.up.join(".")}`).sort().join("|"),
+      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div class="${n.eng.length === 1 && n.eng[0] === "ignored" ? "grey" : ""}">● ${name(n.stage)} <span class="muted">· ${n.eng.join(" + ") || "—"}</span>${ups(n.up)}</div>`).join("") || "—"],
+    ["Actions", (v) => main(v).map((h) => [h.has, h.options, h.art.slice().sort().join("+"), h.eng.slice().sort().join("+"), h.optsAfter].join(":")).sort().join("|"),
+      (v) => v.hyps.map((h) => `<div class="hcell${h.has === "no" ? " grey" : ""}${h.secondary ? " sec" : ""}"><b>${esc(h.label || "action")}</b>${h.secondary ? ' <span class="tagsec">secondary</span>' : ""} · hypothesis ${h.has || "—"} · ${optLabel(h.options)} → ${optLabel(h.optsAfter)} options${h.labelAfter ? ` (→ ${esc(h.labelAfter)})` : ""}
+        ${h.hypText ? `<br>“${esc(h.hypText)}”` : ""}
+        <br><span class="${h.has === "no" || (h.art.length === 1 && h.art[0] === "no") ? "grey" : ""}">artifact: ${tagsOf(H_ART, h.art)}${h.artNote ? ` — <i>${esc(h.artNote)}</i>` : ""}</span>
+        <br>outcome: ${tagsOf(H_ENG, h.eng)}${h.engNote ? ` — <i>${esc(h.engNote)}</i>` : ""}</div>`).join("") || '<span class="muted">0</span>'],
   ];
   const agree = fields.map(() => [0, 0]);
+  const ag = agreedRec();
   let body = "";
   for (const t of turns) {
     const vs = coders.map(([, o]) => (o.v2?.[t.key] || o.turns?.[t.key] ? v2Of(o, t.key) : null));
     if (!vs.some(Boolean)) continue;
-    body += `<tr class="tturn"><th colspan="${coders.length + 1}">Turn ${t.k} <span class="muted">${fmt(t.S)}</span> <span class="pr-text" title="click to expand">“${esc(t.prompt || "")}”</span></th></tr>`;
+    const av = ag?.v2?.[t.key] ? v2Norm(ag.v2[t.key]) : null;
+    body += `<tr class="tturn"><th colspan="${coders.length + 2}">Turn ${t.k} <span class="muted">${fmt(t.S)}</span> <span class="pr-text" title="click to expand">“${esc(t.prompt || "")}”</span></th></tr>`;
     fields.forEach(([label, key, show], fi) => {
       const keys = vs.filter(Boolean).map(key), same = keys.length > 1 && keys.every((k) => k === keys[0]);
       if (keys.length > 1) { agree[fi][1]++; if (same) agree[fi][0]++; }
-      body += `<tr><td class="fl">${label}</td>${vs.map((v) => `<td class="${!v ? "nc" : keys.length < 2 ? "" : same ? "ok" : "no"}">${v ? show(v) : '<span class="muted">not coded</span>'}</td>`).join("")}</tr>`;
+      const use = coders.map(([c], ci) => (vs[ci] ? `<button class="use" data-use="${fi}" data-from="${esc(c)}" data-key="${esc(t.key)}" title="Copy ${esc(c)}'s ${label.toLowerCase()} into the agreed codes">use ${esc(c)}</button>` : "")).join("");
+      body += `<tr><td class="fl">${label}</td>${vs.map((v) => `<td class="${!v ? "nc" : keys.length < 2 ? "" : same ? "ok" : "no"}">${v ? show(v) : '<span class="muted">not coded</span>'}</td>`).join("")}
+        <td class="agcell">${av ? show(av) : '<span class="muted">—</span>'}<div class="uses">${use}</div></td></tr>`;
     });
   }
   b.innerHTML = `<div class="tsum">${fields.map(([label], fi) => `<div><b>${agree[fi][1] ? Math.round((100 * agree[fi][0]) / agree[fi][1]) + "%" : "—"}</b>${label} agree <span class="muted">(${agree[fi][0]}/${agree[fi][1]} turns)</span></div>`).join("")}</div>
-    <table class="v2cmp"><thead><tr><th></th>${coders.map(([c]) => `<th>${esc(c)}${c === state.coder ? " (you)" : ""}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table>`;
+    <div class="muted" style="font-size:11px;margin:-4px 0 8px">Greyed = coded “no” / ignored. Secondary actions (italic) don't count toward agreement.</div>
+    <table class="v2cmp"><thead><tr><th></th>${coders.map(([c]) => `<th>${esc(c)}${c === state.coder ? " (you)" : ""}</th>`).join("")}<th class="agh">Agreed <span class="muted" style="font-weight:400">(shared)</span></th></tr></thead><tbody>${body}</tbody></table>`;
 }
+// copy one field of a coder's v2 coding into the agreed record
+const V2_FIELDS = [
+  (from, to) => { to.intent.stage = from.intent.stage; to.intent.up = [...from.intent.up]; },
+  (from, to) => { to.intent.inspired = from.intent.inspired; },
+  (from, to) => { to.nodes = JSON.parse(JSON.stringify(from.nodes)); },
+  (from, to) => { to.hyps = JSON.parse(JSON.stringify(from.hyps)); },
+];
+const v2LayoutBar = () => `<div class="v2lay">${state.compare ? `compare as: ${[["cards", "cards"], ["table", "side by side"]].map(([k, l]) => `<button class="b${v2Layout === k ? " on" : ""}" data-v2lay="${k}">${l}</button>`).join("")}` : ""}
+  <button class="b${editAgreed ? " on agon" : ""}" data-editagreed style="margin-left:auto" title="Edit the shared agreed codes for this session (coding meeting)">✎ edit agreed</button></div>`;
 function renderV2() {
   const b = $("v2board");
   if (state.mode !== "v2" || !D || !state.pid) { b.innerHTML = ""; return; }
-  if (state.compare && v2Layout === "table") {
-    const y = b.scrollTop;
-    renderV2Table(b, deriveTurns(), mine());
-    b.insertAdjacentHTML("afterbegin", v2LayoutBar());
-    b.scrollTop = y;
-    return;
-  }
-  const turns = deriveTurns(), r = mine(), y = b.scrollTop, dis = !state.coder ? " disabled" : "";
+  const turns = deriveTurns(), r = v2Target(), y = b.scrollTop, dis = !state.coder ? " disabled" : "";
+  if (state.compare && v2Layout === "table" && !editAgreed) { renderV2Table(b, turns); b.insertAdjacentHTML("afterbegin", v2LayoutBar()); b.scrollTop = y; return; }
   const others = state.compare ? Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([c, o]) => c !== state.coder && (Object.keys(o.v2 || {}).length || Object.keys(o.turns || {}).length)) : [];
   const opts = (list, cur, ph) => `<option value="">${ph}</option>` + list.map((x) => `<option value="${x.n}"${cur === x.n ? " selected" : ""}>${x.n} · ${esc(x.name)}</option>`).join("");
   let h = "";
   if (!turns.length) h += '<div class="empty">No prompts logged for this session (or the recording isn\'t synced yet — Events & sync tab).</div>';
   if (!state.coder) h += '<div class="banner">Enter your coder name in the header to code.</div>';
-  // compare summary
-  for (const [c, o] of others) {
+  if (editAgreed) h += '<div class="banner agban"><b>Editing the AGREED codes</b> for this session (shared by everyone, not your own coding). Turn ✎ edit agreed off to return to your coding.</div>';
+  for (const [c, o] of editAgreed ? [] : others) {
     const both = turns.filter((t) => r && (r.v2?.[t.key] || r.turns?.[t.key]) && (o.v2?.[t.key] || o.turns?.[t.key]));
     const A = (t) => v2Of(r, t.key), B = (t) => v2Of(o, t.key);
     const pc = (xs) => (xs.length ? Math.round((100 * xs.filter(Boolean).length) / xs.length) + "%" : "—");
     const intent = both.filter((t) => A(t).intent.stage || B(t).intent.stage).map((t) => A(t).intent.stage === B(t).intent.stage);
     const jac = both.map((t) => { const a = new Set(A(t).nodes.map((n) => n.stage)), bb = new Set(B(t).nodes.map((n) => n.stage)), u = new Set([...a, ...bb]); return u.size ? [...a].filter((v) => bb.has(v)).length / u.size : 1; });
-    const eng = []; for (const t of both) for (const n of A(t).nodes) { const m = B(t).nodes.find((z) => z.stage === n.stage); if (m && n.eng && m.eng) eng.push(n.eng === m.eng); }
-    const hc = both.map((t) => A(t).hyps.length === B(t).hyps.length);
+    const eng = []; for (const t of both) for (const n of A(t).nodes) { const m = B(t).nodes.find((z) => z.stage === n.stage); if (m && n.eng.length && m.eng.length) eng.push(n.eng.slice().sort().join() === m.eng.slice().sort().join()); }
+    const hc = both.map((t) => A(t).hyps.filter((x) => !x.secondary).length === B(t).hyps.filter((x) => !x.secondary).length);
     h += `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${esc(state.coder)} vs ${esc(c)}</b>${both.length} turns both coded</div>
       <div><b>${pc(intent)}</b>same intent edge</div><div><b>${jac.length ? Math.round((100 * jac.reduce((a, v) => a + v, 0)) / jac.length) + "%" : "—"}</b>node overlap</div>
-      <div><b>${pc(eng)}</b>same engagement</div><div><b>${pc(hc)}</b>same # hypotheses</div></div>`;
+      <div><b>${pc(eng)}</b>same engagement</div><div><b>${pc(hc)}</b>same # actions (not secondary)</div></div>`;
   }
   turns.forEach((t, ti) => {
-    const v = v2Of(r, t.key), auto = !!v.auto && !r?.v2?.[t.key];
-    const nodes = v.nodes.length ? v.nodes : [{ stage: null, eng: null }];
+    const v = v2Of(r, t.key), auto = !!v.auto;
+    const nodes = v.nodes.length ? v.nodes : [{ stage: null, eng: [], up: [] }];
     h += `<div class="tcard" data-key="${esc(t.key)}">
       <div class="th"><b>Turn ${t.k}</b><span class="tm" style="font:11px ui-monospace,Menlo,monospace;color:var(--muted)">${fmt(t.S)}</span>
         <span class="pr-text" title="click to expand">“${esc(t.prompt || "")}”</span>${auto ? ' <span class="draft" title="Pre-filled from your turns coding — editing confirms it">draft</span>' : ""}</div>
@@ -2083,39 +2277,57 @@ function renderV2() {
           <div><div class="v2head">${esc(srcName(t)[0].toUpperCase() + srcName(t).slice(1))} · nodes <button class="play" data-a="${t.N}" data-b="${t.E}">▶ ${fmt(t.N)}–${fmt(t.E)}</button></div>
             ${nodes.map((n, i) => `<div class="v2n" data-n="${i}"><select data-v="nstage"${dis}>${opts(NODE_STAGES, n.stage, "node…")}</select>${v.nodes.length > 1 ? `<button class="x" data-v2del${dis} style="border:0;background:none;cursor:pointer;color:var(--muted)">×</button>` : ""}</div>`).join("")}
             <button class="addnode" data-v2addnode${dis}>+ node</button></div>
-          <div><div class="v2head">Engagement</div>
-            ${nodes.map((n, i) => `<div class="v2eng" data-n="${i}">${chips(V2_ENG, n.eng, "eng", dis)}</div>`).join("")}</div>
+          <div><div class="v2head">Engagement <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(pick more than one if unsure · ↑ arrow optional, if the artifact was used that way)</span></div>
+            ${nodes.map((n, i) => `<div class="v2eng" data-n="${i}">${chips(V2_ENG, n.eng, "eng", dis)}
+              <select class="upsel${n.up.length ? " on" : ""}" data-v="nup" style="--c:${ST[n.up[0]]?.c || "#b9b2a6"}"${dis} title="upward arrow (one)">
+                <option value="">↑ (optional)</option>${V2_UP.map((u) => `<option value="${u.n}"${n.up[0] === u.n ? " selected" : ""}>↑ ${u.n} ${esc(u.name)}</option>`).join("")}</select></div>`).join("")}</div>
         </div>
       </div>
       <div class="hyps">
-        <div class="hh">Hypotheses · ${v.hyps.length}<button class="addhyp" data-addhyp${dis}>+ hypothesis</button></div>
-        ${v.hyps.map((hy, j) => `<div class="v2grid hrow" data-h="${j}">
-          <div><div class="v2head">Intent <button class="x" data-delhyp${dis} style="margin-left:auto;border:0;background:none;cursor:pointer;color:var(--muted)" title="remove">×</button></div>
+        <div class="hh">Actions · ${v.hyps.length}<button class="addhyp" data-addhyp${dis}>+ action</button></div>
+        ${v.hyps.map((hy, j) => `<div class="v2grid hrow${hy.secondary ? " sec" : ""}" data-h="${j}">
+          <div><div class="v2head">Intent <label class="secl" title="A side hypothesis (e.g. “well-known cities pay more”) — kept, but not counted for agreement"><input type="checkbox" data-hsec${hy.secondary ? " checked" : ""}${dis} /> optional secondary hypothesis</label>
+              <button class="x" data-delhyp${dis} style="margin-left:auto;border:0;background:none;cursor:pointer;color:var(--muted)" title="remove">×</button></div>
             <div class="sub">hypothesis?</div>${chips([["yes", "yes"], ["no", "no"]], hy.has, "has", dis)}
-            <div class="sub">how many options?</div>${chips(H_OPTS, hy.options, "hopts", dis)}
+            ${hy.has === "yes" ? `<input class="lbl" data-v="hyptext" placeholder="describe the hypothesis (e.g. Hampden is the best fit)" value="${esc(hy.hypText || "")}"${dis} />` : ""}
+            <div class="sub">how many options? (before)</div>${chips(H_OPTS, hy.options, "hopts", dis)}
             <input class="lbl" data-v="hlabel" placeholder="label (optional, e.g. Hampden)" value="${esc(hy.label || "")}"${dis} /></div>
-          <div><div class="v2head">Artifact</div>${chips(H_ART, hy.art, "hart", dis)}
-            <input class="lbl" data-v="hartnote" placeholder="description (optional): what the artifact said about it" value="${esc(hy.artNote || "")}"${dis} /></div>
-          <div><div class="v2head">Engagement</div>${chips(H_ENG, hy.eng, "heng", dis)}
-            <input class="lbl" data-v="hengnote" placeholder="description (optional): how the hypothesis changed" value="${esc(hy.engNote || "")}"${dis} /></div></div>`).join("")}
+          <div class="${hy.has === "no" ? "off" : ""}"><div class="v2head">Artifact${hy.has === "no" ? ' <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(n/a — no hypothesis)</span>' : ""}</div>${chips(H_ART, hy.art, "hart", hy.has === "no" ? " disabled" : dis)}
+            <input class="lbl" data-v="hartnote" placeholder="description: what the artifact said about it (if the chat text, not the artifact, countered it: code No and note it here)" value="${esc(hy.artNote || "")}"${dis} /></div>
+          <div><div class="v2head">Outcome</div>${chips(H_ENG, hy.eng, "heng", dis)}
+            <input class="lbl" data-v="hengnote" placeholder="description (optional): how it changed" value="${esc(hy.engNote || "")}"${dis} />
+            <div class="sub">how many options? (after)</div>${chips(H_OPTS, hy.optsAfter, "hopta", dis)}
+            <input class="lbl" data-v="hlabelafter" placeholder="label (optional, e.g. Hampden)" value="${esc(hy.labelAfter || "")}"${dis} /></div></div>`).join("")}
       </div>
       ${others.map(([c, o]) => { const ov = v2Of(o, t.key);
         return `<div class="tcmp"><b style="font-size:11px;color:var(--muted)">${esc(c)}</b>
-          <span class="${ov.intent.stage === v.intent.stage ? "ok" : "no"}">${ov.intent.stage ? `${ov.intent.stage} ${esc(ST[ov.intent.stage].name)}` : "—"}</span> ·
-          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); return `<span class="${m && m.eng === n.eng ? "ok" : "no"}">●${n.stage ?? "?"} ${n.eng || ""}</span>`; }).join(" ") || "—"} ·
-          ${ov.hyps.length} hypothes${ov.hyps.length === 1 ? "is" : "es"}${ov.hyps.length ? ": " + ov.hyps.map((hy) => `[${hy.has || "?"} · ${hy.options === "4" ? "4+" : hy.options || "?"} · ${hy.art || "?"} · ${hy.eng || "?"}]`).join(" ") : ""}</div>`; }).join("")}
+          <span class="${ov.intent.stage === v.intent.stage ? "ok" : "no"}">${ov.intent.stage ? `${ov.intent.stage} ${esc(ST[ov.intent.stage].name)}` : "—"}${ov.intent.up.length ? " ↑" + ov.intent.up.join(" ↑") : ""}</span> ·
+          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); const same = m && m.eng.slice().sort().join() === n.eng.slice().sort().join() && m.up.join() === n.up.join();
+            return `<span class="${same ? "ok" : "no"}">●${n.stage ?? "?"} ${n.eng.join("+")}${n.up.length ? " ↑" + n.up.join(" ↑") : ""}</span>`; }).join(" ") || "—"} ·
+          ${ov.hyps.length} action${ov.hyps.length === 1 ? "" : "s"}${ov.hyps.length ? ": " + ov.hyps.map((hy) => `<span class="${hy.has === "no" ? "grey" : ""}${hy.secondary ? " sec" : ""}">[${hy.has || "?"} · ${optLabel(hy.options)}→${optLabel(hy.optsAfter)} · ${hy.art.join("+") || "?"} · ${hy.eng.join("+") || "?"}]</span>`).join(" ") : ""}</div>`; }).join("")}
       ${turns[ti + 1] ? `<div class="flowto">↓ into Turn ${turns[ti + 1].k} intent</div>` : ""}
     </div>`;
   });
-  b.innerHTML = (state.compare ? v2LayoutBar() : "") + h;
+  b.innerHTML = v2LayoutBar() + h;
   b.scrollTop = y;
 }
-const v2LayoutBar = () => `<div class="v2lay">compare as: ${[["cards", "cards"], ["table", "side by side"]].map(([k, l]) => `<button class="b${v2Layout === k ? " on" : ""}" data-v2lay="${k}">${l}</button>`).join("")}</div>`;
 $("v2board").addEventListener("click", (e) => {
   const lay = e.target.closest("[data-v2lay]");
   if (lay) { v2Layout = lay.dataset.v2lay; lsSet("pr-v2cmp", v2Layout); renderV2(); return; }
-});
-$("v2board").addEventListener("click", (e) => {
+  if (e.target.closest("[data-editagreed]")) { editAgreed = !editAgreed; if (editAgreed) { v2Layout = "cards"; lsSet("pr-v2cmp", v2Layout); } renderV2(); renderSegPane(); return; }
+  const use = e.target.closest("[data-use]");
+  if (use) {
+    if (!state.coder) return alert("Enter your coder name first.");
+    const src = CODES[`${state.pid}|${state.task}`]?.[use.dataset.from];
+    if (!src) return;
+    const ag = agreedRec(true);
+    ag.v2 ||= {};
+    const to = v2Norm(ag.v2[use.dataset.key] || { intent: {}, nodes: [], hyps: [] }); delete to.auto;
+    V2_FIELDS[+use.dataset.use](v2Of(src, use.dataset.key), to);
+    ag.v2[use.dataset.key] = to;
+    saveAgreed(); renderV2();
+    return;
+  }
   const pl = e.target.closest(".play");
   if (pl) { if (pl.classList.contains("on")) { vid.pause(); clipEnd = null; renderTurnsPlaying(); } else playClip(+pl.dataset.a, +pl.dataset.b); return; }
   const pt = e.target.closest(".pr-text");
@@ -2123,58 +2335,66 @@ $("v2board").addEventListener("click", (e) => {
   if (!state.coder) return;
   const card = e.target.closest(".tcard[data-key]");
   if (!card) return;
+  const b = e.target.closest("button");
+  if (!b || b.disabled) return;
   const v = v2Rec(card.dataset.key);
   const ni = e.target.closest("[data-n]") ? +e.target.closest("[data-n]").dataset.n : null;
   const hj = e.target.closest("[data-h]") ? +e.target.closest("[data-h]").dataset.h : null;
-  const node = () => { while (v.nodes.length <= ni) v.nodes.push({ stage: null, eng: null }); return v.nodes[ni]; };
-  const tog = (o, k, val) => { o[k] = o[k] === val ? null : val; };
-  const b = e.target.closest("button");
-  if (!b) return;
-  if (b.dataset.eng) tog(node(), "eng", b.dataset.eng);
-  else if (b.hasAttribute("data-v2addnode")) { if (!v.nodes.length) v.nodes.push({ stage: null, eng: null }); v.nodes.push({ stage: null, eng: null }); }
+  const node = () => { while (v.nodes.length <= ni) v.nodes.push({ stage: null, eng: [], up: [] }); return v.nodes[ni]; };
+  const one = (o, k, val) => { o[k] = o[k] === val ? null : val; };                                       // single choice
+  const many = (o, k, val) => { o[k] = o[k].includes(val) ? o[k].filter((x) => x !== val) : [...o[k], val]; };   // multi-select
+  const d = b.dataset;
+  if (d.eng) many(node(), "eng", d.eng);
+  else if (b.hasAttribute("data-v2addnode")) { if (!v.nodes.length) v.nodes.push({ stage: null, eng: [], up: [] }); v.nodes.push({ stage: null, eng: [], up: [] }); }
   else if (b.hasAttribute("data-v2del")) v.nodes.splice(ni, 1);
-  else if (b.hasAttribute("data-addhyp")) v.hyps.push({ has: null, options: null, art: null, eng: null, label: "", artNote: "", engNote: "" });
+  else if (b.hasAttribute("data-addhyp")) v.hyps.push({ has: null, options: null, optsAfter: null, art: [], eng: [], secondary: false, label: "", labelAfter: "", hypText: "", artNote: "", engNote: "" });
   else if (b.hasAttribute("data-delhyp")) v.hyps.splice(hj, 1);
-  else if (b.dataset.has) tog(v.hyps[hj], "has", b.dataset.has);
-  else if (b.dataset.hopts) tog(v.hyps[hj], "options", b.dataset.hopts);
-  else if (b.dataset.hart) tog(v.hyps[hj], "art", b.dataset.hart);
-  else if (b.dataset.heng) tog(v.hyps[hj], "eng", b.dataset.heng);
+  else if (d.has) { one(v.hyps[hj], "has", d.has); if (v.hyps[hj].has === "no") v.hyps[hj].art = []; }
+  else if (d.hopts) one(v.hyps[hj], "options", d.hopts);
+  else if (d.hopta) one(v.hyps[hj], "optsAfter", d.hopta);
+  else if (d.hart) many(v.hyps[hj], "art", d.hart);
+  else if (d.heng) many(v.hyps[hj], "eng", d.heng);
   else return;
-  changed();
+  v2Changed();
 });
 $("v2board").addEventListener("change", (e) => {
   if (!state.coder) return;
-  const card = e.target.closest(".tcard[data-key]"), f = e.target.dataset.v;
-  if (!card || !f) return;
-  const v = v2Rec(card.dataset.key), val = e.target.value === "" ? null : +e.target.value;
+  const card = e.target.closest(".tcard[data-key]");
+  if (!card) return;
+  const v = v2Rec(card.dataset.key);
+  if (e.target.matches("[data-hsec]")) { v.hyps[+e.target.closest("[data-h]").dataset.h].secondary = e.target.checked; return v2Changed(); }
+  const f = e.target.dataset.v, val = e.target.value === "" ? null : +e.target.value;
   if (f === "istage") { v.intent.stage = val; delete v.intent.was; }
   else if (f === "inspired") v.intent.inspired = val;
-  else if (f === "nstage") { const i = +e.target.closest("[data-n]").dataset.n; while (v.nodes.length <= i) v.nodes.push({ stage: null, eng: null }); v.nodes[i].stage = val; }
+  else if (f === "nup") { const i = +e.target.closest("[data-n]").dataset.n; while (v.nodes.length <= i) v.nodes.push({ stage: null, eng: [], up: [] }); v.nodes[i].up = val ? [val] : []; }
+  else if (f === "nstage") { const i = +e.target.closest("[data-n]").dataset.n; while (v.nodes.length <= i) v.nodes.push({ stage: null, eng: [], up: [] }); v.nodes[i].stage = val; }
   else return;
-  changed();
+  v2Changed();
 });
 $("v2board").addEventListener("input", (e) => {
   if (!state.coder) return;
   const card = e.target.closest(".tcard[data-key]"), f = e.target.dataset.v;
-  const HF = { hlabel: "label", hartnote: "artNote", hengnote: "engNote" };
+  const HF = { hlabel: "label", hlabelafter: "labelAfter", hyptext: "hypText", hartnote: "artNote", hengnote: "engNote" };
   if (!card || (f !== "inote" && !HF[f])) return;
   const v = v2Rec(card.dataset.key);
   if (f === "inote") v.intent.note = e.target.value;
   else v.hyps[+e.target.closest("[data-h]").dataset.h][HF[f]] = e.target.value;
-  save();
+  if (editAgreed) saveAgreed(); else save();
 });
 $("csvV2").addEventListener("click", () => {
-  const rows = [["coder", "pid", "cond", "task", "turn", "prompt_logged", "row", "idx", "intent_edge", "intent_inspired_by", "node", "engagement", "hyp_has", "hyp_options", "hyp_artifact", "hyp_engagement", "label_or_note", "hyp_artifact_note", "hyp_engagement_note", "draft"]];
-  for (const m of Object.values(CODES)) for (const r of Object.values(m)) {
+  const rows = [["coder", "pid", "cond", "task", "turn", "prompt_logged", "row", "idx", "intent_edge", "intent_up", "intent_inspired_by", "node", "engagement", "up_arrows",
+    "action_hypothesis", "hypothesis_text", "options_before", "artifact_relation", "outcome", "options_after", "secondary", "label_or_note", "label_after", "artifact_note", "outcome_note", "draft"]];
+  for (const r of [...Object.values(CODES).flatMap((m) => Object.values(m)), ...Object.values(AGREED)]) {
     if (!Object.keys(r.v2 || {}).length && !Object.keys(r.turns || {}).length) continue;
     const s2 = D.sessions.find((x) => x.pid === r.pid && x.task === r.task);
     const cond = s2?.cond || COND[r.pid[0]] || "";
     for (const t of s2 ? deriveTurns(s2, r) : []) {
       if (!r.v2?.[t.key] && !r.turns?.[t.key]) continue;
       const v = v2Of(r, t.key), base = [r.coder, r.pid, cond, r.task, t.k, t.key], dr = r.v2?.[t.key] ? "" : "draft";
-      rows.push([...base, "intent", "", v.intent.stage ?? "", v.intent.inspired ?? "", "", "", "", "", "", "", v.intent.note, "", "", dr]);
-      v.nodes.forEach((n, i) => rows.push([...base, "node", i + 1, "", "", n.stage ?? "", n.eng ?? "", "", "", "", "", "", "", "", dr]));
-      v.hyps.forEach((hy, j) => rows.push([...base, "hypothesis", j + 1, "", "", "", "", hy.has ?? "", hy.options === "4" ? "4+" : hy.options ?? "", hy.art ?? "", hy.eng ?? "", hy.label, hy.artNote || "", hy.engNote || "", dr]));
+      rows.push([...base, "intent", "", v.intent.stage ?? "", v.intent.up.join(" "), v.intent.inspired ?? "", "", "", "", "", "", "", "", "", "", "", "", v.intent.note, "", "", "", dr]);
+      v.nodes.forEach((n, i) => rows.push([...base, "node", i + 1, "", "", "", n.stage ?? "", n.eng.join("+"), n.up.join(" "), "", "", "", "", "", "", "", "", "", "", "", dr]));
+      v.hyps.forEach((hy, j) => rows.push([...base, "action", j + 1, "", "", "", "", "", "", hy.has ?? "", hy.hypText, hy.options ? optLabel(hy.options) : "", hy.art.join("+"), hy.eng.join("+"),
+        hy.optsAfter ? optLabel(hy.optsAfter) : "", hy.secondary ? 1 : "", hy.label, hy.labelAfter, hy.artNote, hy.engNote, dr]));
     }
   }
   const cell = (x) => { const t2 = String(x ?? ""); return /[",\n]/.test(t2) ? '"' + t2.replace(/"/g, '""') + '"' : t2; };
@@ -2193,10 +2413,12 @@ $("bkDown").addEventListener("click", () => {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (!k.startsWith(`pr-bk:${state.coder}:`)) continue;
+      if (!k.startsWith(`pr-bk:${state.coder}:`) && !k.startsWith(`pr-bk-keep:${state.coder}:`)) continue;
       const { rec } = JSON.parse(localStorage.getItem(k));
       const id = `${rec.coder}__${rec.pid}__${rec.task}`;
+      // add the browser's turns / v2 entries the loaded record is missing (e.g. dropped by an outdated server)
       if (!out[id]) out[id] = rec;
+      else out[id] = { ...out[id], turns: { ...(rec.turns || {}), ...(out[id].turns || {}) }, v2: { ...(rec.v2 || {}), ...(out[id].v2 || {}) } };
     }
   } catch {}
   const a = document.createElement("a");
@@ -2310,6 +2532,7 @@ function renderSegPane() {
   if (!state.coder) h += `<div class="banner" style="margin:8px 0 0">Enter your <b>coder</b> name at the top to annotate. Each coder's annotations are saved separately.</div></div>`;
   else h += `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;font-size:12px"><span class="muted">Session</span><select id="sLabel">${LABELS.map(([k, l]) => `<option value="${k}"${(r?.label || "") === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
     <textarea id="sNote" rows="2" placeholder="Session memo (e.g. narrowing factor, overall pattern)…">${esc(r?.note || "")}</textarea></div>`;
+  if (state.mode === "v2") { p.innerHTML = h + v2PaneHtml() + figureHtml(); fillThumbs(p); return; }
   if (state.mode !== "timeline") { p.innerHTML = h + turnPaneHtml() + figureHtml(); fillThumbs(p); return; }
   const list = segs(), g = list.find((x) => x.id === state.sel), pn = pins().find((x) => x.id === state.selPin);
   const arts = cur()?.artifacts || [];
@@ -2686,6 +2909,7 @@ document.addEventListener("keydown", (e) => {
   if (e.target.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
   if (!D || !state.pid) return;
   const k = e.code === "BracketRight" ? "]" : e.code === "BracketLeft" ? "[" : e.key;
+  if (state.mode === "v2" && MARKS.some(([, mk]) => mk === k.toLowerCase())) return;   // no marker keys in turns v2
   if (state.mode !== "timeline" && (/^\d$/.test(k) || ["[", "]", "ArrowUp", "ArrowDown", "Backspace", "Delete"].includes(k))) {
     if (k === "Backspace" || k === "Delete") { if (state.selPin) { e.preventDefault(); deleteSel(); } }
     return;
@@ -2776,6 +3000,10 @@ $("csvSeq").addEventListener("click", () => {
   }
   download(`process_sequences_${Date.now()}.csv`, rows);
 });
+
+$("cbBtn").addEventListener("click", () => { const open = $("codebook").hidden; $("codebook").hidden = !open; lsSet("pr-codebook", open ? "1" : ""); });
+$("cbClose").addEventListener("click", () => { $("codebook").hidden = true; lsSet("pr-codebook", ""); });
+if (lsGet("pr-codebook")) $("codebook").hidden = false;
 
 load();
 </script>
