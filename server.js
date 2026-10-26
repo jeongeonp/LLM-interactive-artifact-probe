@@ -803,7 +803,8 @@ app.post("/api/process-codes", safe(async (req, res) => {
       intent: { stage: [3, 6, 9, 12, 15].includes(+x.intent?.stage) ? +x.intent.stage : null, note: String(x.intent?.note ?? "").slice(0, 2000), inspired: st(x.intent?.inspired) },
       nodes: (Array.isArray(x.nodes) ? x.nodes : []).slice(0, 12).map((n) => ({ stage: st(n?.stage), eng: pick(n?.eng, ["skimmed", "read", "ignored"]) })),
       hyps: (Array.isArray(x.hyps) ? x.hyps : []).slice(0, 30).map((h) => ({ has: pick(h?.has, ["yes", "no"]), options: pick(h?.options, ["1", "2", "3", "4"]),
-        art: pick(h?.art, ["confirm", "counter", "no", "narrows"]), eng: pick(h?.eng, ["changed", "narrowed", "expanded", "nochange"]), label: String(h?.label ?? "").slice(0, 200) })),
+        art: pick(h?.art, ["confirm", "counter", "no", "narrows"]), eng: pick(h?.eng, ["changed", "narrowed", "expanded", "nochange"]), label: String(h?.label ?? "").slice(0, 200),
+        artNote: String(h?.artNote ?? "").slice(0, 2000), engNote: String(h?.engNote ?? "").slice(0, 2000) })),
     };
   }
   const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, turns, start, v2, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
