@@ -295,6 +295,17 @@
   .hrow .lbl { width:100%; font:11.5px inherit; padding:2px 6px; border:1px solid var(--line); border-radius:5px; margin-top:4px; }
   .hrow .sub { font-size:10.5px; color:var(--muted); margin:4px 0 2px; }
   .addhyp { border:1px dashed #e0a49a; background:none; border-radius:6px; font-size:11px; padding:1px 8px; cursor:pointer; color:#a5321f; }
+  .v2lay { display:flex; gap:5px; align-items:center; font-size:11px; color:var(--muted); margin-bottom:8px; }
+  table.v2cmp { width:100%; border-collapse:collapse; background:var(--panel); font-size:12px; table-layout:fixed; }
+  .v2cmp th, .v2cmp td { border:1px solid var(--line); padding:5px 7px; text-align:left; vertical-align:top; }
+  .v2cmp thead th { background:#efe9df; font-size:12px; position:sticky; top:-8px; z-index:1; }
+  .v2cmp thead th:first-child, .v2cmp td.fl { width:130px; }
+  .v2cmp td.fl { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:var(--muted); background:#faf7f2; }
+  .v2cmp tr.tturn th { background:#f2ece2; font-size:12px; font-weight:700; }
+  .v2cmp tr.tturn .pr-text { font-weight:400; color:#5a564e; }
+  .v2cmp td.ok { background:#eef7ef; } .v2cmp td.no { background:#fdecea; } .v2cmp td.nc { background:#f6f5f2; }
+  .v2cmp .hcell { padding:3px 0; border-bottom:1px dashed #eadfce; font-size:11.5px; line-height:1.45; }
+  .v2cmp .hcell:last-child { border-bottom:0; }
   .flowto { font-size:10.5px; color:var(--muted); padding:2px 9px 5px; text-align:right; }
   .pinchip.diff { background:#fff; color:#a5321f; border:1px dashed #c0392b; }
   #center.turns #seqpanel { display:none; }
@@ -425,6 +436,9 @@
   <button class="linkbtn" id="csvSeq" title="One row per (coder, session): the derived sequence">⭳ sequences CSV</button>
   <button class="linkbtn" id="csvTurns" title="One row per turn slot (intent / node / engagement step), every coder">⭳ turns CSV</button>
   <button class="linkbtn" id="csvV2" title="turns v2: one row per intent, node and hypothesis, every coder">⭳ v2 CSV</button>
+  <button class="linkbtn" id="bkDown" title="Download all your coding (every session) as a backup file — includes copies kept in this browser">⭳ backup</button>
+  <button class="linkbtn" id="bkUp" title="Restore coding from a backup file into the database (your coder name only)">⭱ restore</button>
+  <input type="file" id="bkIn" accept=".json,application/json" style="display:none" />
   <button class="linkbtn" id="refresh" title="Re-read sessions and the Drive folder">↻ refresh</button>
   <a href="/artifact-review">Artifact review →</a>
 </header>
@@ -1707,6 +1721,16 @@ function changed() {
   save();
 }
 let saveT = null;
+// ---- safety: the page knows which save format it needs; every save is also kept in this browser ----
+const SCHEMA = 3;
+function backupLocal(r) {
+  try { localStorage.setItem(`pr-bk:${r.coder}:${r.pid}:${r.task}`, JSON.stringify({ at: new Date().toISOString(), rec: r })); } catch {}
+}
+let warned = false;
+function outdatedWarn() {
+  if (warned) return; warned = true;
+  alert("⚠ This server is out of date and is NOT saving your newest coding (turns v2 / nodes / descriptions).\n\nYour work is kept in this browser. Restart the server (Ctrl+C, then: node server.js) or use the live site, then reload — or click ⭳ backup in the header to download it now.");
+}
 function save() {
   const r = mine();
   if (!r) return;
@@ -1714,8 +1738,19 @@ function save() {
   clearTimeout(saveT);
   saveT = setTimeout(async () => {
     try {
+      backupLocal(r);
       const res = await fetch("/api/process-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(r) });
       if (!res.ok) throw new Error(res.status);
+      // the server reports what it stored; an outdated server process drops fields it doesn't know
+      const out = await res.json().catch(() => ({}));
+      const want = { v2: Object.keys(r.v2 || {}).length, hyps: Object.values(r.v2 || {}).reduce((n, x) => n + (x.hyps || []).length, 0),
+        nodes: Object.values(r.turns || {}).filter((t) => Array.isArray(t.nodes)).length };
+      const lost = out.schema !== SCHEMA ? Object.keys(want).filter((k) => want[k]) : Object.keys(want).filter((k) => (out.kept?.[k] ?? 0) < want[k]);
+      if (lost.length || out.schema !== SCHEMA) {
+        $("saved") && ($("saved").innerHTML = `<span style="color:#b3261e;font-weight:700" title="The server didn't store: ${lost.join(", ") || "newer fields"}. Restart it (node server.js) or use the live site. Your work is kept in this browser — ⭳ backup downloads it.">⚠ NOT saved — server out of date</span>`);
+        outdatedWarn();
+        return;
+      }
       $("saved") && ($("saved").textContent = "saved ✓");
     } catch (e) {
       $("saved") && ($("saved").textContent = "⚠ save failed — " + e.message);
@@ -1970,9 +2005,48 @@ function v2Rec(key) {   // editable record (materializes the draft on first edit
   return r.v2[key];
 }
 const chips = (list, cur, attr, dis) => `<span class="chips">${list.map(([v, l]) => `<button data-${attr}="${v}" class="${v.replace(/\s/g, "")}${cur === v ? " on" : ""}"${dis}>${l}</button>`).join("")}</span>`;
+let v2Layout = lsGet("pr-v2cmp") || "cards";   // compare layout: "cards" (inline under each turn) | "table" (side by side)
+// Side-by-side compare: one column per coder, one block per turn; a cell is green when every coder
+// who coded that turn agrees on it, red when they differ.
+function renderV2Table(b, turns, r) {
+  const coders = Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([, o]) => Object.keys(o.v2 || {}).length || Object.keys(o.turns || {}).length)
+    .sort(([a], [c]) => (a === state.coder ? -1 : c === state.coder ? 1 : a.localeCompare(c)));
+  const name = (n) => (n ? `${n} ${esc(ST[n].name)}` : "—");
+  const tag = (list, v) => (v ? (list.find(([k]) => k === v)?.[1] || v) : "—");
+  const fields = [
+    ["Intent edge", (v) => v.intent.stage ?? "", (v) => name(v.intent.stage)],
+    ["Inspired by", (v) => v.intent.inspired ?? "", (v) => name(v.intent.inspired)],
+    ["Nodes · engagement", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}:${n.eng || ""}`).sort().join("|"),
+      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div>● ${name(n.stage)} <span class="muted">· ${n.eng || "—"}</span></div>`).join("") || "—"],
+    ["Hypotheses", (v) => v.hyps.map((h) => [h.has, h.options, h.art, h.eng].join(":")).sort().join("|"),
+      (v) => v.hyps.map((h) => `<div class="hcell"><b>${esc(h.label || "hypothesis")}</b> · ${h.has || "—"} · ${h.options === "4" ? "4+" : h.options || "—"} opt
+        <br>artifact: ${tag(H_ART, h.art)}${h.artNote ? ` — <i>${esc(h.artNote)}</i>` : ""}<br>engagement: ${tag(H_ENG, h.eng)}${h.engNote ? ` — <i>${esc(h.engNote)}</i>` : ""}</div>`).join("") || "<span class=\"muted\">0</span>"],
+  ];
+  const agree = fields.map(() => [0, 0]);
+  let body = "";
+  for (const t of turns) {
+    const vs = coders.map(([, o]) => (o.v2?.[t.key] || o.turns?.[t.key] ? v2Of(o, t.key) : null));
+    if (!vs.some(Boolean)) continue;
+    body += `<tr class="tturn"><th colspan="${coders.length + 1}">Turn ${t.k} <span class="muted">${fmt(t.S)}</span> <span class="pr-text" title="click to expand">“${esc(t.prompt || "")}”</span></th></tr>`;
+    fields.forEach(([label, key, show], fi) => {
+      const keys = vs.filter(Boolean).map(key), same = keys.length > 1 && keys.every((k) => k === keys[0]);
+      if (keys.length > 1) { agree[fi][1]++; if (same) agree[fi][0]++; }
+      body += `<tr><td class="fl">${label}</td>${vs.map((v) => `<td class="${!v ? "nc" : keys.length < 2 ? "" : same ? "ok" : "no"}">${v ? show(v) : '<span class="muted">not coded</span>'}</td>`).join("")}</tr>`;
+    });
+  }
+  b.innerHTML = `<div class="tsum">${fields.map(([label], fi) => `<div><b>${agree[fi][1] ? Math.round((100 * agree[fi][0]) / agree[fi][1]) + "%" : "—"}</b>${label} agree <span class="muted">(${agree[fi][0]}/${agree[fi][1]} turns)</span></div>`).join("")}</div>
+    <table class="v2cmp"><thead><tr><th></th>${coders.map(([c]) => `<th>${esc(c)}${c === state.coder ? " (you)" : ""}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table>`;
+}
 function renderV2() {
   const b = $("v2board");
   if (state.mode !== "v2" || !D || !state.pid) { b.innerHTML = ""; return; }
+  if (state.compare && v2Layout === "table") {
+    const y = b.scrollTop;
+    renderV2Table(b, deriveTurns(), mine());
+    b.insertAdjacentHTML("afterbegin", v2LayoutBar());
+    b.scrollTop = y;
+    return;
+  }
   const turns = deriveTurns(), r = mine(), y = b.scrollTop, dis = !state.coder ? " disabled" : "";
   const others = state.compare ? Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([c, o]) => c !== state.coder && (Object.keys(o.v2 || {}).length || Object.keys(o.turns || {}).length)) : [];
   const opts = (list, cur, ph) => `<option value="">${ph}</option>` + list.map((x) => `<option value="${x.n}"${cur === x.n ? " selected" : ""}>${x.n} · ${esc(x.name)}</option>`).join("");
@@ -2033,9 +2107,14 @@ function renderV2() {
       ${turns[ti + 1] ? `<div class="flowto">↓ into Turn ${turns[ti + 1].k} intent</div>` : ""}
     </div>`;
   });
-  b.innerHTML = h;
+  b.innerHTML = (state.compare ? v2LayoutBar() : "") + h;
   b.scrollTop = y;
 }
+const v2LayoutBar = () => `<div class="v2lay">compare as: ${[["cards", "cards"], ["table", "side by side"]].map(([k, l]) => `<button class="b${v2Layout === k ? " on" : ""}" data-v2lay="${k}">${l}</button>`).join("")}</div>`;
+$("v2board").addEventListener("click", (e) => {
+  const lay = e.target.closest("[data-v2lay]");
+  if (lay) { v2Layout = lay.dataset.v2lay; lsSet("pr-v2cmp", v2Layout); renderV2(); return; }
+});
 $("v2board").addEventListener("click", (e) => {
   const pl = e.target.closest(".play");
   if (pl) { if (pl.classList.contains("on")) { vid.pause(); clipEnd = null; renderTurnsPlaying(); } else playClip(+pl.dataset.a, +pl.dataset.b); return; }
@@ -2102,6 +2181,56 @@ $("csvV2").addEventListener("click", () => {
   const url = URL.createObjectURL(new Blob([rows.map((x) => x.map(cell).join(",")).join("\n")], { type: "text/csv" }));
   Object.assign(document.createElement("a"), { href: url, download: `process-turns-v2-${new Date().toISOString().slice(0, 10)}.csv` }).click();
   URL.revokeObjectURL(url);
+});
+
+// ---- backup / restore of a coder's records ----
+// Backup = the coder's records as loaded (+ newer copies kept in this browser). Restore merges per turn:
+// turns / v2 entries missing in the database are added; for ones present in both, the coder chooses.
+$("bkDown").addEventListener("click", () => {
+  if (!state.coder) return alert("Enter your coder name first.");
+  const out = {};
+  for (const m of Object.values(CODES)) if (m[state.coder]) out[`${state.coder}__${m[state.coder].pid}__${m[state.coder].task}`] = m[state.coder];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k.startsWith(`pr-bk:${state.coder}:`)) continue;
+      const { rec } = JSON.parse(localStorage.getItem(k));
+      const id = `${rec.coder}__${rec.pid}__${rec.task}`;
+      if (!out[id]) out[id] = rec;
+    }
+  } catch {}
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ coder: state.coder, at: new Date().toISOString(), records: out }, null, 1)], { type: "application/json" }));
+  a.download = `process-coding-${state.coder}-${new Date().toISOString().slice(0, 16).replace(":", "")}.json`;
+  a.click();
+});
+$("bkUp").addEventListener("click", () => { if (!state.coder) return alert("Enter your coder name first."); $("bkIn").value = ""; $("bkIn").click(); });
+$("bkIn").addEventListener("change", async () => {
+  const f = $("bkIn").files[0];
+  if (!f) return;
+  let j;
+  try { j = JSON.parse(await f.text()); } catch { return alert("Not a valid backup file."); }
+  // accepts a ⭳ backup file, or a raw dump of the page's CODES ({ "pid|task": { coder: record } })
+  let recs = j.records ? Object.values(j.records) : Object.values(j).flatMap((m) => (m && typeof m === "object" ? Object.values(m) : []));
+  recs = recs.filter((r) => r && r.coder === state.coder && r.pid && r.task);
+  if (!recs.length) return alert(`No records for coder "${state.coder}" in this file.`);
+  const fresh = await getJson("/api/process-codes");
+  let conflicts = 0;
+  for (const r of recs) { const cur = fresh[`${r.coder}__${r.pid}__${r.task}`] || {}; for (const k of ["turns", "v2"]) for (const t of Object.keys(r[k] || {})) if (cur[k]?.[t]) conflicts++; }
+  const preferBackup = conflicts ? confirm(`${recs.length} session(s) in the backup. ${conflicts} turn(s) exist both in the backup and in the database.\n\nOK = use the BACKUP's version for those\nCancel = keep the DATABASE's version (only add what's missing)`) : false;
+  let n = 0;
+  for (const r of recs) {
+    const cur = fresh[`${r.coder}__${r.pid}__${r.task}`] || {};
+    const merged = { ...cur, ...r, coder: r.coder, pid: r.pid, task: r.task };
+    for (const k of ["turns", "v2"]) merged[k] = preferBackup ? { ...(cur[k] || {}), ...(r[k] || {}) } : { ...(r[k] || {}), ...(cur[k] || {}) };
+    if (!preferBackup) { merged.segs = cur.segs?.length ? cur.segs : r.segs || []; merged.pins = cur.pins?.length ? cur.pins : r.pins || []; }
+    const res = await fetch("/api/process-codes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(merged) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || out.schema !== SCHEMA) return alert("Restore stopped: this server is out of date or refused the save. Restart it and try again.");
+    n++;
+  }
+  alert(`Restored ${n} session(s).`);
+  load(true);
 });
 
 // ---- markers view: the marker analysis (starting hypothesis + markers, turn by turn) ----

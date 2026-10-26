@@ -809,7 +809,10 @@ app.post("/api/process-codes", safe(async (req, res) => {
   }
   const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, turns, start, v2, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
   await setProcessCode(`${data.coder}__${data.pid}__${data.task}`, data);
-  res.json({ ok: true });
+  // schema + what was kept: the page compares this with what it sent and warns if anything was dropped
+  // (e.g. an old server process still running after the code was updated)
+  res.json({ ok: true, schema: 3, kept: { v2: Object.keys(v2).length, hyps: Object.values(v2).reduce((n, x) => n + x.hyps.length, 0),
+    nodes: Object.values(turns).filter((t) => Array.isArray(t.nodes)).length, pins: pins.length, segs: segs.length } });
 }));
 
 app.get("/api/export.json", async (req, res) => {
