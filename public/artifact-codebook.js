@@ -31,10 +31,13 @@ let BOOK = [], ADDS = [];
 const CODE = {};        // id -> { label (full path), short, group, scheme, parent, custom, by }
 const GROUP_ITEMS = {}; // group id -> every code id inside it (sub-codes included)
 const DESC = {};        // code id -> [itself, ...its sub-codes]
+// Built-in codes / categories removed in the codebook editor (artifact-compare) — kind "hide" entries.
+let HIDDEN = new Set();
 function buildBook() {
-  BOOK = CODEBOOK.map((sc) => ({ ...sc, groups: sc.groups.map((g) => {
+  HIDDEN = new Set(ADDS.filter((c) => c.kind === "hide").map((c) => c.target));
+  BOOK = CODEBOOK.map((sc) => ({ ...sc, groups: sc.groups.filter((g) => !HIDDEN.has(g.id)).map((g) => {
     const solo = g.items.length === 1 && g.items[0][0] === g.id;
-    return { ...g, solo, items: g.items.map(([id, label]) => ({ id, label, subs: [] })) };
+    return { ...g, solo, items: g.items.filter(([id]) => !HIDDEN.has(id)).map(([id, label]) => ({ id, label, subs: [] })) };
   }) }));
   const placed = new Set();
   // Added codes can nest under other added codes, so place them in passes until stable.

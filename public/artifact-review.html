@@ -46,6 +46,13 @@
   .progress { font-size:12px; margin-bottom:8px; }
   .progress .bar { height:5px; background:#eee9df; border-radius:3px; overflow:hidden; margin-top:4px; }
   .progress .bar i { display:block; height:100%; background:var(--accent); }
+  table.prog { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:8px; font-variant-numeric:tabular-nums; }
+  .prog th { font-size:10px; color:var(--muted); font-weight:600; text-align:left; padding:0 4px 2px; }
+  .prog td { padding:3px 4px; vertical-align:top; }
+  .prog td:first-child { font-weight:600; width:1%; white-space:nowrap; padding-right:8px; }
+  .prog tr.me td:first-child { color:var(--accent); }
+  .prog .bar { height:4px; background:#eee9df; border-radius:2px; overflow:hidden; margin-top:2px; }
+  .prog .bar i { display:block; height:100%; background:var(--accent); }
   .tagtab td.num { text-align:right; font-variant-numeric:tabular-nums; width:34px; }
   .tagtab tr { cursor:pointer; }
   .tagtab tr:hover td { background:#f6f3ed; }
@@ -208,6 +215,7 @@
 </div>
 
 <script src="/artifact-codebook.js"></script>
+<script src="/artifact-rounds.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -294,6 +302,7 @@ function agreement(a) {
 }
 function matchesCode(a, f) {
   if (f === "~flag") return flagged(a);
+  if (f === "~r2") return ROUNDS[2].includes(keyOf(a));
   if (f === "~uncoded") return state.compare ? agreement(a) === "none" || agreement(a) === "single" : !isCoded(mine(a));
   if (f === "~disagree") return agreement(a) === "disagree";
   const ids = f.startsWith("g:") ? GROUP_ITEMS[f.slice(2)] || [] : DESC[f] || [f];
@@ -350,15 +359,24 @@ function renderTags(scope) {
   const base = scope.filter((a) => passes(a, { code: 1, cond: 1 }));
   const n = (f, cond) => base.filter((a) => (!cond || a.cond === cond) && matchesCode(a, f)).length;
   let h = "";
-  if (state.coder && !state.compare) {
-    const done = base.filter((a) => isCoded(mine(a))).length;
-    h += `<div class="progress"><b>${esc(state.coder)}</b> coded ${done} / ${base.length}<div class="bar"><i style="width:${base.length ? (100 * done) / base.length : 0}%"></i></div></div>`;
-  } else if (state.compare) {
+  // every coder's progress: on what's in view (task / condition / participant filters) and on the round 2 sample
+  const allCoders = [...new Set(Object.values(CODES).flatMap((m) => Object.entries(m).filter(([, x]) => isCoded(x)).map(([c]) => c)))].sort((x, y) => x.localeCompare(y));
+  if (state.coder && !allCoders.includes(state.coder)) allCoders.push(state.coder);
+  if (allCoders.length) {
+    const view = scope.filter((a) => passes(a, { code: 1 })), r2 = scope.filter((a) => ROUNDS[2].includes(keyOf(a)));
+    const bar = (n, of) => `<div class="bar"><i style="width:${of ? (100 * n) / of : 0}%"></i></div>`;
+    const done = (c, xs) => xs.filter((a) => isCoded(byCoder(a)[c])).length;
+    h += `<table class="prog"><tr><th></th><th>in view</th><th>round 2</th></tr>` + allCoders.map((c) => {
+      const d = done(c, view), d2 = done(c, r2);
+      return `<tr class="${c === state.coder ? "me" : ""}"><td>${esc(c)}</td><td>${d} / ${view.length}${bar(d, view.length)}</td><td>${d2} / ${r2.length}${bar(d2, r2.length)}</td></tr>`;
+    }).join("") + "</table>";
+  }
+  if (state.compare) {
     const coders = [...new Set(Object.values(CODES).flatMap((m) => Object.keys(m)))].sort();
     const both = base.filter((a) => codedBy(a).length >= 2), agree = both.filter((a) => agreement(a) === "agree").length;
     h += `<div class="progress">Coders: <b>${coders.map(esc).join(", ") || "—"}</b><br>${both.length} coded by 2+ · exact agreement ${both.length ? Math.round((100 * agree) / both.length) : 0}%</div>`;
   }
-  const stat = [["~flag", "🚩 Needs discussion"], ["~uncoded", state.compare ? "Not coded by 2+ coders" : "Not coded by me"]];
+  const stat = [["~r2", "🎲 Round 2 sample"], ["~flag", "🚩 Needs discussion"], ["~uncoded", state.compare ? "Not coded by 2+ coders" : "Not coded by me"]];
   if (state.compare) stat.push(["~disagree", "≠ Disagreements"]);
   h += `<div class="chips" style="margin-bottom:6px">${stat.map(([f, l]) => `<span class="chip${state.code === f ? " on" : ""}" data-code="${f}">${l}<span class="n">${n(f)}</span></span>`).join("")}</div>`;
   const row = (f, label, cls, showS) => `<tr class="${cls}${state.code === f ? " on" : ""}" data-code="${esc(f)}"><td>${esc(label)}</td><td class="num">${n(f, "interactive") || ""}</td><td class="num">${showS ? n(f, "static") || "" : ""}</td></tr>`;

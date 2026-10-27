@@ -642,15 +642,41 @@ app.post("/api/artifact-codebook", safe(async (req, res) => {
   _cbCache = null;
   res.json({ ok: true, id, code: doc });
 }));
-// Remove an added code — only if no coder has applied it and nothing is nested under it.
+// Remove a code or category from the codebook. Added ones are deleted; built-in ones (written into
+// artifact-codebook.js) are hidden with a { kind: "hide" } entry, which "restore" deletes again.
+// Refused while anything is nested under it or anyone has applied it — unless moveTo is given: then
+// every coder's and the final code's tags move to that code (e.g. the category's "Other"), with
+// "was: <label>" added to its Other description so the original tag isn't lost.
+const CODE_ID = /^[A-Za-z0-9._-]{1,60}$/;
 app.post("/api/artifact-codebook/delete", safe(async (req, res) => {
-  const id = String(req.body?.id || "");
+  const id = String(req.body?.id || ""), moveTo = req.body?.moveTo ? String(req.body.moveTo) : "";
+  const label = String(req.body?.label ?? id).slice(0, 80), members = (Array.isArray(req.body?.members) ? req.body.members : [id]).map(String);
+  if (!CODE_ID.test(id) || (moveTo && !CODE_ID.test(moveTo)) || !members.every((m) => CODE_ID.test(m))) return res.status(400).json({ error: "bad id" });
   const adds = await codebookAdds();
-  if (!adds.some((c) => c.id === id)) return res.status(404).json({ error: "not found" });
-  if (adds.some((c) => c.parent === id)) return res.status(409).json({ error: "it has codes nested under it — remove those first" });
-  const used = Object.values(await getCodes()).filter((x) => (x.codes || []).includes(id)).map((x) => x.coder);
-  if (used.length) return res.status(409).json({ error: `still applied by ${[...new Set(used)].join(", ")} — untick it everywhere first` });
-  await deleteCodebookAdd(id);
+  const added = adds.find((c) => c.id === id && c.kind !== "hide");
+  if (adds.some((c) => c.parent === id && c.kind !== "hide")) return res.status(409).json({ error: "it has codes nested under it — remove those first" });
+  const all = await getCodes();
+  const users = Object.entries(all).filter(([, x]) => (x.codes || []).some((c) => members.includes(c)));
+  if (users.length && !moveTo) {
+    const who = [...new Set(users.map(([, x]) => (x.coder === "_final" ? "the final code" : x.coder)))];
+    return res.status(409).json({ error: `still applied on ${new Set(users.map(([, x]) => x.key)).size} artifact(s) by ${who.join(", ")}`, used: users.length });
+  }
+  for (const [docId, x] of users) {
+    const codes = [...new Set([...(x.codes || []).filter((c) => !members.includes(c)), moveTo])];
+    const other = { ...(x.other || {}) };
+    other[moveTo] = [other[moveTo], `was: ${label}`].filter((t) => t && String(t).trim()).join("; ").slice(0, 500);
+    await setCode(docId, { ...x, codes, other });
+  }
+  if (added) await deleteCodebookAdd(id);
+  else await setCodebookAdd(`hide__${id}`, { id: `hide__${id}`, kind: "hide", target: id, label, createdBy: String(req.body?.coder || ""), created: new Date().toISOString() });
+  _cbCache = null;
+  res.json({ ok: true, moved: users.length });
+}));
+// Bring back a hidden built-in code or category.
+app.post("/api/artifact-codebook/restore", safe(async (req, res) => {
+  const id = String(req.body?.id || "");
+  if (!CODE_ID.test(id)) return res.status(400).json({ error: "bad id" });
+  await deleteCodebookAdd(`hide__${id}`);
   _cbCache = null;
   res.json({ ok: true });
 }));
