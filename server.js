@@ -36,6 +36,7 @@ app.get("/", (req, res, next) => {
   res.redirect("/start.html");
 });
 app.get("/artifact-review", (req, res) => res.sendFile(path.join(__dirname, "public", "artifact-review.html")));
+app.get("/artifact-compare", (req, res) => res.sendFile(path.join(__dirname, "public", "artifact-compare.html")));
 app.get("/process-review", (req, res) => res.sendFile(path.join(__dirname, "public", "process-review.html")));
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -606,6 +607,8 @@ app.post("/api/artifact-codes", safe(async (req, res) => {
     flag: !!flag,
     note: String(note ?? "").slice(0, 5000),
   };
+  // the discussed final code (coder "_final", from /artifact-compare): whether it's settled and who last edited it
+  if (data.coder === "_final") Object.assign(data, { decided: !!req.body.decided, by: String(req.body.by ?? "").slice(0, 30) });
   await setCode(`${data.coder}__${data.key}`, data);
   res.json({ ok: true });
 }));

@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Artifact Compare</title>
+<style>
+  :root { --bg:#f7f6f2; --panel:#fff; --line:#e4e1d8; --accent:#b4622e; --text:#2a2725; --muted:#8a857c;
+          --int:#356b35; --int-bg:#e3f0e3; --sta:#8a5a2b; --sta-bg:#f3e8dc; --ok:#356b35; --bad:#b3261e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system,Segoe UI,Roboto,sans-serif; color:var(--text); background:var(--bg); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; align-items:center; gap:14px; padding:9px 16px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header b { color:var(--accent); }
+  header label { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  header input[type=text] { padding:4px 8px; border:1px solid var(--line); border-radius:6px; font:12px ui-monospace,Menlo,monospace; }
+  header select { font-size:12px; padding:3px 4px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  header a, .linkbtn { color:#6f6a61; font-size:13px; text-decoration:none; background:none; border:0; cursor:pointer; padding:0; }
+  header a:hover, .linkbtn:hover { color:var(--accent); }
+  .muted { color:var(--muted); }
+  main { display:flex; flex:1; min-height:0; }
+
+  /* ---- list of artifacts ---- */
+  #list { width:250px; flex:none; overflow-y:auto; border-right:1px solid var(--line); background:var(--panel); }
+  .progress { padding:10px 12px; font-size:12px; border-bottom:1px solid var(--line); }
+  .progress .bar { height:5px; background:#eee9df; border-radius:3px; overflow:hidden; margin-top:4px; }
+  .progress .bar i { display:block; height:100%; background:var(--ok); }
+  .li { display:flex; align-items:center; gap:7px; padding:6px 12px; border-bottom:1px solid #f2efe8; cursor:pointer; font-size:12px; }
+  .li:hover { background:#f6f3ed; }
+  .li.on { background:#efe9df; box-shadow:inset 3px 0 0 var(--accent); }
+  .li .t { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#5a564e; }
+  .li b { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .dot { width:9px; height:9px; border-radius:50%; flex:none; background:#d8d3c9; }
+  .dot.agree { background:var(--ok); }
+  .dot.disagree { background:var(--bad); }
+  .dot.decided { background:#fff; border:2px solid var(--ok); }
+  .li .fl { font-size:11px; }
+  .lh { padding:8px 12px 4px; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:700; background:#faf7f2; border-bottom:1px solid var(--line); position:sticky; top:0; }
+
+  /* ---- artifact ---- */
+  #stage { flex:1; min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--line); }
+  .bar2 { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); background:var(--panel); font-size:13px; }
+  .bar2 .grow { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bar2 button { padding:3px 10px; border:1px solid var(--line); border-radius:6px; background:#f2efe8; cursor:pointer; font-size:13px; }
+  .bar2 button:hover { border-color:var(--accent); }
+  .bar2 a { color:var(--accent); text-decoration:none; font-weight:600; white-space:nowrap; font-size:12px; }
+  #frame { flex:1; width:100%; border:0; background:#fff; }
+  .prompt { padding:8px 12px; font-size:12px; background:#faf7f2; border-top:1px solid var(--line); max-height:7.5em; overflow:auto; white-space:pre-wrap; color:#5a564e; }
+  .prompt b { color:var(--text); }
+
+  /* ---- comparison ---- */
+  #cmp { width:min(560px, 46vw); flex:none; overflow-y:auto; padding:12px 14px 40px; background:var(--panel); font-size:13px; }
+  #cmp h4 { margin:16px 0 6px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+  #cmp h4:first-child { margin-top:0; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:11px; font-size:11px; font-weight:600; }
+  .pill.interactive { background:var(--int-bg); color:var(--int); }
+  .pill.static { background:var(--sta-bg); color:var(--sta); }
+  .pill.task { background:#e7eef7; color:#3a5a80; }
+  table.ct { width:100%; border-collapse:collapse; font-size:12px; }
+  .ct th { font-size:11px; color:#6f6a61; font-weight:700; padding:4px; border-bottom:2px solid var(--line); position:sticky; top:-12px; background:var(--panel); z-index:1; }
+  .ct th.c, .ct td.c { text-align:center; width:64px; }
+  .ct th.fin, .ct td.fin { background:#f3f8f1; }
+  .ct td { padding:3px 4px; border-bottom:1px solid #f0ede6; }
+  .ct tr.sch td { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:700; padding-top:12px; border-bottom:0; }
+  .ct tr.grp td { font-weight:600; color:#5a564e; padding-top:7px; border-bottom:0; font-size:11.5px; }
+  .ct tr.code td:first-child { padding-left:14px; }
+  .ct tr.sub td:first-child { padding-left:28px; color:#6f6a61; }
+  .ct tr.diff td:not(.fin) { background:#fdf0ed; }
+  .ct tr.diff td:first-child::after { content:" ≠"; color:var(--bad); font-weight:700; }
+  .ct .y { color:var(--ok); font-weight:700; }
+  .ct .oth { display:block; font-size:10.5px; color:#9a6b1d; font-weight:400; max-width:120px; margin:0 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ct input { width:15px; height:15px; cursor:pointer; }
+  .ct th button { display:block; margin:3px auto 0; font-size:10px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; padding:0 6px; color:#6f6a61; font-weight:400; }
+  .ct th button:hover { border-color:var(--accent); color:var(--accent); }
+  .opts { display:flex; gap:12px; align-items:center; font-size:12px; color:var(--muted); margin:2px 0 6px; flex-wrap:wrap; }
+  .opts button { font-size:12px; border:1px solid var(--line); border-radius:6px; background:#f2efe8; padding:2px 9px; cursor:pointer; }
+  .opts button:hover { border-color:var(--accent); }
+  .notes { border:1px solid var(--line); border-radius:8px; padding:7px 10px; background:#faf7f2; font-size:12px; }
+  .notes + .notes { margin-top:6px; }
+  .notes .who { font-weight:700; }
+  .flag { font-size:10px; padding:1px 7px; border-radius:9px; background:#fde8e4; color:var(--bad); font-weight:600; }
+  textarea#disc { width:100%; height:90px; border:1px solid var(--line); border-radius:8px; padding:7px; font:inherit; resize:vertical; }
+  input.othertxt { width:100%; font:12px inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; margin-top:4px; }
+  .decide { display:flex; align-items:center; gap:10px; margin-top:10px; }
+  .decide button { padding:7px 14px; border:1px solid var(--line); border-radius:8px; background:#faf7f2; cursor:pointer; font:inherit; font-weight:600; }
+  .decide button.on { background:var(--ok); border-color:var(--ok); color:#fff; }
+  #saved { font-size:11px; color:var(--muted); }
+  .empty { color:var(--muted); padding:24px; }
+  kbd { font:11px ui-monospace,Menlo,monospace; background:#f2efe8; border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <b>Artifact compare</b>
+  <span class="muted" id="hdrCount" style="font-size:13px">loading…</span>
+  <label>Task <select id="fTask"><option value="">all</option><option value="relocation">Relocation</option><option value="studytool">Study tools</option><option value="userchoice">User choice</option></select></label>
+  <label>Condition <select id="fCond"><option value="">all</option><option value="interactive">Interactive</option><option value="static">Static</option></select></label>
+  <label>Show <select id="fShow">
+    <option value="multi">coded by 2+</option><option value="disagree">disagreements</option><option value="flag">flagged 🚩</option>
+    <option value="open">not decided</option><option value="decided">decided</option><option value="all">all coded</option></select></label>
+  <label title="Recorded with the final code as who last edited it">Your name <input type="text" id="who" spellcheck="false" style="width:100px" /></label>
+  <button class="linkbtn" id="csv" title="Download the final codes (one row per artifact)">⭳ final CSV</button>
+  <button class="linkbtn" id="refresh">↻ refresh</button>
+  <a href="/artifact-review" style="margin-left:auto">← Artifact review</a>
+</header>
+<main>
+  <aside id="list"></aside>
+  <section id="stage">
+    <div class="bar2">
+      <button id="prev" title="Previous (←)">←</button><button id="next" title="Next (→)">→</button>
+      <span class="grow" id="title"></span>
+      <a id="ctx" target="_blank">Context in review ↗</a><a id="open" target="_blank">Open ↗</a>
+    </div>
+    <iframe id="frame" sandbox="allow-scripts" title="artifact"></iframe>
+    <div class="prompt" id="prompt"></div>
+  </section>
+  <section id="cmp"><div class="empty">Loading…</div></section>
+</main>
+
+<script src="/artifact-codebook.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const FINAL = "_final"; // the discussed code is stored as this coder (kept out of agreement on artifact-review)
+const TASK_LABEL = { relocation: "Relocation", studytool: "Study tools", userchoice: "User choice" };
+const COND_LABEL = { interactive: "Interactive", static: "Static" };
+const DEFAULT_PIDS = "I3-I17,S1-S14,S16,T1-T11";
+const q = new URLSearchParams(location.search);
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const state = { task: q.get("task") || "", cond: q.get("cond") || "", show: q.get("show") || "multi", key: q.get("key") || "",
+  who: (q.get("who") || lsGet("ac-who") || lsGet("ar-coder") || "").replace(/[^A-Za-z0-9_-]/g, ""), allCodes: lsGet("ac-all") === "1" };
+let DATA = { artifacts: [] }, CODES = {}, FIN = {}, list = [];
+
+const keyOf = (a) => `${a.pid}__${a.cond}__${a.task}__${a.seq}`;
+const ctxUrl = (a) => `/review.html?pid=${encodeURIComponent(a.pid)}&task=${encodeURIComponent(a.task)}&cond=${encodeURIComponent(a.cond)}&tab=full&art=${a.seq}`;
+const pidNum = (p) => +String(p).replace(/\D/g, "") || 0;
+const byPid = (a, b) => a.task.localeCompare(b.task) || a.cond.localeCompare(b.cond) || a.pid[0].localeCompare(b.pid[0]) || pidNum(a.pid) - pidNum(b.pid) || a.seq - b.seq;
+function parsePids(spec) {
+  const out = new Set();
+  for (const part of spec.split(/[\s,]+/).filter(Boolean)) {
+    const m = part.match(/^([a-z]+)(\d+)-(?:[a-z]+)?(\d+)$/i);
+    if (m) for (let i = +m[2]; i <= +m[3]; i++) out.add((m[1] + i).toUpperCase());
+    else out.add(part.toUpperCase());
+  }
+  return out;
+}
+const coders = (a) => Object.entries(CODES[keyOf(a)] || {}).filter(([, x]) => x.codes?.length).sort(([x], [y]) => x.localeCompare(y));
+function agreement(a) {
+  const sets = coders(a).map(([, x]) => [...x.codes].sort().join("|"));
+  if (sets.length < 2) return sets.length ? "single" : "none";
+  return sets.every((s) => s === sets[0]) ? "agree" : "disagree";
+}
+const fin = (a) => FIN[keyOf(a)] || null;
+const flagged = (a) => coders(a).some(([, x]) => x.flag);
+
+function syncUrl() {
+  const p = new URLSearchParams();
+  for (const k of ["task", "cond", "key"]) if (state[k]) p.set(k, state[k]);
+  if (state.show !== "multi") p.set("show", state.show);
+  history.replaceState(null, "", location.pathname + (p.toString() ? "?" + p : ""));
+}
+
+async function load(fresh) {
+  const getJson = async (url) => { const r = await fetch(url); if (!r.ok) throw new Error(`${url} → HTTP ${r.status}`); return r.json(); };
+  let d, c;
+  try { [d, c] = await Promise.all([getJson("/api/artifact-review" + (fresh ? "?fresh=1" : "")), getJson("/api/artifact-codes"), loadBook()]); }
+  catch (e) { $("cmp").innerHTML = `<div class="empty" style="color:var(--bad)">Could not load: ${esc(e.message)}</div>`; return; }
+  const pids = parsePids(DEFAULT_PIDS);
+  DATA = { ...d, artifacts: d.artifacts.filter((a) => pids.has(String(a.pid).toUpperCase())) };
+  CODES = {}; FIN = {};
+  for (const x of Object.values(c)) {
+    if (!x?.coder || !x?.key) continue;
+    if (x.coder === FINAL) FIN[x.key] = x;
+    else if (!x.coder.startsWith("_")) (CODES[x.key] ||= {})[x.coder] = x;
+  }
+  render();
+}
+
+function render() {
+  const scope = DATA.artifacts.filter((a) => (!state.task || a.task === state.task) && (!state.cond || a.cond === state.cond) && coders(a).length);
+  const multi = scope.filter((a) => coders(a).length >= 2);
+  const show = {
+    multi: (a) => coders(a).length >= 2, disagree: (a) => agreement(a) === "disagree", flag: flagged,
+    open: (a) => !fin(a)?.decided, decided: (a) => !!fin(a)?.decided, all: () => true,
+  }[state.show] || (() => true);
+  list = scope.filter(show).sort(byPid);
+  const done = multi.filter((a) => fin(a)?.decided).length, agree = multi.filter((a) => agreement(a) === "agree").length;
+  $("hdrCount").textContent = `${list.length} artifacts`;
+  let h = `<div class="progress"><b>${done}</b> / ${multi.length} decided (coded by 2+)<div class="bar"><i style="width:${multi.length ? (100 * done) / multi.length : 0}%"></i></div>
+    <div class="muted" style="margin-top:5px">exact agreement before discussion: ${multi.length ? Math.round((100 * agree) / multi.length) : 0}%</div>
+    <div class="muted" style="margin-top:3px"><span class="dot agree" style="display:inline-block"></span> agree · <span class="dot disagree" style="display:inline-block"></span> differ · <span class="dot decided" style="display:inline-block"></span> decided</div></div>`;
+  let sec = "";
+  for (const a of list) {
+    const s = `${TASK_LABEL[a.task]} · ${COND_LABEL[a.cond]}`;
+    if (s !== sec) { h += `<div class="lh">${esc(s)}</div>`; sec = s; }
+    const st = fin(a)?.decided ? "decided" : agreement(a);
+    h += `<div class="li${keyOf(a) === state.key ? " on" : ""}" data-key="${esc(keyOf(a))}"><span class="dot ${st}"></span><b>${esc(a.pid)} #${a.seq}</b><span class="t">${esc(a.title || "untitled")}</span>${flagged(a) ? '<span class="fl">🚩</span>' : ""}</div>`;
+  }
+  if (!list.length) h += '<div class="empty">Nothing matches.</div>';
+  $("list").innerHTML = h;
+  if (!list.some((a) => keyOf(a) === state.key)) state.key = list[0] ? keyOf(list[0]) : "";
+  show1();
+}
+
+// ---- one artifact ----
+let shownKey = null;
+const htmlCache = new Map();
+const getHtml = (file) => {
+  if (!htmlCache.has(file)) htmlCache.set(file, fetch(file).then((r) => (r.ok ? r.text() : `<p style="font:14px sans-serif;color:#999;padding:20px">Could not load ${file}</p>`)));
+  return htmlCache.get(file);
+};
+const cur = () => list.find((a) => keyOf(a) === state.key);
+function show1() {
+  syncUrl();
+  document.querySelectorAll(".li").forEach((el) => el.classList.toggle("on", el.dataset.key === state.key));
+  const a = cur();
+  if (!a) { $("cmp").innerHTML = '<div class="empty">Pick an artifact on the left.</div>'; $("frame").removeAttribute("srcdoc"); $("title").textContent = ""; $("prompt").textContent = ""; return; }
+  if (shownKey !== state.key) {
+    shownKey = state.key;
+    $("frame").removeAttribute("srcdoc");
+    getHtml(a.file).then((h) => { if (cur() === a) $("frame").srcdoc = h; });
+    document.querySelector(`.li[data-key="${CSS.escape(state.key)}"]`)?.scrollIntoView({ block: "nearest" });
+  }
+  const i = list.indexOf(a);
+  $("title").innerHTML = `<b>${esc(a.pid)} · #${a.seq}</b> ${esc(a.title || "untitled")} <span class="muted">(${i + 1} / ${list.length})</span>`;
+  $("ctx").href = ctxUrl(a); $("open").href = a.file;
+  $("prev").disabled = i <= 0; $("next").disabled = i >= list.length - 1;
+  const uc = a.task === "userchoice" ? DATA.scenarios?.userchoice?.[a.pid] : null;
+  $("prompt").innerHTML = (uc ? `<b>Topic:</b> ${esc(uc)}\n` : "") + `<b>Prompt:</b> ${esc(a.prompt || "(not found)")}`;
+  drawCmp();
+}
+
+// The table: one row per code (only codes someone used, unless "all codes"), one column per coder,
+// and the Final column the group ticks while discussing.
+function drawCmp() {
+  const a = cur(), cs = coders(a), f = fin(a) || { codes: [], other: {}, note: "", decided: false };
+  const finSet = new Set(f.codes || []);
+  const used = new Set([...cs.flatMap(([, x]) => x.codes), ...finSet]);
+  const col = (id) => cs.map(([, x]) => x.codes.includes(id));
+  let rows = "";
+  for (const sc of BOOK) {
+    if (sc.onlyCond && a.cond !== sc.onlyCond) continue;
+    let schemeRows = "";
+    for (const g of sc.groups) {
+      let groupRows = "";
+      const codeRow = (node, label, cls) => {
+        const ids = [node.id, ...(node.subs || []).map((s) => s.id)];
+        if (!state.allCodes && !ids.some((id) => used.has(id))) return "";
+        const v = col(node.id), diff = cs.length > 1 && v.some((x) => x !== v[0]);
+        let r = `<tr class="${cls}${diff ? " diff" : ""}"><td>${esc(label)}${node.custom ? ' <span class="muted" title="added while coding">✚</span>' : ""}</td>` +
+          cs.map(([, x], j) => `<td class="c">${v[j] ? '<span class="y">✓</span>' : ""}${v[j] && x.other?.[node.id] ? `<span class="oth" title="${esc(x.other[node.id])}">${esc(x.other[node.id])}</span>` : ""}</td>`).join("") +
+          `<td class="c fin"><input type="checkbox" data-id="${node.id}"${finSet.has(node.id) ? " checked" : ""}></td></tr>`;
+        for (const sub of node.subs || []) r += codeRow(sub, "↳ " + sub.label, "sub");
+        return r;
+      };
+      if (g.solo && g.items.length === 1) groupRows = codeRow(g.items[0], g.label, "code");
+      else {
+        const inner = g.items.map((it) => codeRow(it, it.label, "code")).join("");
+        if (inner) groupRows = `<tr class="grp"><td colspan="${cs.length + 2}">${esc(g.label)}</td></tr>` + inner;
+      }
+      schemeRows += groupRows;
+    }
+    if (schemeRows) rows += `<tr class="sch"><td colspan="${cs.length + 2}">${esc(sc.label)}</td></tr>` + schemeRows;
+  }
+  const head = `<tr><th style="text-align:left">Code</th>${cs.map(([c]) => `<th class="c">${esc(c)}<button data-take="${esc(c)}" title="Set the final code to ${esc(c)}'s codes">use</button></th>`).join("")}<th class="c fin">Final</th></tr>`;
+  const others = [...finSet].filter((id) => isOther(id));
+  let h = `<h4>${esc(a.pid)} <span class="pill ${a.cond}">${COND_LABEL[a.cond]}</span> <span class="pill task">${TASK_LABEL[a.task]}</span>
+      <span style="float:right;text-transform:none;letter-spacing:0;font-weight:400">${{ agree: "✓ coders agree", disagree: "≠ coders differ", single: "1 coder" }[agreement(a)] || ""}</span></h4>
+    <div class="opts"><label><input type="checkbox" id="allCodes"${state.allCodes ? " checked" : ""}> show all codes</label>
+      <button id="fillAgreed" title="Final = the codes every coder applied">final = codes all agree on</button>
+      <button id="fillAny" title="Final = every code any coder applied">final = any coder's codes</button></div>
+    <table class="ct">${head}${rows || `<tr><td colspan="${cs.length + 2}" class="muted">No codes yet.</td></tr>`}</table>`;
+  if (others.length) h += `<h4>Final "Other" descriptions</h4>` + others.map((id) => `<div class="muted" style="font-size:11px;margin-top:6px">${esc(CODE[id]?.label || id)}</div>
+      <input class="othertxt" data-other="${id}" placeholder="describe…" value="${esc(f.other?.[id] ?? cs.map(([, x]) => x.other?.[id]).find(Boolean) ?? "")}">`).join("");
+  const notes = cs.filter(([, x]) => x.note || x.flag);
+  if (notes.length) h += "<h4>Coders' notes</h4>" + notes.map(([c, x]) => `<div class="notes"><span class="who">${esc(c)}</span>${x.flag ? ' <span class="flag">🚩 discuss</span>' : ""}${x.note ? `<div style="white-space:pre-wrap;margin-top:2px">${esc(x.note)}</div>` : ""}</div>`).join("");
+  h += `<h4>Discussion</h4><textarea id="disc" placeholder="what was decided and why…">${esc(f.note || "")}</textarea>
+    <div class="decide"><button id="decided" class="${f.decided ? "on" : ""}">${f.decided ? "✓ Decided" : "Mark decided"}</button>
+      <span id="saved">${f.by ? `last edited by ${esc(f.by)}` : ""}</span></div>
+    <p class="muted" style="font-size:11px;margin-top:14px"><kbd>←</kbd> <kbd>→</kbd> previous / next · saved automatically. The final code is stored apart from the coders' own codes.</p>`;
+  $("cmp").innerHTML = h;
+
+  const box = $("cmp");
+  box.querySelectorAll(".ct input[type=checkbox]").forEach((c) => c.addEventListener("change", () => {
+    const id = c.dataset.id, s = new Set(fin(a)?.codes || []);
+    if (c.checked) { s.add(id); if (CODE[id]?.parent) s.add(CODE[id].parent); }        // a sub-code implies its parent
+    else (DESC[id] || [id]).forEach((x) => s.delete(x));                               // unticking a parent clears its subs
+    saveFinal(a, { codes: [...s] }); drawCmp();
+  }));
+  box.querySelectorAll("[data-take]").forEach((b) => b.addEventListener("click", () => {
+    const x = CODES[keyOf(a)][b.dataset.take];
+    saveFinal(a, { codes: [...x.codes], other: { ...(x.other || {}) } }); drawCmp();
+  }));
+  $("fillAgreed").onclick = () => { saveFinal(a, { codes: cs[0] ? cs[0][1].codes.filter((id) => cs.every(([, x]) => x.codes.includes(id))) : [] }); drawCmp(); };
+  $("fillAny").onclick = () => { saveFinal(a, { codes: [...new Set(cs.flatMap(([, x]) => x.codes))] }); drawCmp(); };
+  $("allCodes").onchange = (e) => { state.allCodes = e.target.checked; lsSet("ac-all", state.allCodes ? "1" : ""); drawCmp(); };
+  box.querySelectorAll("input.othertxt").forEach((t) => t.addEventListener("input", () => saveFinal(a, { other: { ...(fin(a)?.other || {}), [t.dataset.other]: t.value } }, 700)));
+  $("disc").addEventListener("input", () => saveFinal(a, { note: $("disc").value }, 700));
+  $("decided").onclick = () => { saveFinal(a, { decided: !fin(a)?.decided }); drawCmp(); renderListDots(); };
+}
+function renderListDots() {
+  for (const el of document.querySelectorAll(".li")) {
+    const a = list.find((x) => keyOf(x) === el.dataset.key);
+    if (a) el.querySelector(".dot").className = `dot ${fin(a)?.decided ? "decided" : agreement(a)}`;
+  }
+}
+
+const timers = {};
+function saveFinal(a, patch, delay = 0) {
+  const key = keyOf(a), prev = fin(a) || { codes: [], other: {}, note: "", decided: false };
+  const rec = { ...prev, ...patch, coder: FINAL, key, by: state.who || prev.by || "" };
+  FIN[key] = rec;
+  const s = $("saved"); if (s) s.textContent = "saving…";
+  clearTimeout(timers[key]);
+  timers[key] = setTimeout(async () => {
+    try {
+      const r = await fetch("/api/artifact-codes", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coder: FINAL, key, codes: rec.codes, other: rec.other, flag: false, note: rec.note, decided: rec.decided, by: rec.by }) });
+      if (!r.ok) throw new Error();
+      if (cur() && keyOf(cur()) === key && $("saved")) $("saved").textContent = "saved ✓";
+    } catch { if ($("saved")) $("saved").textContent = "⚠ not saved"; }
+  }, delay);
+}
+
+// ---- controls ----
+const step = (d) => { const i = list.findIndex((a) => keyOf(a) === state.key); if (list[i + d]) { state.key = keyOf(list[i + d]); show1(); } };
+$("prev").onclick = () => step(-1);
+$("next").onclick = () => step(1);
+$("list").addEventListener("click", (e) => { const li = e.target.closest(".li"); if (li) { state.key = li.dataset.key; show1(); } });
+document.addEventListener("keydown", (e) => {
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.key === "ArrowLeft") step(-1); else if (e.key === "ArrowRight") step(1);
+});
+for (const [id, k] of [["fTask", "task"], ["fCond", "cond"], ["fShow", "show"]]) {
+  $(id).value = state[k];
+  $(id).addEventListener("change", () => { state[k] = $(id).value; render(); });
+}
+$("who").value = state.who;
+$("who").addEventListener("change", () => { state.who = $("who").value.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 30); $("who").value = state.who; lsSet("ac-who", state.who); });
+$("refresh").onclick = () => load(true);
+// One row per artifact coded by anyone: the coders' codes and the final code, with a 0/1 column per final code.
+$("csv").addEventListener("click", () => {
+  const ids = Object.keys(CODE);
+  const cell = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const lab = (xs) => (xs || []).map((id) => CODE[id]?.label || id).join("; ");
+  const rows = [["pid", "cond", "task", "seq", "title", "coders", "agreement", "decided", "final_codes", ...ids, "final_other", "discussion", "edited_by"].join(",")];
+  for (const a of DATA.artifacts.filter((a) => coders(a).length).sort(byPid)) {
+    const f = fin(a), set = new Set(f?.codes || []);
+    rows.push([a.pid, a.cond, a.task, a.seq, a.title, coders(a).map(([c]) => c).join(" "), agreement(a), f?.decided ? 1 : 0, lab(f?.codes),
+      ...ids.map((id) => (set.has(id) ? 1 : 0)), Object.entries(f?.other || {}).map(([k, v]) => `${CODE[k]?.label || k}: ${v}`).join("; "), f?.note, f?.by].map(cell).join(","));
+  }
+  const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+  Object.assign(document.createElement("a"), { href: url, download: `artifact-final-codes-${new Date().toISOString().slice(0, 10)}.csv` }).click();
+  URL.revokeObjectURL(url);
+});
+
+load();
+</script>
+</body>
+</html>
