@@ -439,6 +439,8 @@
   .tsum { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
   .tsum div { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:4px 10px; font-size:11px; color:var(--muted); }
   .tsum b { display:block; font-size:16px; color:var(--text); font-variant-numeric:tabular-nums; }
+  details.agall { margin:0 0 10px; font-size:12px; } details.agall summary { cursor:pointer; color:var(--muted); margin-bottom:6px; }
+  .tsum .kap { font-size:11px; font-weight:600; color:var(--muted); margin-left:4px; }
   /* drafted from timeline codes: grey until a coder confirms or edits; unsure = needs a look */
   .slot.auto { background:repeating-linear-gradient(135deg,#f3f2ef,#f3f2ef 6px,#eceae5 6px,#eceae5 12px); }
   .slot.auto select, .slot.auto .eitem select { color:#77736b; border-style:dashed; }
@@ -2203,6 +2205,69 @@ function v2Changed() { if (editAgreed) { saveAgreed(); renderV2(); renderSegPane
 // Side-by-side compare: one column per coder, one block per turn; a cell is green when every coder who coded
 // that turn agrees, red when they differ. Anything coded "no" is greyed out; secondary actions are shown in
 // italics and left out of the agreement.
+// ---- inter-coder agreement on turns v2, counted per decision (not per turn), with Cohen's κ where it applies:
+//   intent edge — one choice per turn · nodes — each node stage present / absent per turn
+//   engagement — on nodes both coded, agree when the picks share a level (more than one pick = unsure)
+//   ↑ arrows — each arrow present / absent per turn, pooled over the artifact (not tied to a node)
+//   # actions — same number of non-secondary actions per turn
+function kappa(pairs) {
+  const n = pairs.length;
+  if (!n) return { po: null, k: null, n: 0 };
+  const po = pairs.filter(([a, b]) => a === b).length / n, ca = {}, cb = {};
+  for (const [a, b] of pairs) { ca[a] = (ca[a] || 0) + 1; cb[b] = (cb[b] || 0) + 1; }
+  const pe = Object.keys({ ...ca, ...cb }).reduce((x, k) => x + ((ca[k] || 0) / n) * ((cb[k] || 0) / n), 0);
+  return { po, k: pe < 1 ? (po - pe) / (1 - pe) : null, n };
+}
+const v2Arrows = (v) => [...new Set(v.nodes.filter((n) => n.stage).flatMap((n) => n.up))].sort((a, b) => a - b);
+const engAgree = (a, b) => a.some((x) => b.includes(x));
+function v2Pairs(r, o, turns, P = { turns: 0, intent: [], nodes: [], arrows: [], eng: [], acts: [] }) {
+  const both = turns.filter((t) => r && o && (r.v2?.[t.key] || r.turns?.[t.key]) && (o.v2?.[t.key] || o.turns?.[t.key]));
+  const { intent, nodes, arrows, eng, acts } = P;
+  P.turns += both.length;
+  for (const t of both) {
+    const A = v2Of(r, t.key), B = v2Of(o, t.key);
+    if (A.intent.stage || B.intent.stage) intent.push([A.intent.stage ?? "none", B.intent.stage ?? "none"]);
+    const sa = new Set(A.nodes.map((n) => n.stage).filter(Boolean)), sb = new Set(B.nodes.map((n) => n.stage).filter(Boolean));
+    if (sa.size || sb.size) for (const x of NODE_STAGES) nodes.push([sa.has(x.n), sb.has(x.n)]);
+    const ua = v2Arrows(A), ub = v2Arrows(B);
+    for (const u of V2_UP) arrows.push([ua.includes(u.n), ub.includes(u.n)]);
+    for (const n of A.nodes) { const m = n.stage && B.nodes.find((z) => z.stage === n.stage); if (m && n.eng.length && m.eng.length) eng.push(engAgree(n.eng, m.eng)); }
+    acts.push([A.hyps.filter((x) => !x.secondary).length, B.hyps.filter((x) => !x.secondary).length]);
+  }
+  return P;
+}
+const v2Agreement = (r, o, turns) => v2Stats(v2Pairs(r, o, turns));
+function v2Stats({ turns, intent, nodes, arrows, eng, acts }) {
+  return { turns, stats: [
+    { label: "intent edge", unit: "turns", ...kappa(intent) },
+    { label: "nodes", unit: "stage × turn", ...kappa(nodes) },
+    { label: "engagement", unit: "shared nodes", ...kappa(eng.map((x) => [x, true])), k: null },
+    { label: "↑ arrows (per artifact)", unit: "arrow × turn", ...kappa(arrows) },
+    { label: "# actions", unit: "turns", ...kappa(acts) },
+  ] };
+}
+// every coder pair, pooled over all sessions both have coded in turns v2 (the study-wide IRR)
+function v2AgreementAll() {
+  const P = {};
+  for (const [k, m] of Object.entries(CODES)) {
+    const coders = Object.entries(m).filter(([c, o]) => !c.startsWith("_") && Object.keys(o.v2 || {}).length).sort(([a], [b]) => a.localeCompare(b));
+    if (coders.length < 2) continue;
+    const [pid, task] = k.split("|"), s2 = D.sessions.find((x) => x.pid === pid && x.task === task);
+    if (!s2) continue;
+    const turns = deriveTurns(s2, coders[0][1]);
+    coders.forEach(([c1, o1], i) => coders.slice(i + 1).forEach(([c2, o2]) => {
+      const key = `${c1} vs ${c2}`;
+      P[key] ||= { turns: 0, intent: [], nodes: [], arrows: [], eng: [], acts: [], sessions: 0 };
+      const before = P[key].turns; v2Pairs(o1, o2, turns, P[key]); if (P[key].turns > before) P[key].sessions++;
+    }));
+  }
+  return Object.entries(P).filter(([, x]) => x.turns).map(([key, x]) => agreeHtml(`${esc(key)} <span class="muted" style="font-weight:400">· ${x.sessions} sessions</span>`, v2Stats(x))).join("");
+}
+const agreeAllHtml = () => { const h = v2AgreementAll(); return h ? `<details class="agall"${lsGet("pr-agall") === "1" ? " open" : ""}><summary>All sessions, pooled (study-wide agreement)</summary>${h}</details>` : ""; };
+const agreeHtml = (title, ag) => `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${title}</b>${ag.turns} turns both coded</div>
+  ${ag.stats.map((x) => `<div><b>${x.po == null ? "—" : Math.round(100 * x.po) + "%"}${x.k != null ? ` <span class="kap">κ ${x.k.toFixed(2)}</span>` : ""}</b>${x.label} <span class="muted">(n=${x.n} ${x.unit})</span></div>`).join("")}</div>`;
+const AGREE_NOTE = `<div class="muted" style="font-size:10.5px;margin:-4px 0 8px">% = raw agreement · κ = Cohen's kappa, chance-corrected (&lt;.40 weak · .40–.60 moderate · .60–.80 substantial · &gt;.80 strong; “—” when it can't be computed).
+  Nodes and ↑ arrows are scored as present / absent for every stage in each turn; arrows are pooled per artifact, so it doesn't matter which node they sit on. Engagement agrees when the picks share a level.</div>`;
 function renderV2Table(b, turns) {
   const coders = Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([, o]) => Object.keys(o.v2 || {}).length || Object.keys(o.turns || {}).length)
     .sort(([a], [c]) => (a === state.coder ? -1 : c === state.coder ? 1 : a.localeCompare(c)));
@@ -2212,8 +2277,9 @@ function renderV2Table(b, turns) {
   const fields = [
     ["Intent edge", (v) => `${v.intent.stage ?? ""}|${v.intent.up.join(".")}`, (v) => name(v.intent.stage) + ups(v.intent.up)],
     ["Inspired by", (v) => v.intent.inspired ?? "", (v) => name(v.intent.inspired)],
-    ["Nodes · engagement", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}:${n.eng.slice().sort().join("+")}:${n.up.join(".")}${n.text ? ":text" : ""}`).sort().join("|"),
-      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div class="${n.eng.length === 1 && n.eng[0] === "ignored" ? "grey" : ""}">● ${name(n.stage)}${n.text ? ' <span class="tagtxt">text</span>' : ""} <span class="muted">· ${n.eng.join(" + ") || "—"}</span>${ups(n.up)}</div>`).join("") || "—"],
+    ["Nodes · engagement", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}:${n.eng.slice().sort().join("+")}${n.text ? ":text" : ""}`).sort().join("|"),
+      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div class="${n.eng.length === 1 && n.eng[0] === "ignored" ? "grey" : ""}">● ${name(n.stage)}${n.text ? ' <span class="tagtxt">text</span>' : ""} <span class="muted">· ${n.eng.join(" + ") || "—"}</span></div>`).join("") || "—"],
+    ["↑ Arrows (artifact)", (v) => v2Arrows(v).join("."), (v) => (v2Arrows(v).length ? ups(v2Arrows(v)) : '<span class="muted">none</span>')],
     ["Actions", (v) => main(v).map((h) => [h.has, h.options, h.art.slice().sort().join("+"), h.eng.slice().sort().join("+"), h.optsAfter].join(":")).sort().join("|"),
       (v) => v.hyps.map((h) => `<div class="hcell${h.has === "no" ? " grey" : ""}${h.secondary ? " sec" : ""}"><b>${esc(h.label || "action")}</b>${h.secondary ? ' <span class="tagsec">secondary</span>' : ""} · hypothesis ${h.has || "—"} · ${optLabel(h.options)} → ${optLabel(h.optsAfter)} options${h.labelAfter ? ` (→ ${esc(h.labelAfter)})` : ""}
         ${h.hypText ? `<br>“${esc(h.hypText)}”` : ""}
@@ -2236,8 +2302,9 @@ function renderV2Table(b, turns) {
         <td class="agcell">${av ? show(av) : '<span class="muted">—</span>'}<div class="uses">${use}</div></td></tr>`;
     });
   }
-  b.innerHTML = `<div class="tsum">${fields.map(([label], fi) => `<div><b>${agree[fi][1] ? Math.round((100 * agree[fi][0]) / agree[fi][1]) + "%" : "—"}</b>${label} agree <span class="muted">(${agree[fi][0]}/${agree[fi][1]} turns)</span></div>`).join("")}</div>
-    <div class="muted" style="font-size:11px;margin:-4px 0 8px">Greyed = coded “no” / ignored. Secondary actions (italic) don't count toward agreement.</div>
+  const pairs = coders.flatMap(([c1, o1], i) => coders.slice(i + 1).map(([c2, o2]) => agreeHtml(`${esc(c1)} vs ${esc(c2)}`, v2Agreement(o1, o2, turns)))).join("");
+  b.innerHTML = `${pairs}${pairs ? AGREE_NOTE : ""}${agreeAllHtml()}
+    <div class="muted" style="font-size:11px;margin:-4px 0 8px">Row colours: green = every coder's cell is identical. Greyed = coded “no” / ignored. Secondary actions (italic) don't count toward agreement.</div>
     <table class="v2cmp"><thead><tr><th></th>${coders.map(([c]) => `<th>${esc(c)}${c === state.coder ? " (you)" : ""}</th>`).join("")}<th class="agh">Agreed <span class="muted" style="font-weight:400">(shared)</span></th></tr></thead><tbody>${body}</tbody></table>`;
 }
 // copy one field of a coder's v2 coding into the agreed record
@@ -2245,6 +2312,7 @@ const V2_FIELDS = [
   (from, to) => { to.intent.stage = from.intent.stage; to.intent.up = [...from.intent.up]; },
   (from, to) => { to.intent.inspired = from.intent.inspired; },
   (from, to) => { to.nodes = JSON.parse(JSON.stringify(from.nodes)); },
+  (from, to) => { to.nodes = JSON.parse(JSON.stringify(from.nodes)); },   // arrows live on the nodes, so they come with them
   (from, to) => { to.hyps = JSON.parse(JSON.stringify(from.hyps)); },
 ];
 const v2LayoutBar = () => `<div class="v2lay">${state.compare ? `compare as: ${[["cards", "cards"], ["table", "side by side"]].map(([k, l]) => `<button class="b${v2Layout === k ? " on" : ""}" data-v2lay="${k}">${l}</button>`).join("")}` : ""}
@@ -2260,18 +2328,8 @@ function renderV2() {
   if (!turns.length) h += '<div class="empty">No prompts logged for this session (or the recording isn\'t synced yet — Events & sync tab).</div>';
   if (!state.coder) h += '<div class="banner">Enter your coder name in the header to code.</div>';
   if (editAgreed) h += '<div class="banner agban"><b>Editing the AGREED codes</b> for this session (shared by everyone, not your own coding). Turn ✎ edit agreed off to return to your coding.</div>';
-  for (const [c, o] of editAgreed ? [] : others) {
-    const both = turns.filter((t) => r && (r.v2?.[t.key] || r.turns?.[t.key]) && (o.v2?.[t.key] || o.turns?.[t.key]));
-    const A = (t) => v2Of(r, t.key), B = (t) => v2Of(o, t.key);
-    const pc = (xs) => (xs.length ? Math.round((100 * xs.filter(Boolean).length) / xs.length) + "%" : "—");
-    const intent = both.filter((t) => A(t).intent.stage || B(t).intent.stage).map((t) => A(t).intent.stage === B(t).intent.stage);
-    const jac = both.map((t) => { const a = new Set(A(t).nodes.map((n) => n.stage)), bb = new Set(B(t).nodes.map((n) => n.stage)), u = new Set([...a, ...bb]); return u.size ? [...a].filter((v) => bb.has(v)).length / u.size : 1; });
-    const eng = []; for (const t of both) for (const n of A(t).nodes) { const m = B(t).nodes.find((z) => z.stage === n.stage); if (m && n.eng.length && m.eng.length) eng.push(n.eng.slice().sort().join() === m.eng.slice().sort().join()); }
-    const hc = both.map((t) => A(t).hyps.filter((x) => !x.secondary).length === B(t).hyps.filter((x) => !x.secondary).length);
-    h += `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${esc(state.coder)} vs ${esc(c)}</b>${both.length} turns both coded</div>
-      <div><b>${pc(intent)}</b>same intent edge</div><div><b>${jac.length ? Math.round((100 * jac.reduce((a, v) => a + v, 0)) / jac.length) + "%" : "—"}</b>node overlap</div>
-      <div><b>${pc(eng)}</b>same engagement</div><div><b>${pc(hc)}</b>same # actions (not secondary)</div></div>`;
-  }
+  for (const [c, o] of editAgreed ? [] : others) h += agreeHtml(`${esc(state.coder)} vs ${esc(c)}`, v2Agreement(r, o, turns));
+  if (!editAgreed && others.length) h += AGREE_NOTE + agreeAllHtml();
   turns.forEach((t, ti) => {
     const v = v2Of(r, t.key), auto = !!v.auto;
     const nodes = v.nodes.length ? v.nodes : [{ stage: null, eng: [], up: [] }];
@@ -2314,8 +2372,9 @@ function renderV2() {
       ${others.map(([c, o]) => { const ov = v2Of(o, t.key);
         return `<div class="tcmp"><b style="font-size:11px;color:var(--muted)">${esc(c)}</b>
           <span class="${ov.intent.stage === v.intent.stage ? "ok" : "no"}">${ov.intent.stage ? `${ov.intent.stage} ${esc(ST[ov.intent.stage].name)}` : "—"}${ov.intent.up.length ? " ↑" + ov.intent.up.join(" ↑") : ""}</span> ·
-          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); const same = m && m.eng.slice().sort().join() === n.eng.slice().sort().join() && m.up.join() === n.up.join() && !m.text === !n.text;
-            return `<span class="${same ? "ok" : "no"}">●${n.stage ?? "?"}${n.text ? " (text)" : ""} ${n.eng.join("+")}${n.up.length ? " ↑" + n.up.join(" ↑") : ""}</span>`; }).join(" ") || "—"} ·
+          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); const same = m && (!m.eng.length && !n.eng.length || engAgree(m.eng, n.eng)) && !m.text === !n.text;
+            return `<span class="${same ? "ok" : "no"}">●${n.stage ?? "?"}${n.text ? " (text)" : ""} ${n.eng.join("+")}</span>`; }).join(" ") || "—"}
+          ${(() => { const ua = v2Arrows(ov), ub = v2Arrows(v); return ua.length || ub.length ? ` · <span class="${ua.join() === ub.join() ? "ok" : "no"}">${ua.length ? ua.map((u) => "↑" + u).join(" ") : "no ↑"}</span>` : ""; })()} ·
           ${ov.hyps.length} action${ov.hyps.length === 1 ? "" : "s"}${ov.hyps.length ? ": " + ov.hyps.map((hy) => `<span class="${hy.has === "no" ? "grey" : ""}${hy.secondary ? " sec" : ""}">[${hy.has || "?"} · ${optLabel(hy.options)}→${optLabel(hy.optsAfter)} · ${hy.art.join("+") || "?"} · ${hy.eng.join("+") || "?"}]</span>`).join(" ") : ""}</div>`; }).join("")}
       ${turns[ti + 1] ? `<div class="flowto">↓ into Turn ${turns[ti + 1].k} intent</div>` : ""}
     </div>`;
@@ -2332,6 +2391,7 @@ function renderV2() {
   b.innerHTML = v2LayoutBar() + h;
   b.scrollTop = y;
 }
+$("v2board").addEventListener("toggle", (e) => { if (e.target.matches("details.agall")) lsSet("pr-agall", e.target.open ? "1" : ""); }, true);
 $("v2board").addEventListener("click", (e) => {
   const lay = e.target.closest("[data-v2lay]");
   if (lay) { v2Layout = lay.dataset.v2lay; lsSet("pr-v2cmp", v2Layout); renderV2(); return; }
