@@ -280,6 +280,9 @@
   .v2nodes > div:first-child { border-right:1px solid var(--line); background:#fff8ef; }
   .v2nodes > div:last-child { background:#f2f8f3; }
   .v2n { display:flex; align-items:center; gap:4px; min-height:26px; margin-bottom:3px; }
+  .txtg { flex:none; font-size:10px; padding:0 6px; border:1px dashed #b9b2a6; border-radius:8px; background:#fff; color:#8a857b; cursor:pointer; line-height:16px; }
+  .txtg.on { border-style:solid; border-color:#5b6f8a; background:#5b6f8a; color:#fff; }
+  .tagtxt { font-size:9.5px; font-style:normal; background:#5b6f8a; color:#fff; border-radius:7px; padding:0 5px; }
   .v2n select { flex:1; min-width:0; font-size:12px; padding:2px 4px; border:1px solid var(--line); border-radius:6px; background:#fff; }
   .chips { display:inline-flex; gap:2px; flex-wrap:wrap; }
   .chips button { border:1px solid var(--line); background:#fff; border-radius:9px; padding:0 7px; font-size:10.5px; cursor:pointer; color:#5a564e; line-height:18px; }
@@ -353,6 +356,9 @@
   .tseq .who { font-size:11px; font-weight:700; color:var(--muted); width:100%; }
   .tseq .tsep { align-self:stretch; display:flex; align-items:center; font-size:9.5px; font-weight:700; color:#b9ab97; padding:0 4px; border-left:1px dashed #d8cfc0; margin-left:4px; }
   .tcard { background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:8px; }
+  .tcard.fin { border-color:#b07a4f; } .tcard.fin .fbody { padding:8px 12px 10px; display:grid; gap:6px; }
+  .tcard.fin input.lbl, .tcard.fin textarea { width:100%; box-sizing:border-box; font:inherit; font-size:12px; padding:4px 6px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .tcard.fin textarea { min-height:44px; resize:vertical; }
   .tcard.seltc { box-shadow:0 0 0 2px var(--accent); }
   .tcard .th { display:flex; align-items:baseline; gap:8px; padding:6px 10px; border-bottom:1px solid var(--line); font-size:12px; }
   .tcard .th b { font-size:13px; }
@@ -2021,7 +2027,7 @@ function v2PaneHtml() {
       const ups = ns.flatMap((n) => n.up);
       h += `<div class="srow v2pr v2grp" data-seek="${t.N}"><img data-t="${t.N + 0.5}" alt="" /><div style="min-width:0">
         <div class="st">● ${esc(srcName(t))}</div>
-        <div class="v2bds">${ns.map((n) => bd(n.stage, `${esc(nm(n.stage).toLowerCase())}${n.eng.length ? ` <span class="muted">· ${n.eng.join(" + ")}</span>` : ""}`, n.eng.length === 1 && n.eng[0] === "ignored")).join("")}</div>
+        <div class="v2bds">${ns.map((n) => bd(n.stage, `${esc(nm(n.stage).toLowerCase())}${n.eng.length ? ` <span class="muted">· ${n.eng.join(" + ")}</span>` : ""}${n.text ? ' <span class="tagtxt">text</span>' : ""}`, n.eng.length === 1 && n.eng[0] === "ignored")).join("")}</div>
         ${ups.length ? `<div class="v2bds">${ups.map((u) => bd(u, `↑ ${esc(nm(u))}`)).join("")}</div>` : ""}
         <div class="tm">${fmt(t.N)}</div></div></div>`;
     }
@@ -2033,6 +2039,8 @@ function v2PaneHtml() {
           <div class="tm">artifact: ${art || "—"}${hy.artNote ? ` — <i>${esc(hy.artNote)}</i>` : ""}</div><div class="tm">outcome: ${out || "—"}${hy.engNote ? ` — <i>${esc(hy.engNote)}</i>` : ""}</div></div></div>`;
     });
   }
+  const fd = decOf(r);
+  if (fd.status || fd.choice) { any = true; h += `<div class="srow tsep-row">Final decision</div><div class="srow v2pr"><div style="min-width:0"><b>${esc(DEC_STAT.find(([k]) => k === fd.status)?.[1] || "—")}</b>${fd.choice ? ` · ${esc(fd.choice)}` : ""}${fd.note ? `<div class="tm"><i>${esc(fd.note)}</i></div>` : ""}</div></div>`; }
   if (!any) h += '<div class="muted" style="font-size:12px;padding:8px 2px">Nothing coded in turns v2 yet for this session.</div>';
   return h + "</div>";
 }
@@ -2136,7 +2144,7 @@ function v2Norm(v) {
   return {
     ...(v.auto ? { auto: true } : {}),
     intent: { stage: v.intent?.stage ?? null, up: arr(v.intent?.up).map(Number), note: v.intent?.note || "", inspired: v.intent?.inspired ?? null, ...(v.intent?.was ? { was: v.intent.was } : {}) },
-    nodes: (v.nodes || []).map((n) => ({ stage: n.stage ?? null, eng: arr(n.eng), up: arr(n.up).map(Number).slice(0, 1) })),
+    nodes: (v.nodes || []).map((n) => ({ stage: n.stage ?? null, eng: arr(n.eng), up: arr(n.up).map(Number).slice(0, 1), ...(n.text ? { text: true } : {}) })),
     hyps: (v.hyps || []).map((h) => ({ has: h.has ?? null, options: h.options ?? null, optsAfter: h.optsAfter ?? null, art: arr(h.art).filter((a) => a !== "narrows"),
       eng: arr(h.eng), secondary: !!h.secondary, label: h.label || "", labelAfter: h.labelAfter || "", hypText: h.hypText || "", artNote: h.artNote || "", engNote: h.engNote || "" })),
   };
@@ -2150,6 +2158,10 @@ function v2Draft(r, key) {
       up: [...new Set((n.edges || []).map((e) => e.stage).filter((s2) => V2_UP.some((u) => u.n === s2)))] })), hyps: [] };
 }
 const v2Of = (r, key) => v2Norm(r?.v2?.[key] || v2Draft(r, key) || { intent: {}, nodes: [], hyps: [] });
+// session-level final decision (stored on the record as `decision`, next to v2)
+const DEC_STAT = [["decided", "decided on one"], ["narrowed", "narrowed, not decided"], ["undecided", "undecided"]];
+const decOf = (r) => ({ status: r?.decision?.status || null, choice: r?.decision?.choice || "", note: r?.decision?.note || "" });
+function decRec() { const r = v2Target(true); r.decision = decOf(r); return r.decision; }
 function v2Rec(key) {   // editable record (materializes the draft, and older single values, on first edit)
   const r = v2Target(true);
   r.v2 ||= {};
@@ -2200,8 +2212,8 @@ function renderV2Table(b, turns) {
   const fields = [
     ["Intent edge", (v) => `${v.intent.stage ?? ""}|${v.intent.up.join(".")}`, (v) => name(v.intent.stage) + ups(v.intent.up)],
     ["Inspired by", (v) => v.intent.inspired ?? "", (v) => name(v.intent.inspired)],
-    ["Nodes · engagement", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}:${n.eng.slice().sort().join("+")}:${n.up.join(".")}`).sort().join("|"),
-      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div class="${n.eng.length === 1 && n.eng[0] === "ignored" ? "grey" : ""}">● ${name(n.stage)} <span class="muted">· ${n.eng.join(" + ") || "—"}</span>${ups(n.up)}</div>`).join("") || "—"],
+    ["Nodes · engagement", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}:${n.eng.slice().sort().join("+")}:${n.up.join(".")}${n.text ? ":text" : ""}`).sort().join("|"),
+      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div class="${n.eng.length === 1 && n.eng[0] === "ignored" ? "grey" : ""}">● ${name(n.stage)}${n.text ? ' <span class="tagtxt">text</span>' : ""} <span class="muted">· ${n.eng.join(" + ") || "—"}</span>${ups(n.up)}</div>`).join("") || "—"],
     ["Actions", (v) => main(v).map((h) => [h.has, h.options, h.art.slice().sort().join("+"), h.eng.slice().sort().join("+"), h.optsAfter].join(":")).sort().join("|"),
       (v) => v.hyps.map((h) => `<div class="hcell${h.has === "no" ? " grey" : ""}${h.secondary ? " sec" : ""}"><b>${esc(h.label || "action")}</b>${h.secondary ? ' <span class="tagsec">secondary</span>' : ""} · hypothesis ${h.has || "—"} · ${optLabel(h.options)} → ${optLabel(h.optsAfter)} options${h.labelAfter ? ` (→ ${esc(h.labelAfter)})` : ""}
         ${h.hypText ? `<br>“${esc(h.hypText)}”` : ""}
@@ -2275,7 +2287,7 @@ function renderV2() {
           <select data-v="inspired"${dis} style="width:100%;font-size:11.5px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:#fff">${opts(NODE_STAGES, v.intent.inspired, "— node —")}</select></div>
         <div class="v2nodes">
           <div><div class="v2head">${esc(srcName(t)[0].toUpperCase() + srcName(t).slice(1))} · nodes <button class="play" data-a="${t.N}" data-b="${t.E}">▶ ${fmt(t.N)}–${fmt(t.E)}</button></div>
-            ${nodes.map((n, i) => `<div class="v2n" data-n="${i}"><select data-v="nstage"${dis}>${opts(NODE_STAGES, n.stage, "node…")}</select>${v.nodes.length > 1 ? `<button class="x" data-v2del${dis} style="border:0;background:none;cursor:pointer;color:var(--muted)">×</button>` : ""}</div>`).join("")}
+            ${nodes.map((n, i) => `<div class="v2n" data-n="${i}"><select data-v="nstage"${dis}>${opts(NODE_STAGES, n.stage, "node…")}</select>${/^[SI]/.test(state.pid) ? `<button class="txtg${n.text ? " on" : ""}" data-v2txt${dis} title="This node came from the chat text reply, not the artifact">text</button>` : ""}${v.nodes.length > 1 ? `<button class="x" data-v2del${dis} style="border:0;background:none;cursor:pointer;color:var(--muted)">×</button>` : ""}</div>`).join("")}
             <button class="addnode" data-v2addnode${dis}>+ node</button></div>
           <div><div class="v2head">Engagement <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(pick more than one if unsure · ↑ arrow optional, if the artifact was used that way)</span></div>
             ${nodes.map((n, i) => `<div class="v2eng" data-n="${i}">${chips(V2_ENG, n.eng, "eng", dis)}
@@ -2302,12 +2314,21 @@ function renderV2() {
       ${others.map(([c, o]) => { const ov = v2Of(o, t.key);
         return `<div class="tcmp"><b style="font-size:11px;color:var(--muted)">${esc(c)}</b>
           <span class="${ov.intent.stage === v.intent.stage ? "ok" : "no"}">${ov.intent.stage ? `${ov.intent.stage} ${esc(ST[ov.intent.stage].name)}` : "—"}${ov.intent.up.length ? " ↑" + ov.intent.up.join(" ↑") : ""}</span> ·
-          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); const same = m && m.eng.slice().sort().join() === n.eng.slice().sort().join() && m.up.join() === n.up.join();
-            return `<span class="${same ? "ok" : "no"}">●${n.stage ?? "?"} ${n.eng.join("+")}${n.up.length ? " ↑" + n.up.join(" ↑") : ""}</span>`; }).join(" ") || "—"} ·
+          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); const same = m && m.eng.slice().sort().join() === n.eng.slice().sort().join() && m.up.join() === n.up.join() && !m.text === !n.text;
+            return `<span class="${same ? "ok" : "no"}">●${n.stage ?? "?"}${n.text ? " (text)" : ""} ${n.eng.join("+")}${n.up.length ? " ↑" + n.up.join(" ↑") : ""}</span>`; }).join(" ") || "—"} ·
           ${ov.hyps.length} action${ov.hyps.length === 1 ? "" : "s"}${ov.hyps.length ? ": " + ov.hyps.map((hy) => `<span class="${hy.has === "no" ? "grey" : ""}${hy.secondary ? " sec" : ""}">[${hy.has || "?"} · ${optLabel(hy.options)}→${optLabel(hy.optsAfter)} · ${hy.art.join("+") || "?"} · ${hy.eng.join("+") || "?"}]</span>`).join(" ") : ""}</div>`; }).join("")}
       ${turns[ti + 1] ? `<div class="flowto">↓ into Turn ${turns[ti + 1].k} intent</div>` : ""}
     </div>`;
   });
+  // final decision for the session (end of the task): what they settled on, and why
+  if (turns.length) {
+    const fd = decOf(r);
+    h += `<div class="tcard fin"><div class="th"><b>Final decision</b><span class="muted" style="font-size:11px">end of the task — what they settled on</span></div>
+      <div class="fbody">${chips(DEC_STAT, fd.status, "fstat", dis)}
+        <input class="lbl" data-fv="choice" placeholder="choice (e.g. Baltimore · Hampden)" value="${esc(fd.choice)}"${dis} />
+        <textarea data-fv="note" placeholder="why / how they got there (optional)"${dis}>${esc(fd.note)}</textarea>
+        ${others.map(([c, o]) => { const od = decOf(o); return od.status || od.choice ? `<div class="sub" style="font-size:11px"><b>${esc(c)}:</b> ${esc(DEC_STAT.find(([k]) => k === od.status)?.[1] || "—")}${od.choice ? ` · ${esc(od.choice)}` : ""}${od.note ? ` — <i>${esc(od.note)}</i>` : ""}</div>` : ""; }).join("")}</div></div>`;
+  }
   b.innerHTML = v2LayoutBar() + h;
   b.scrollTop = y;
 }
@@ -2333,6 +2354,8 @@ $("v2board").addEventListener("click", (e) => {
   const pt = e.target.closest(".pr-text");
   if (pt) { pt.classList.toggle("open"); return; }
   if (!state.coder) return;
+  const fs = e.target.closest("[data-fstat]");
+  if (fs && !fs.disabled) { const d = decRec(); d.status = d.status === fs.dataset.fstat ? null : fs.dataset.fstat; return v2Changed(); }
   const card = e.target.closest(".tcard[data-key]");
   if (!card) return;
   const b = e.target.closest("button");
@@ -2347,6 +2370,7 @@ $("v2board").addEventListener("click", (e) => {
   if (d.eng) many(node(), "eng", d.eng);
   else if (b.hasAttribute("data-v2addnode")) { if (!v.nodes.length) v.nodes.push({ stage: null, eng: [], up: [] }); v.nodes.push({ stage: null, eng: [], up: [] }); }
   else if (b.hasAttribute("data-v2del")) v.nodes.splice(ni, 1);
+  else if (b.hasAttribute("data-v2txt")) { const n = node(); if (n.text) delete n.text; else n.text = true; }
   else if (b.hasAttribute("data-addhyp")) v.hyps.push({ has: null, options: null, optsAfter: null, art: [], eng: [], secondary: false, label: "", labelAfter: "", hypText: "", artNote: "", engNote: "" });
   else if (b.hasAttribute("data-delhyp")) v.hyps.splice(hj, 1);
   else if (d.has) { one(v.hyps[hj], "has", d.has); if (v.hyps[hj].has === "no") v.hyps[hj].art = []; }
@@ -2373,6 +2397,7 @@ $("v2board").addEventListener("change", (e) => {
 });
 $("v2board").addEventListener("input", (e) => {
   if (!state.coder) return;
+  if (e.target.dataset.fv) { decRec()[e.target.dataset.fv] = e.target.value; return editAgreed ? saveAgreed() : save(); }
   const card = e.target.closest(".tcard[data-key]"), f = e.target.dataset.v;
   const HF = { hlabel: "label", hlabelafter: "labelAfter", hyptext: "hypText", hartnote: "artNote", hengnote: "engNote" };
   if (!card || (f !== "inote" && !HF[f])) return;
@@ -2383,19 +2408,22 @@ $("v2board").addEventListener("input", (e) => {
 });
 $("csvV2").addEventListener("click", () => {
   const rows = [["coder", "pid", "cond", "task", "turn", "prompt_logged", "row", "idx", "intent_edge", "intent_up", "intent_inspired_by", "node", "engagement", "up_arrows",
-    "action_hypothesis", "hypothesis_text", "options_before", "artifact_relation", "outcome", "options_after", "secondary", "label_or_note", "label_after", "artifact_note", "outcome_note", "draft"]];
+    "action_hypothesis", "hypothesis_text", "options_before", "artifact_relation", "outcome", "options_after", "secondary", "label_or_note", "label_after", "artifact_note", "outcome_note", "draft", "node_from"]];
   for (const r of [...Object.values(CODES).flatMap((m) => Object.values(m)), ...Object.values(AGREED)]) {
-    if (!Object.keys(r.v2 || {}).length && !Object.keys(r.turns || {}).length) continue;
+    if (!Object.keys(r.v2 || {}).length && !Object.keys(r.turns || {}).length && !r.decision) continue;
     const s2 = D.sessions.find((x) => x.pid === r.pid && x.task === r.task);
     const cond = s2?.cond || COND[r.pid[0]] || "";
     for (const t of s2 ? deriveTurns(s2, r) : []) {
       if (!r.v2?.[t.key] && !r.turns?.[t.key]) continue;
       const v = v2Of(r, t.key), base = [r.coder, r.pid, cond, r.task, t.k, t.key], dr = r.v2?.[t.key] ? "" : "draft";
       rows.push([...base, "intent", "", v.intent.stage ?? "", v.intent.up.join(" "), v.intent.inspired ?? "", "", "", "", "", "", "", "", "", "", "", "", v.intent.note, "", "", "", dr]);
-      v.nodes.forEach((n, i) => rows.push([...base, "node", i + 1, "", "", "", n.stage ?? "", n.eng.join("+"), n.up.join(" "), "", "", "", "", "", "", "", "", "", "", "", dr]));
+      v.nodes.forEach((n, i) => rows.push([...base, "node", i + 1, "", "", "", n.stage ?? "", n.eng.join("+"), n.up.join(" "), "", "", "", "", "", "", "", "", "", "", "", dr, n.stage ? (n.text ? "text" : "artifact") : ""]));
       v.hyps.forEach((hy, j) => rows.push([...base, "action", j + 1, "", "", "", "", "", "", hy.has ?? "", hy.hypText, hy.options ? optLabel(hy.options) : "", hy.art.join("+"), hy.eng.join("+"),
         hy.optsAfter ? optLabel(hy.optsAfter) : "", hy.secondary ? 1 : "", hy.label, hy.labelAfter, hy.artNote, hy.engNote, dr]));
     }
+    // final decision: status → outcome, choice → label_after, note → label_or_note
+    const fd = decOf(r);
+    if (fd.status || fd.choice) rows.push([r.coder, r.pid, cond, r.task, "", "", "decision", "", "", "", "", "", "", "", "", "", "", "", fd.status ?? "", "", "", fd.note, fd.choice, "", "", "", ""]);
   }
   const cell = (x) => { const t2 = String(x ?? ""); return /[",\n]/.test(t2) ? '"' + t2.replace(/"/g, '""') + '"' : t2; };
   const url = URL.createObjectURL(new Blob([rows.map((x) => x.map(cell).join(",")).join("\n")], { type: "text/csv" }));

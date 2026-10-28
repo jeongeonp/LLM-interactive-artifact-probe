@@ -835,13 +835,16 @@ app.post("/api/process-codes", safe(async (req, res) => {
       intent: { stage: [3, 6, 9, 12, 15].includes(+x.intent?.stage) ? +x.intent.stage : null, up: many((Array.isArray(x.intent?.up) ? x.intent.up : []).map(Number), upOk).sort((a, b) => a - b),
         note: String(x.intent?.note ?? "").slice(0, 2000), inspired: st(x.intent?.inspired) },
       nodes: (Array.isArray(x.nodes) ? x.nodes : []).slice(0, 12).map((n) => ({ stage: st(n?.stage), eng: many(n?.eng, ["skimmed", "read", "ignored"]),
-        up: many((Array.isArray(n?.up) ? n.up : []).map(Number), upOk).slice(0, 1) })),   // one upward arrow per node
+        up: many((Array.isArray(n?.up) ? n.up : []).map(Number), upOk).slice(0, 1), ...(n?.text ? { text: true } : {}) })),   // one upward arrow per node; text = came from the chat reply, not the artifact
       hyps: (Array.isArray(x.hyps) ? x.hyps : []).slice(0, 30).map((h) => ({ has: pick(h?.has, ["yes", "no"]), options: pick(h?.options, ["1", "2", "3", "4"]),
         optsAfter: pick(h?.optsAfter, ["1", "2", "3", "4"]), art: many(h?.art, ["confirm", "counter", "no"]), eng: many(h?.eng, ["changed", "narrowed", "expanded", "nochange"]),
         secondary: !!h?.secondary, label: String(h?.label ?? "").slice(0, 200), labelAfter: String(h?.labelAfter ?? "").slice(0, 200), hypText: String(h?.hypText ?? "").slice(0, 2000), artNote: String(h?.artNote ?? "").slice(0, 2000), engNote: String(h?.engNote ?? "").slice(0, 2000) })),
     };
   }
-  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, turns, start, v2, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
+  // final decision for the session (end of v2); kept when an older page omits it
+  const decIn = b.decision && typeof b.decision === "object" ? b.decision : (await getProcessCode(`${b.coder}__${b.pid}__${b.task}`))?.decision || {};
+  const decision = { status: pick(decIn.status, ["decided", "narrowed", "undecided"]), choice: String(decIn.choice ?? "").slice(0, 300), note: String(decIn.note ?? "").slice(0, 3000) };
+  const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, turns, start, v2, decision, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
   await setProcessCode(`${data.coder}__${data.pid}__${data.task}`, data);
   // schema + what was kept: the page compares this with what it sent and warns if anything was dropped
   // (e.g. an old server process still running after the code was updated)
