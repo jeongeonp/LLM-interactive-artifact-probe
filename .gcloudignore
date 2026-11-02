@@ -23,3 +23,7 @@ seed-demo.mjs
 
 # Local Claude Code settings / worktrees
 .claude/
+
+# Local nightly backups of the coding data
+backups/
+backup-codes.mjs

@@ -154,6 +154,17 @@ export function setProcessCode(id, data) {
   ).run(String(id), JSON.stringify({ ...data, updated: new Date().toISOString() }));
 }
 
+// Version history of coder records: one snapshot per record per hour (see db-firebase.js).
+db.exec(`CREATE TABLE IF NOT EXISTS process_codes_history (id TEXT PRIMARY KEY, record_id TEXT, at TEXT, data TEXT);`);
+export function snapshotProcessCode(id, data) {
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO process_codes_history (id, record_id, at, data) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET at = excluded.at, data = excluded.data`)
+    .run(`${id}__${at.slice(0, 13)}`, String(id), at, JSON.stringify({ ...data, recordId: String(id), at }));
+}
+export function getProcessHistory(id) {
+  return db.prepare("SELECT data FROM process_codes_history WHERE record_id = ? ORDER BY at").all(String(id)).map((r) => JSON.parse(r.data));
+}
+
 // Codes added to the artifact codebook while coding (see /api/artifact-codebook).
 db.exec(`CREATE TABLE IF NOT EXISTS artifact_codebook (id TEXT PRIMARY KEY, data TEXT);`);
 export function getCodebookAdds() {

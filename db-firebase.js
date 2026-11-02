@@ -352,3 +352,18 @@ export async function updateProcessCode(id, fields) {
 export async function setProcessCode(id, data) {
   await processCol.doc(String(id ?? "").replace(/[/#]/g, "_")).set({ ...data, updated: new Date().toISOString() });
 }
+// Version history of coder records: snapshots in their own collection (never read on page load),
+// one per record per hour — later saves in the same hour replace that hour's snapshot.
+const processHistCol = db.collection("processCodesHistory");
+export async function snapshotProcessCode(id, data) {
+  const at = new Date().toISOString();
+  await processHistCol.doc(`${String(id).replace(/[/#]/g, "_")}__${at.slice(0, 13)}`).set({ ...data, recordId: String(id), at });
+}
+export async function getProcessHistory(id) {
+  try {
+    const snap = await processHistCol.where("recordId", "==", String(id)).get();
+    return snap.docs.map((d) => d.data()).sort((a, b) => a.at.localeCompare(b.at));
+  } catch (e) {
+    return onReadError(e, []);
+  }
+}

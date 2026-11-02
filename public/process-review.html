@@ -33,8 +33,15 @@
   .tchip:hover { border-color:var(--accent); }
   .tchip.on { box-shadow:0 0 0 2px var(--accent); border-color:var(--accent); background:#fff; }
   .tchip .dot { width:8px; height:8px; border-radius:50%; background:#d8d3c9; }
+  .tchip .dot.todo { background:#fff; box-shadow:inset 0 0 0 2px #e0b84a; }
+  .tchip .dot.done { background:#5aae5e; }
+  .tchip.asg { border-color:#e0b84a; background:#fffaf0; font-weight:600; }
+  .tchip.asg.fin { border-color:#5aae5e; background:#eef7ee; }
+  .tchip.unasg { opacity:.5; }
   .tchip .n { color:var(--muted); font-variant-numeric:tabular-nums; }
   .tchip .n.full { color:#2f7a3a; font-weight:700; }
+  .rfilt { display:flex; gap:3px; flex-wrap:wrap; margin:0 0 10px; }
+  .rfilt .b { padding:1px 7px; font-size:11px; }
   .legend { font-size:11px; color:var(--muted); margin-top:14px; line-height:1.8; }
   .legend i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
 
@@ -324,9 +331,6 @@
   .upl { font-size:10.5px; color:#3f6b4a; margin-top:2px; }
   .v2cmp th.agh { background:#e3eedf; }
   .v2cmp td.agcell { background:#f6faf3; border-left:2px solid #9cc79f; }
-  .uses { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; }
-  .use { border:1px dashed #9cc79f; background:#fff; border-radius:8px; font-size:10px; padding:0 6px; cursor:pointer; color:#2f7a3a; }
-  .use:hover { background:#e3eedf; }
   .b.agon { background:#2f7a3a; border-color:#2f7a3a; }
   .banner.agban { background:#e9f4e7; border-color:#9cc79f; }
   .srow.v2pr { cursor:pointer; }
@@ -637,6 +641,29 @@ const MARKS = [["expressing a hypothesis", "h"], ["narrowing", "n"], ["widening"
 const LABELS = [["", "— unlabeled", "#d8d3c9"], ["good", "Good / strong", "#5aae5e"], ["average", "Average / mediocre", "#e0b84a"], ["poor", "Non-informative", "#e57373"]];
 const LABEL_C = Object.fromEntries(LABELS.map(([k, , c]) => [k, c]));
 const COND = { I: "interactive", S: "static", T: "text" };
+// Coding assignments. Relocation sessions still to code (Nov 2): j codes all; krisha and T split them, randomized
+// within each condition and balanced on # turns (33 vs 34). Key = "pid|task".
+const ASSIGN = (() => {
+  const krisha = ["I1", "I5", "I16", "S5", "S11", "S16", "T7", "T12"], T = ["I3", "I4", "I12", "S3", "S8", "S13", "T1", "T10"];
+  const out = {};
+  for (const pid of [...krisha, ...T]) out[`${pid}|relocation`] = ["j", krisha.includes(pid) ? "krisha" : "T"];
+  // already coded by all three before the split
+  for (const pid of ["I9", "I14", "S6", "S10", "T2", "T3"]) out[`${pid}|relocation`] = ["j", "krisha", "T"];
+  // study tool (Nov 2): same scheme, 11 sessions each, 36 vs 37 turns; I8 stays with T (already started)
+  const kS = ["I2", "I6", "I7", "I11", "I13", "S4", "S9", "S14", "T4", "T5", "T6"], tS = ["I8", "I10", "I15", "I17", "S1", "S2", "S7", "S12", "T8", "T9", "T11"];
+  for (const pid of [...kS, ...tS]) out[`${pid}|studytool`] = ["j", kS.includes(pid) ? "krisha" : "T"];
+  return out;
+})();
+const assignedTo = (pid, task, coder) => !!coder && (ASSIGN[`${pid}|${task}`] || []).some((c) => c.toLowerCase() === coder.toLowerCase());
+const hasAssignments = (coder) => !!coder && Object.values(ASSIGN).some((cs) => cs.some((c) => c.toLowerCase() === coder.toLowerCase()));
+// Coding rounds, for the sidebar filter: r1 / r2 = the three-coder IRR sets, r3 / r4 = the split rounds.
+const ROUNDS = [
+  ["r1", "R1", "R1 · three-coder set 1", ["I14|relocation", "S10|relocation", "T2|relocation"]],
+  ["r2", "R2", "R2 · three-coder set 2", ["I9|relocation", "S6|relocation", "T3|relocation"]],
+  ["r3", "R3", "R3 · relocation split", ["I1", "I5", "I16", "S5", "S11", "S16", "T7", "T12", "I3", "I4", "I12", "S3", "S8", "S13", "T1", "T10"].map((p) => p + "|relocation")],
+  ["r4", "R4", "R4 · study tool split", Object.keys(ASSIGN).filter((k) => k.endsWith("|studytool"))],
+];
+let sideRound = (() => { try { return localStorage.getItem("pr-round") || ""; } catch { return ""; } })();
 const TASK_SHORT = { relocation: "relocation", studytool: "study tool", userchoice: "user choice" };
 
 // ---- tiny utils ----
@@ -830,32 +857,54 @@ function v2Progress(s, r) {
   if (!done && !total) return "";
   return `<span class="n${total && done >= total ? " full" : ""}" title="turns v2: ${done} of ${total} turns coded">${done}/${total}</span>`;
 }
+function v2Done(s, r) {
+  const total = deriveTurns(s, r).length;
+  return total > 0 && Object.values(r?.v2 || {}).filter((v) => v && (v.intent?.stage || (v.nodes || []).some((n) => n.stage) || (v.hyps || []).length)).length >= total;
+}
 function renderSide() {
   const byNum = (a, b) => a[0].localeCompare(b[0]) || +a.slice(1) - +b.slice(1);
   const pids = Object.keys(D.videos).sort(byNum);
   const pending = (D.pending || []).filter((x) => !D.videos[x]).sort(byNum);
-  let h = "";
+  const mineAsg = hasAssignments(state.coder);
+  const round = ROUNDS.find(([k]) => k === sideRound), inRound = (pid, task) => !round || round[3].includes(`${pid}|${task}`);
+  let h = `<div class="rfilt">${[["", "All", "every session"], ...ROUNDS].map(([k, l, t]) => `<button class="b${sideRound === k ? " on" : ""}" data-round="${k}" title="${esc(t)}">${l}</button>`).join("")}</div>`;
+  if (mineAsg) {
+    const mine = Object.keys(ASSIGN).filter((k) => assignedTo(...k.split("|"), state.coder) && inRound(...k.split("|")));
+    const fin = mine.filter((k) => { const [pid, task] = k.split("|"), s = sessionsFor(pid).find((x) => x.task === task); return s && v2Done(s, recOf(pid, task, state.coder)); });
+    h += `<div class="legend" style="margin:0 0 8px">Assigned to <b>${esc(state.coder)}</b>: ${fin.length} / ${mine.length} finished</div>`;
+  }
   for (const p of ["I", "S", "T"]) {
-    const ps = pids.filter((x) => x[0] === p), wait = pending.filter((x) => x[0] === p);
+    const ps = pids.filter((x) => x[0] === p && sessionsFor(x).some((s) => inRound(x, s.task))), wait = round ? [] : pending.filter((x) => x[0] === p);
     if (!ps.length && !wait.length) continue;
     h += `<h3>${COND[p]} (${ps.length}${wait.length ? ` + ${wait.length} pending` : ""})</h3>`;
     // Transcript in Drive but no video yet — shown so it's clear they're coming, not missing.
     for (const pid of wait) h += `<div class="prow pending" title="Transcript is in Drive; the video isn't yet. Use ↻ refresh once it has uploaded."><b>${pid}</b><span class="muted">video pending</span></div>`;
     for (const pid of ps) {
       const shared = D.videos[pid]?.sharedWith;
-      h += `<div class="prow"><b${shared?.length ? ` title="Same recording as ${esc(shared.join(", "))}"` : ""}>${pid}${shared?.length ? "⁺" : ""}</b>` + sessionsFor(pid).map((s) => {
+      h += `<div class="prow"><b${shared?.length ? ` title="Same recording as ${esc(shared.join(", "))}"` : ""}>${pid}${shared?.length ? "⁺" : ""}</b>` + sessionsFor(pid).filter((s) => inRound(pid, s.task)).map((s) => {
         const r = recOf(pid, s.task, state.coder);
         const others = Object.keys(CODES[`${pid}|${s.task}`] || {}).filter((c) => c !== state.coder).length;
         const on = pid === state.pid && s.task === state.task ? " on" : "";
-        return `<span class="tchip${on}" data-pid="${pid}" data-task="${esc(s.task)}" title="${esc(s.task)}${others ? ` · ${others} other coder(s)` : ""}">
-          <span class="dot" style="background:${LABEL_C[r?.label || ""]}"></span>${esc(TASK_SHORT[s.task] || s.task)}${v2Progress(s, r)}</span>`;
+        // with a coder that has assignments: assigned sessions stand out (amber = to do, green = finished)
+        let cls = "", dot = `<span class="dot" style="background:${LABEL_C[r?.label || ""]}"></span>`;
+        if (mineAsg) {
+          const asg = assignedTo(pid, s.task, state.coder), fin = asg && v2Done(s, r);
+          cls = asg ? " asg" + (fin ? " fin" : "") : " unasg";
+          dot = `<span class="dot${asg ? (fin ? " done" : " todo") : ""}"></span>`;
+        }
+        return `<span class="tchip${on}${cls}" data-pid="${pid}" data-task="${esc(s.task)}" title="${esc(s.task)}${mineAsg && assignedTo(pid, s.task, state.coder) ? " · assigned to you" : ""}${others ? ` · ${others} other coder(s)` : ""}">
+          ${dot}${esc(TASK_SHORT[s.task] || s.task)}${v2Progress(s, r)}</span>`;
       }).join("") + "</div>";
     }
   }
-  h += `<div class="legend">${LABELS.map(([k, l, c]) => `<div><i style="background:${c}"></i>${esc(l)}</div>`).join("")}<div style="margin-top:4px">number = your turns v2 coded / turns</div></div>`;
+  h += mineAsg
+    ? `<div class="legend"><div><i style="background:#fff;box-shadow:inset 0 0 0 2px #e0b84a"></i>assigned · to do</div><div><i style="background:#5aae5e"></i>assigned · finished</div><div>faded = not assigned to you</div><div style="margin-top:4px">number = your turns v2 coded / turns</div></div>`
+    : `<div class="legend">${LABELS.map(([k, l, c]) => `<div><i style="background:${c}"></i>${esc(l)}</div>`).join("")}<div style="margin-top:4px">number = your turns v2 coded / turns</div></div>`;
   $("side").innerHTML = h;
 }
 $("side").addEventListener("click", (e) => {
+  const rb = e.target.closest("[data-round]");
+  if (rb) { sideRound = sideRound === rb.dataset.round ? "" : rb.dataset.round; lsSet("pr-round", sideRound); renderSide(); return; }
   const c = e.target.closest(".tchip");
   if (c) openSession(c.dataset.pid, c.dataset.task);
 });
@@ -2026,10 +2075,10 @@ function v2PaneHtml() {
     const ns = v.nodes.filter((x) => x.stage);
     if (ns.length) {
       const bd = (n, txt, grey) => `<span class="v2bd${grey ? " grey" : ""}"><i style="--c:${ST[n].c}">${n}</i>${txt}</span>`;
-      const ups = ns.flatMap((n) => n.up);
+      const ups = v.up;
       h += `<div class="srow v2pr v2grp" data-seek="${t.N}"><img data-t="${t.N + 0.5}" alt="" /><div style="min-width:0">
         <div class="st">● ${esc(srcName(t))}</div>
-        <div class="v2bds">${ns.map((n) => bd(n.stage, `${esc(nm(n.stage).toLowerCase())}${n.eng.length ? ` <span class="muted">· ${n.eng.join(" + ")}</span>` : ""}${n.text ? ' <span class="tagtxt">text</span>' : ""}`, n.eng.length === 1 && n.eng[0] === "ignored")).join("")}</div>
+        <div class="v2bds">${ns.map((n) => bd(n.stage, `${esc(nm(n.stage).toLowerCase())}${n.text ? ' <span class="tagtxt">text</span>' : ""}`)).join("")}${engText(v) ? ` <span class="muted">· ${esc(engText(v))}</span>` : ""}</div>
         ${ups.length ? `<div class="v2bds">${ups.map((u) => bd(u, `↑ ${esc(nm(u))}`)).join("")}</div>` : ""}
         <div class="tm">${fmt(t.N)}</div></div></div>`;
     }
@@ -2146,7 +2195,12 @@ function v2Norm(v) {
   return {
     ...(v.auto ? { auto: true } : {}),
     intent: { stage: v.intent?.stage ?? null, up: arr(v.intent?.up).map(Number), note: v.intent?.note || "", inspired: v.intent?.inspired ?? null, ...(v.intent?.was ? { was: v.intent.was } : {}) },
-    nodes: (v.nodes || []).map((n) => ({ stage: n.stage ?? null, eng: arr(n.eng), up: arr(n.up).map(Number).slice(0, 1), ...(n.text ? { text: true } : {}) })),
+    nodes: (v.nodes || []).map((n) => ({ stage: n.stage ?? null, ...(n.text ? { text: true } : {}) })),
+    // engagement: one depth per source (the artifact, and the chat text reply when a node came from it),
+    // plus one optional ↑ arrow per turn. Older records kept these per node — merged here on read.
+    eng: v.eng && !Array.isArray(v.eng) ? { artifact: arr(v.eng.artifact), text: arr(v.eng.text) }
+      : { artifact: [...new Set((v.nodes || []).filter((n) => n.stage && !n.text).flatMap((n) => arr(n.eng)))], text: [...new Set((v.nodes || []).filter((n) => n.stage && n.text).flatMap((n) => arr(n.eng)))] },
+    up: v.up !== undefined ? arr(v.up).map(Number).slice(0, 1) : [...new Set((v.nodes || []).filter((n) => n.stage).flatMap((n) => arr(n.up).map(Number)))].sort((a, b) => a - b),
     hyps: (v.hyps || []).map((h) => ({ has: h.has ?? null, options: h.options ?? null, optsAfter: h.optsAfter ?? null, art: arr(h.art).filter((a) => a !== "narrows"),
       eng: arr(h.eng), secondary: !!h.secondary, label: h.label || "", labelAfter: h.labelAfter || "", hypText: h.hypText || "", artNote: h.artNote || "", engNote: h.engNote || "" })),
   };
@@ -2207,8 +2261,7 @@ function v2Changed() { if (editAgreed) { saveAgreed(); renderV2(); renderSegPane
 // italics and left out of the agreement.
 // ---- inter-coder agreement on turns v2, counted per decision (not per turn), with Cohen's κ where it applies:
 //   intent edge — one choice per turn · nodes — each node stage present / absent per turn
-//   engagement — on nodes both coded, agree when the picks share a level (more than one pick = unsure)
-//   ↑ arrows — each arrow present / absent per turn, pooled over the artifact (not tied to a node)
+//   ↑ arrow — one optional arrow per turn, scored present / absent per arrow (engagement depth is not compared)
 //   # actions — same number of non-secondary actions per turn
 function kappa(pairs) {
   const n = pairs.length;
@@ -2218,56 +2271,95 @@ function kappa(pairs) {
   const pe = Object.keys({ ...ca, ...cb }).reduce((x, k) => x + ((ca[k] || 0) / n) * ((cb[k] || 0) / n), 0);
   return { po, k: pe < 1 ? (po - pe) / (1 - pe) : null, n };
 }
-const v2Arrows = (v) => [...new Set(v.nodes.filter((n) => n.stage).flatMap((n) => n.up))].sort((a, b) => a - b);
+const v2Arrows = (v) => v.up;
 const engAgree = (a, b) => a.some((x) => b.includes(x));
-function v2Pairs(r, o, turns, P = { turns: 0, intent: [], nodes: [], arrows: [], eng: [], acts: [] }) {
-  const both = turns.filter((t) => r && o && (r.v2?.[t.key] || r.turns?.[t.key]) && (o.v2?.[t.key] || o.turns?.[t.key]));
-  const { intent, nodes, arrows, eng, acts } = P;
-  P.turns += both.length;
-  for (const t of both) {
-    const A = v2Of(r, t.key), B = v2Of(o, t.key);
-    if (A.intent.stage || B.intent.stage) intent.push([A.intent.stage ?? "none", B.intent.stage ?? "none"]);
-    const sa = new Set(A.nodes.map((n) => n.stage).filter(Boolean)), sb = new Set(B.nodes.map((n) => n.stage).filter(Boolean));
-    if (sa.size || sb.size) for (const x of NODE_STAGES) nodes.push([sa.has(x.n), sb.has(x.n)]);
-    const ua = v2Arrows(A), ub = v2Arrows(B);
-    for (const u of V2_UP) arrows.push([ua.includes(u.n), ub.includes(u.n)]);
-    for (const n of A.nodes) { const m = n.stage && B.nodes.find((z) => z.stage === n.stage); if (m && n.eng.length && m.eng.length) eng.push(engAgree(n.eng, m.eng)); }
-    acts.push([A.hyps.filter((x) => !x.secondary).length, B.hyps.filter((x) => !x.secondary).length]);
+const engText = (v) => [["artifact", v.eng.artifact], ["text", v.eng.text]].filter(([, e]) => e.length).map(([k, e]) => `${k}: ${e.join("+")}`).join(" · ");
+// one tuple per decision, one value per coder, over the turns every coder in `recs` coded (2 coders → pairs)
+function v2Tuples(recs, turns, P = { turns: 0, intent: [], nodes: [], arrows: [], acts: [] }) {
+  const all = turns.filter((t) => recs.every((r) => r && (r.v2?.[t.key] || r.turns?.[t.key])));
+  P.turns += all.length;
+  for (const t of all) {
+    const V = recs.map((r) => v2Of(r, t.key));
+    if (V.some((v) => v.intent.stage)) P.intent.push(V.map((v) => v.intent.stage ?? "none"));
+    const S = V.map((v) => new Set(v.nodes.map((n) => n.stage).filter(Boolean)));
+    if (S.some((x) => x.size)) for (const x of NODE_STAGES) P.nodes.push(S.map((ss) => ss.has(x.n)));
+    for (const u of V2_UP) P.arrows.push(V.map((v) => v2Arrows(v).includes(u.n)));
+    P.acts.push(V.map((v) => v.hyps.filter((x) => !x.secondary).length));
   }
   return P;
 }
+const v2Pairs = (r, o, turns, P) => v2Tuples([r, o], turns, P);
 const v2Agreement = (r, o, turns) => v2Stats(v2Pairs(r, o, turns));
-function v2Stats({ turns, intent, nodes, arrows, eng, acts }) {
-  return { turns, stats: [
-    { label: "intent edge", unit: "turns", ...kappa(intent) },
-    { label: "nodes", unit: "stage × turn", ...kappa(nodes) },
-    { label: "engagement", unit: "shared nodes", ...kappa(eng.map((x) => [x, true])), k: null },
-    { label: "↑ arrows (per artifact)", unit: "arrow × turn", ...kappa(arrows) },
-    { label: "# actions", unit: "turns", ...kappa(acts) },
+// Fleiss' κ for 3+ coders; po = share of items where every coder gave the same value
+function fleiss(items) {
+  const N = items.length;
+  if (!N) return { po: null, k: null, n: 0 };
+  const m = items[0].length, tot = {};
+  let Pbar = 0;
+  for (const it of items) {
+    const c = {};
+    for (const x of it) { c[x] = (c[x] || 0) + 1; tot[x] = (tot[x] || 0) + 1; }
+    Pbar += (Object.values(c).reduce((a, b) => a + b * b, 0) - m) / (m * (m - 1));
+  }
+  Pbar /= N;
+  const Pe = Object.values(tot).reduce((a, b) => a + (b / (N * m)) ** 2, 0);
+  return { po: items.filter((it) => it.every((x) => x === it[0])).length / N, k: Pe < 1 ? (Pbar - Pe) / (1 - Pe) : null, n: N };
+}
+function v2Stats({ turns, intent, nodes, arrows, acts }) {
+  const K = (x) => (x[0]?.length > 2 ? fleiss(x) : kappa(x));
+  return { turns, k3: acts[0]?.length > 2, stats: [
+    { label: "intent edge", unit: "turns", ...K(intent) },
+    { label: "nodes", unit: "stage × turn", ...K(nodes) },
+    { label: "↑ arrow", unit: "arrow × turn", ...K(arrows) },
+    { label: "# actions", unit: "turns", ...K(acts) },
   ] };
+}
+// IRR sets: sessions all three coded independently before an agreement meeting, reported separately.
+// Records edited during a meeting aren't independent codes and are left out of every IRR number.
+const IRR_CODERS = ["j", "krisha", "T"];
+const IRR_SETS = [
+  { name: "Set 1", sessions: ["I14|relocation", "S10|relocation", "T2|relocation"] },
+  { name: "Set 2", sessions: ["I9|relocation", "S6|relocation", "T3|relocation"] },
+];
+const IRR_EXCLUDE = { "S6|relocation": ["j", "krisha"] };   // saved during the Nov 2 discussion
+const irrRec = (k, c) => (IRR_EXCLUDE[k] || []).includes(c) ? null : CODES[k]?.[c] || null;
+const sessTurns = (k, rec) => { const [pid, task] = k.split("|"), s2 = D.sessions.find((x) => x.pid === pid && x.task === task); return s2 ? deriveTurns(s2, rec) : []; };
+function irrSetsHtml() {
+  return IRR_SETS.map((set) => {
+    const pair = IRR_CODERS.flatMap((c1, i) => IRR_CODERS.slice(i + 1).map((c2) => {
+      const P = { turns: 0, intent: [], nodes: [], arrows: [], acts: [] };
+      for (const k of set.sessions) { const a = irrRec(k, c1), b = irrRec(k, c2); if (a && b) v2Tuples([a, b], sessTurns(k, a), P); }
+      return P.turns ? agreeHtml(`${esc(c1)} vs ${esc(c2)}`, v2Stats(P)) : "";
+    })).join("");
+    const P3 = { turns: 0, intent: [], nodes: [], arrows: [], acts: [] }, used = [];
+    for (const k of set.sessions) { const rs = IRR_CODERS.map((c) => irrRec(k, c)); if (rs.every(Boolean)) { v2Tuples(rs, sessTurns(k, rs[0]), P3); used.push(k.split("|")[0]); } }
+    const ex = set.sessions.filter((k) => IRR_EXCLUDE[k]).map((k) => `${k.split("|")[0]} (${IRR_EXCLUDE[k].join(", ")} left out — edited in discussion)`);
+    return `<div style="margin:6px 0 10px"><b>${esc(set.name)}</b> <span class="muted">· ${set.sessions.map((k) => k.split("|")[0]).join(", ")}${ex.length ? " · " + esc(ex.join("; ")) : ""}</span>
+      ${P3.turns ? agreeHtml(`all three <span class="muted" style="font-weight:400">· Fleiss κ · ${used.join(", ")}</span>`, v2Stats(P3)) : ""}${pair}</div>`;
+  }).join("");
 }
 // every coder pair, pooled over all sessions both have coded in turns v2 (the study-wide IRR)
 function v2AgreementAll() {
   const P = {};
   for (const [k, m] of Object.entries(CODES)) {
-    const coders = Object.entries(m).filter(([c, o]) => !c.startsWith("_") && Object.keys(o.v2 || {}).length).sort(([a], [b]) => a.localeCompare(b));
+    const coders = Object.entries(m).filter(([c, o]) => !c.startsWith("_") && Object.keys(o.v2 || {}).length && irrRec(k, c)).sort(([a], [b]) => a.localeCompare(b));
     if (coders.length < 2) continue;
     const [pid, task] = k.split("|"), s2 = D.sessions.find((x) => x.pid === pid && x.task === task);
     if (!s2) continue;
     const turns = deriveTurns(s2, coders[0][1]);
     coders.forEach(([c1, o1], i) => coders.slice(i + 1).forEach(([c2, o2]) => {
       const key = `${c1} vs ${c2}`;
-      P[key] ||= { turns: 0, intent: [], nodes: [], arrows: [], eng: [], acts: [], sessions: 0 };
+      P[key] ||= { turns: 0, intent: [], nodes: [], arrows: [], acts: [], sessions: 0 };
       const before = P[key].turns; v2Pairs(o1, o2, turns, P[key]); if (P[key].turns > before) P[key].sessions++;
     }));
   }
   return Object.entries(P).filter(([, x]) => x.turns).map(([key, x]) => agreeHtml(`${esc(key)} <span class="muted" style="font-weight:400">· ${x.sessions} sessions</span>`, v2Stats(x))).join("");
 }
-const agreeAllHtml = () => { const h = v2AgreementAll(); return h ? `<details class="agall"${lsGet("pr-agall") === "1" ? " open" : ""}><summary>All sessions, pooled (study-wide agreement)</summary>${h}</details>` : ""; };
-const agreeHtml = (title, ag) => `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${title}</b>${ag.turns} turns both coded</div>
+const agreeAllHtml = () => { const h = v2AgreementAll(); return h ? `<details class="agall"${lsGet("pr-agall") === "1" ? " open" : ""}><summary>All sessions, pooled (study-wide agreement)</summary>${irrSetsHtml()}<div style="margin-top:6px"><b>All sessions</b></div>${h}</details>` : ""; };
+const agreeHtml = (title, ag) => `<div class="tsum"><div style="border:0;background:none;padding:4px 0"><b style="font-size:12px">${title}</b>${ag.turns} turns ${ag.k3 ? "all coded" : "both coded"}</div>
   ${ag.stats.map((x) => `<div><b>${x.po == null ? "—" : Math.round(100 * x.po) + "%"}${x.k != null ? ` <span class="kap">κ ${x.k.toFixed(2)}</span>` : ""}</b>${x.label} <span class="muted">(n=${x.n} ${x.unit})</span></div>`).join("")}</div>`;
-const AGREE_NOTE = `<div class="muted" style="font-size:10.5px;margin:-4px 0 8px">% = raw agreement · κ = Cohen's kappa, chance-corrected (&lt;.40 weak · .40–.60 moderate · .60–.80 substantial · &gt;.80 strong; “—” when it can't be computed).
-  Nodes and ↑ arrows are scored as present / absent for every stage in each turn; arrows are pooled per artifact, so it doesn't matter which node they sit on. Engagement agrees when the picks share a level.</div>`;
+const AGREE_NOTE = `<div class="muted" style="font-size:10.5px;margin:-4px 0 8px">% = raw agreement · κ = Cohen's kappa for two coders, Fleiss' kappa for all three, chance-corrected (&lt;.40 weak · .40–.60 moderate · .60–.80 substantial · &gt;.80 strong; “—” when it can't be computed).
+  Nodes and ↑ arrows are scored as present / absent for every stage in each turn; one ↑ arrow per turn (optional). Engagement depth is recorded but not part of IRR.</div>`;
 function renderV2Table(b, turns) {
   const coders = Object.entries(CODES[`${state.pid}|${state.task}`] || {}).filter(([, o]) => Object.keys(o.v2 || {}).length || Object.keys(o.turns || {}).length)
     .sort(([a], [c]) => (a === state.coder ? -1 : c === state.coder ? 1 : a.localeCompare(c)));
@@ -2277,9 +2369,10 @@ function renderV2Table(b, turns) {
   const fields = [
     ["Intent edge", (v) => `${v.intent.stage ?? ""}|${v.intent.up.join(".")}`, (v) => name(v.intent.stage) + ups(v.intent.up)],
     ["Inspired by", (v) => v.intent.inspired ?? "", (v) => name(v.intent.inspired)],
-    ["Nodes · engagement", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}:${n.eng.slice().sort().join("+")}${n.text ? ":text" : ""}`).sort().join("|"),
-      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div class="${n.eng.length === 1 && n.eng[0] === "ignored" ? "grey" : ""}">● ${name(n.stage)}${n.text ? ' <span class="tagtxt">text</span>' : ""} <span class="muted">· ${n.eng.join(" + ") || "—"}</span></div>`).join("") || "—"],
-    ["↑ Arrows (artifact)", (v) => v2Arrows(v).join("."), (v) => (v2Arrows(v).length ? ups(v2Arrows(v)) : '<span class="muted">none</span>')],
+    ["Nodes", (v) => v.nodes.filter((n) => n.stage).map((n) => `${n.stage}${n.text ? ":text" : ""}`).sort().join("|"),
+      (v) => v.nodes.filter((n) => n.stage).map((n) => `<div>● ${name(n.stage)}${n.text ? ' <span class="tagtxt">text</span>' : ""}</div>`).join("") || "—"],
+    ["Engagement (not in IRR)", (v) => engText(v), (v) => engText(v) || '<span class="muted">—</span>'],
+    ["↑ Arrow", (v) => v2Arrows(v).join("."), (v) => (v2Arrows(v).length ? ups(v2Arrows(v)) : '<span class="muted">none</span>')],
     ["Actions", (v) => main(v).map((h) => [h.has, h.options, h.art.slice().sort().join("+"), h.eng.slice().sort().join("+"), h.optsAfter].join(":")).sort().join("|"),
       (v) => v.hyps.map((h) => `<div class="hcell${h.has === "no" ? " grey" : ""}${h.secondary ? " sec" : ""}"><b>${esc(h.label || "action")}</b>${h.secondary ? ' <span class="tagsec">secondary</span>' : ""} · hypothesis ${h.has || "—"} · ${optLabel(h.options)} → ${optLabel(h.optsAfter)} options${h.labelAfter ? ` (→ ${esc(h.labelAfter)})` : ""}
         ${h.hypText ? `<br>“${esc(h.hypText)}”` : ""}
@@ -2297,24 +2390,15 @@ function renderV2Table(b, turns) {
     fields.forEach(([label, key, show], fi) => {
       const keys = vs.filter(Boolean).map(key), same = keys.length > 1 && keys.every((k) => k === keys[0]);
       if (keys.length > 1) { agree[fi][1]++; if (same) agree[fi][0]++; }
-      const use = coders.map(([c], ci) => (vs[ci] ? `<button class="use" data-use="${fi}" data-from="${esc(c)}" data-key="${esc(t.key)}" title="Copy ${esc(c)}'s ${label.toLowerCase()} into the agreed codes">use ${esc(c)}</button>` : "")).join("");
       body += `<tr><td class="fl">${label}</td>${vs.map((v) => `<td class="${!v ? "nc" : keys.length < 2 ? "" : same ? "ok" : "no"}">${v ? show(v) : '<span class="muted">not coded</span>'}</td>`).join("")}
-        <td class="agcell">${av ? show(av) : '<span class="muted">—</span>'}<div class="uses">${use}</div></td></tr>`;
+        <td class="agcell">${av ? show(av) : '<span class="muted">—</span>'}</td></tr>`;
     });
   }
   const pairs = coders.flatMap(([c1, o1], i) => coders.slice(i + 1).map(([c2, o2]) => agreeHtml(`${esc(c1)} vs ${esc(c2)}`, v2Agreement(o1, o2, turns)))).join("");
   b.innerHTML = `${pairs}${pairs ? AGREE_NOTE : ""}${agreeAllHtml()}
     <div class="muted" style="font-size:11px;margin:-4px 0 8px">Row colours: green = every coder's cell is identical. Greyed = coded “no” / ignored. Secondary actions (italic) don't count toward agreement.</div>
-    <table class="v2cmp"><thead><tr><th></th>${coders.map(([c]) => `<th>${esc(c)}${c === state.coder ? " (you)" : ""}</th>`).join("")}<th class="agh">Agreed <span class="muted" style="font-weight:400">(shared)</span></th></tr></thead><tbody>${body}</tbody></table>`;
+    <table class="v2cmp"><thead><tr><th></th>${coders.map(([c]) => `<th>${esc(c)}${c === state.coder ? " (you)" : ""}</th>`).join("")}<th class="agh">Agreed <span class="muted" style="font-weight:400">(shared · coded separately via ✎ edit agreed)</span></th></tr></thead><tbody>${body}</tbody></table>`;
 }
-// copy one field of a coder's v2 coding into the agreed record
-const V2_FIELDS = [
-  (from, to) => { to.intent.stage = from.intent.stage; to.intent.up = [...from.intent.up]; },
-  (from, to) => { to.intent.inspired = from.intent.inspired; },
-  (from, to) => { to.nodes = JSON.parse(JSON.stringify(from.nodes)); },
-  (from, to) => { to.nodes = JSON.parse(JSON.stringify(from.nodes)); },   // arrows live on the nodes, so they come with them
-  (from, to) => { to.hyps = JSON.parse(JSON.stringify(from.hyps)); },
-];
 const v2LayoutBar = () => `<div class="v2lay">${state.compare ? `compare as: ${[["cards", "cards"], ["table", "side by side"]].map(([k, l]) => `<button class="b${v2Layout === k ? " on" : ""}" data-v2lay="${k}">${l}</button>`).join("")}` : ""}
   <button class="b${editAgreed ? " on agon" : ""}" data-editagreed style="margin-left:auto" title="Edit the shared agreed codes for this session (coding meeting)">✎ edit agreed</button></div>`;
 function renderV2() {
@@ -2332,7 +2416,7 @@ function renderV2() {
   if (!editAgreed && others.length) h += AGREE_NOTE + agreeAllHtml();
   turns.forEach((t, ti) => {
     const v = v2Of(r, t.key), auto = !!v.auto;
-    const nodes = v.nodes.length ? v.nodes : [{ stage: null, eng: [], up: [] }];
+    const nodes = v.nodes.length ? v.nodes : [{ stage: null }];
     h += `<div class="tcard" data-key="${esc(t.key)}">
       <div class="th"><b>Turn ${t.k}</b><span class="tm" style="font:11px ui-monospace,Menlo,monospace;color:var(--muted)">${fmt(t.S)}</span>
         <span class="pr-text" title="click to expand">“${esc(t.prompt || "")}”</span>${auto ? ' <span class="draft" title="Pre-filled from your turns coding — editing confirms it">draft</span>' : ""}</div>
@@ -2347,10 +2431,10 @@ function renderV2() {
           <div><div class="v2head">${esc(srcName(t)[0].toUpperCase() + srcName(t).slice(1))} · nodes <button class="play" data-a="${t.N}" data-b="${t.E}">▶ ${fmt(t.N)}–${fmt(t.E)}</button></div>
             ${nodes.map((n, i) => `<div class="v2n" data-n="${i}"><select data-v="nstage"${dis}>${opts(NODE_STAGES, n.stage, "node…")}</select>${/^[SI]/.test(state.pid) ? `<button class="txtg${n.text ? " on" : ""}" data-v2txt${dis} title="This node came from the chat text reply, not the artifact">text</button>` : ""}${v.nodes.length > 1 ? `<button class="x" data-v2del${dis} style="border:0;background:none;cursor:pointer;color:var(--muted)">×</button>` : ""}</div>`).join("")}
             <button class="addnode" data-v2addnode${dis}>+ node</button></div>
-          <div><div class="v2head">Engagement <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(pick more than one if unsure · ↑ arrow optional, if the artifact was used that way)</span></div>
-            ${nodes.map((n, i) => `<div class="v2eng" data-n="${i}">${chips(V2_ENG, n.eng, "eng", dis)}
-              <select class="upsel${n.up.length ? " on" : ""}" data-v="nup" style="--c:${ST[n.up[0]]?.c || "#b9b2a6"}"${dis} title="upward arrow (one)">
-                <option value="">↑ (optional)</option>${V2_UP.map((u) => `<option value="${u.n}"${n.up[0] === u.n ? " selected" : ""}>↑ ${u.n} ${esc(u.name)}</option>`).join("")}</select></div>`).join("")}</div>
+          <div><div class="v2head">Engagement <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(how deeply they read it · pick more than one if unsure)</span></div>
+            ${[["artifact", "artifact"], ...(v.nodes.some((n) => n.text) || v.eng.text.length ? [["text", "text reply"]] : [])].map(([src, l]) => `<div class="v2eng" data-src="${src}"><span class="muted" style="font-size:11px;width:58px">${l}</span>${chips(V2_ENG, v.eng[src], "eng", dis)}</div>`).join("")}
+            <div class="v2eng"><span class="muted" style="font-size:11px;width:58px">↑ arrow</span><select class="upsel${v.up.length ? " on" : ""}" data-v="up" style="--c:${ST[v.up[0]]?.c || "#b9b2a6"}"${dis} title="one upward arrow, if the artifact was used that way">
+                <option value="">↑ (optional)</option>${V2_UP.map((u) => `<option value="${u.n}"${v.up[0] === u.n ? " selected" : ""}>↑ ${u.n} ${esc(u.name)}</option>`).join("")}</select>${v.up.length > 1 ? `<span class="muted" style="font-size:10.5px">was ${v.up.map((u) => "↑" + u).join(" ")}</span>` : ""}</div></div>
         </div>
       </div>
       <div class="hyps">
@@ -2372,8 +2456,8 @@ function renderV2() {
       ${others.map(([c, o]) => { const ov = v2Of(o, t.key);
         return `<div class="tcmp"><b style="font-size:11px;color:var(--muted)">${esc(c)}</b>
           <span class="${ov.intent.stage === v.intent.stage ? "ok" : "no"}">${ov.intent.stage ? `${ov.intent.stage} ${esc(ST[ov.intent.stage].name)}` : "—"}${ov.intent.up.length ? " ↑" + ov.intent.up.join(" ↑") : ""}</span> ·
-          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); const same = m && (!m.eng.length && !n.eng.length || engAgree(m.eng, n.eng)) && !m.text === !n.text;
-            return `<span class="${same ? "ok" : "no"}">●${n.stage ?? "?"}${n.text ? " (text)" : ""} ${n.eng.join("+")}</span>`; }).join(" ") || "—"}
+          ${ov.nodes.map((n) => { const m = v.nodes.find((z) => z.stage === n.stage); const same = m && !m.text === !n.text;
+            return `<span class="${same ? "ok" : "no"}">●${n.stage ?? "?"}${n.text ? " (text)" : ""}</span>`; }).join(" ") || "—"}${engText(ov) ? ` <span class="muted">(${esc(engText(ov))})</span>` : ""}
           ${(() => { const ua = v2Arrows(ov), ub = v2Arrows(v); return ua.length || ub.length ? ` · <span class="${ua.join() === ub.join() ? "ok" : "no"}">${ua.length ? ua.map((u) => "↑" + u).join(" ") : "no ↑"}</span>` : ""; })()} ·
           ${ov.hyps.length} action${ov.hyps.length === 1 ? "" : "s"}${ov.hyps.length ? ": " + ov.hyps.map((hy) => `<span class="${hy.has === "no" ? "grey" : ""}${hy.secondary ? " sec" : ""}">[${hy.has || "?"} · ${optLabel(hy.options)}→${optLabel(hy.optsAfter)} · ${hy.art.join("+") || "?"} · ${hy.eng.join("+") || "?"}]</span>`).join(" ") : ""}</div>`; }).join("")}
       ${turns[ti + 1] ? `<div class="flowto">↓ into Turn ${turns[ti + 1].k} intent</div>` : ""}
@@ -2396,19 +2480,6 @@ $("v2board").addEventListener("click", (e) => {
   const lay = e.target.closest("[data-v2lay]");
   if (lay) { v2Layout = lay.dataset.v2lay; lsSet("pr-v2cmp", v2Layout); renderV2(); return; }
   if (e.target.closest("[data-editagreed]")) { editAgreed = !editAgreed; if (editAgreed) { v2Layout = "cards"; lsSet("pr-v2cmp", v2Layout); } renderV2(); renderSegPane(); return; }
-  const use = e.target.closest("[data-use]");
-  if (use) {
-    if (!state.coder) return alert("Enter your coder name first.");
-    const src = CODES[`${state.pid}|${state.task}`]?.[use.dataset.from];
-    if (!src) return;
-    const ag = agreedRec(true);
-    ag.v2 ||= {};
-    const to = v2Norm(ag.v2[use.dataset.key] || { intent: {}, nodes: [], hyps: [] }); delete to.auto;
-    V2_FIELDS[+use.dataset.use](v2Of(src, use.dataset.key), to);
-    ag.v2[use.dataset.key] = to;
-    saveAgreed(); renderV2();
-    return;
-  }
   const pl = e.target.closest(".play");
   if (pl) { if (pl.classList.contains("on")) { vid.pause(); clipEnd = null; renderTurnsPlaying(); } else playClip(+pl.dataset.a, +pl.dataset.b); return; }
   const pt = e.target.closest(".pr-text");
@@ -2423,12 +2494,12 @@ $("v2board").addEventListener("click", (e) => {
   const v = v2Rec(card.dataset.key);
   const ni = e.target.closest("[data-n]") ? +e.target.closest("[data-n]").dataset.n : null;
   const hj = e.target.closest("[data-h]") ? +e.target.closest("[data-h]").dataset.h : null;
-  const node = () => { while (v.nodes.length <= ni) v.nodes.push({ stage: null, eng: [], up: [] }); return v.nodes[ni]; };
+  const node = () => { while (v.nodes.length <= ni) v.nodes.push({ stage: null }); return v.nodes[ni]; };
   const one = (o, k, val) => { o[k] = o[k] === val ? null : val; };                                       // single choice
   const many = (o, k, val) => { o[k] = o[k].includes(val) ? o[k].filter((x) => x !== val) : [...o[k], val]; };   // multi-select
   const d = b.dataset;
-  if (d.eng) many(node(), "eng", d.eng);
-  else if (b.hasAttribute("data-v2addnode")) { if (!v.nodes.length) v.nodes.push({ stage: null, eng: [], up: [] }); v.nodes.push({ stage: null, eng: [], up: [] }); }
+  if (d.eng) many(v.eng, e.target.closest("[data-src]").dataset.src, d.eng);
+  else if (b.hasAttribute("data-v2addnode")) { if (!v.nodes.length) v.nodes.push({ stage: null }); v.nodes.push({ stage: null }); }
   else if (b.hasAttribute("data-v2del")) v.nodes.splice(ni, 1);
   else if (b.hasAttribute("data-v2txt")) { const n = node(); if (n.text) delete n.text; else n.text = true; }
   else if (b.hasAttribute("data-addhyp")) v.hyps.push({ has: null, options: null, optsAfter: null, art: [], eng: [], secondary: false, label: "", labelAfter: "", hypText: "", artNote: "", engNote: "" });
@@ -2450,8 +2521,8 @@ $("v2board").addEventListener("change", (e) => {
   const f = e.target.dataset.v, val = e.target.value === "" ? null : +e.target.value;
   if (f === "istage") { v.intent.stage = val; delete v.intent.was; }
   else if (f === "inspired") v.intent.inspired = val;
-  else if (f === "nup") { const i = +e.target.closest("[data-n]").dataset.n; while (v.nodes.length <= i) v.nodes.push({ stage: null, eng: [], up: [] }); v.nodes[i].up = val ? [val] : []; }
-  else if (f === "nstage") { const i = +e.target.closest("[data-n]").dataset.n; while (v.nodes.length <= i) v.nodes.push({ stage: null, eng: [], up: [] }); v.nodes[i].stage = val; }
+  else if (f === "up") v.up = val ? [val] : [];
+  else if (f === "nstage") { const i = +e.target.closest("[data-n]").dataset.n; while (v.nodes.length <= i) v.nodes.push({ stage: null }); v.nodes[i].stage = val; }
   else return;
   v2Changed();
 });
@@ -2477,7 +2548,7 @@ $("csvV2").addEventListener("click", () => {
       if (!r.v2?.[t.key] && !r.turns?.[t.key]) continue;
       const v = v2Of(r, t.key), base = [r.coder, r.pid, cond, r.task, t.k, t.key], dr = r.v2?.[t.key] ? "" : "draft";
       rows.push([...base, "intent", "", v.intent.stage ?? "", v.intent.up.join(" "), v.intent.inspired ?? "", "", "", "", "", "", "", "", "", "", "", "", v.intent.note, "", "", "", dr]);
-      v.nodes.forEach((n, i) => rows.push([...base, "node", i + 1, "", "", "", n.stage ?? "", n.eng.join("+"), n.up.join(" "), "", "", "", "", "", "", "", "", "", "", "", dr, n.stage ? (n.text ? "text" : "artifact") : ""]));
+      v.nodes.forEach((n, i) => rows.push([...base, "node", i + 1, "", "", "", n.stage ?? "", n.stage ? v.eng[n.text ? "text" : "artifact"].join("+") : "", v.up.join(" "), "", "", "", "", "", "", "", "", "", "", "", dr, n.stage ? (n.text ? "text" : "artifact") : ""]));
       v.hyps.forEach((hy, j) => rows.push([...base, "action", j + 1, "", "", "", "", "", "", hy.has ?? "", hy.hypText, hy.options ? optLabel(hy.options) : "", hy.art.join("+"), hy.eng.join("+"),
         hy.optsAfter ? optLabel(hy.optsAfter) : "", hy.secondary ? 1 : "", hy.label, hy.labelAfter, hy.artNote, hy.engNote, dr]));
     }

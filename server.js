@@ -6,7 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 // Backend is switchable: DB_BACKEND=sqlite → local data/probe.db, otherwise Firestore.
 const DB_BACKEND = process.env.DB_BACKEND === "sqlite" ? "./db.js" : "./db-firebase.js";
-const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode, getCodebookAdds, setCodebookAdd, deleteCodebookAdd, getProcessCodes, getProcessCode, setProcessCode, updateProcessCode } = await import(DB_BACKEND);
+const { logEvent, allEvents, artifactEvents, countAllArtifacts, summary, countArtifacts, getScenario, setScenario, deleteEmptySessions, eventsForPids, allScenarios, getCodes, setCode, getCodebookAdds, setCodebookAdd, deleteCodebookAdd, getProcessCodes, getProcessCode, setProcessCode, updateProcessCode, snapshotProcessCode, getProcessHistory } = await import(DB_BACKEND);
 import { listVideos, streamFile, accessToken } from "./drive.js";
 import crypto from "crypto";
 
@@ -732,6 +732,8 @@ app.get("/api/drive/:id", async (req, res) => {
   }
 });
 app.get("/api/process-codes", async (req, res) => res.json(await getProcessCodes()));
+// saved versions of one coder's record (hourly snapshots), oldest first: ?coder=&pid=&task=
+app.get("/api/process-codes/history", async (req, res) => res.json(await getProcessHistory(`${req.query.coder}__${req.query.pid}__${req.query.task}`)));
 // One coder's annotation of one session (pid × task): time segments on the recording, each a
 // Pirolli & Card process (arrow) stage (see STAGES in process-review.html), pins for the loop's nodes
 // and for markers, and a session label.
@@ -835,7 +837,10 @@ app.post("/api/process-codes", safe(async (req, res) => {
       intent: { stage: [3, 6, 9, 12, 15].includes(+x.intent?.stage) ? +x.intent.stage : null, up: many((Array.isArray(x.intent?.up) ? x.intent.up : []).map(Number), upOk).sort((a, b) => a - b),
         note: String(x.intent?.note ?? "").slice(0, 2000), inspired: st(x.intent?.inspired) },
       nodes: (Array.isArray(x.nodes) ? x.nodes : []).slice(0, 12).map((n) => ({ stage: st(n?.stage), eng: many(n?.eng, ["skimmed", "read", "ignored"]),
-        up: many((Array.isArray(n?.up) ? n.up : []).map(Number), upOk).slice(0, 1), ...(n?.text ? { text: true } : {}) })),   // one upward arrow per node; text = came from the chat reply, not the artifact
+        up: many((Array.isArray(n?.up) ? n.up : []).map(Number), upOk).slice(0, 1), ...(n?.text ? { text: true } : {}) })),   // older pages: engagement + ↑ per node; text = came from the chat reply, not the artifact
+      // current pages: one engagement depth per source (artifact / text reply) and one optional ↑ arrow per turn
+      ...(x.eng && typeof x.eng === "object" && !Array.isArray(x.eng) ? { eng: { artifact: many(x.eng.artifact, ["skimmed", "read", "ignored"]), text: many(x.eng.text, ["skimmed", "read", "ignored"]) } } : {}),
+      ...(Array.isArray(x.up) ? { up: many(x.up.map(Number), upOk).slice(0, 1) } : {}),
       hyps: (Array.isArray(x.hyps) ? x.hyps : []).slice(0, 30).map((h) => ({ has: pick(h?.has, ["yes", "no"]), options: pick(h?.options, ["1", "2", "3", "4"]),
         optsAfter: pick(h?.optsAfter, ["1", "2", "3", "4"]), art: many(h?.art, ["confirm", "counter", "no"]), eng: many(h?.eng, ["changed", "narrowed", "expanded", "nochange"]),
         secondary: !!h?.secondary, label: String(h?.label ?? "").slice(0, 200), labelAfter: String(h?.labelAfter ?? "").slice(0, 200), hypText: String(h?.hypText ?? "").slice(0, 2000), artNote: String(h?.artNote ?? "").slice(0, 2000), engNote: String(h?.engNote ?? "").slice(0, 2000) })),
@@ -846,6 +851,7 @@ app.post("/api/process-codes", safe(async (req, res) => {
   const decision = { status: pick(decIn.status, ["decided", "narrowed", "undecided"]), choice: String(decIn.choice ?? "").slice(0, 300), note: String(decIn.note ?? "").slice(0, 3000) };
   const data = { type: "session", coder: String(b.coder), pid: String(b.pid), task: String(b.task), segs, pins, turns, start, v2, decision, label: String(b.label ?? "").slice(0, 40), note: String(b.note ?? "").slice(0, 5000) };
   await setProcessCode(`${data.coder}__${data.pid}__${data.task}`, data);
+  await snapshotProcessCode(`${data.coder}__${data.pid}__${data.task}`, data).catch((e) => console.error("history snapshot failed:", e.message));
   // schema + what was kept: the page compares this with what it sent and warns if anything was dropped
   // (e.g. an old server process still running after the code was updated)
   res.json({ ok: true, schema: 3, kept: { v2: Object.keys(v2).length, hyps: Object.values(v2).reduce((n, x) => n + x.hyps.length, 0),
