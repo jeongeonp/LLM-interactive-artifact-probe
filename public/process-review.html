@@ -331,6 +331,9 @@
   .v2eng .chips button.on { background:#2a2725; border-color:#2a2725; color:#fff; }   /* engagement isn't compared: no per-level colours */
   .upl { font-size:10.5px; color:#3f6b4a; margin-top:2px; }
   .v2cmp th.agh { background:#e3eedf; }
+  .keeps { display:flex; flex-wrap:wrap; gap:2px; margin-top:3px; }
+  .keep { border:0; background:none; padding:0 3px; font-size:9.5px; line-height:13px; color:#2f7a3a; cursor:pointer; opacity:.6; text-decoration:underline dotted; }
+  .keep:hover { opacity:1; }
   .v2cmp td.agcell { background:#f6faf3; border-left:2px solid #9cc79f; }
   .b.agon { background:#2f7a3a; border-color:#2f7a3a; }
   .banner.agban { background:#e9f4e7; border-color:#9cc79f; }
@@ -2385,6 +2388,8 @@ function renderV2Table(b, turns) {
   ];
   const agree = fields.map(() => [0, 0]);
   const ag = agreedRec();
+  // small "keep <coder>" links: copy that coder's answer into the agreed codes (they can still be edited after)
+  const keepBtns = (has, attrs) => { const h = coders.map(([c], ci) => (has[ci] ? `<button class="keep" ${attrs} data-from="${esc(c)}" title="Copy ${esc(c)}'s answer into the agreed codes">keep ${esc(c)}</button>` : "")).join(""); return h ? `<div class="keeps">${h}</div>` : ""; };
   let body = "";
   for (const t of turns) {
     const vs = coders.map(([, o]) => (o.v2?.[t.key] || o.turns?.[t.key] ? v2Of(o, t.key) : null));
@@ -2395,7 +2400,7 @@ function renderV2Table(b, turns) {
       const keys = vs.filter(Boolean).map(key), same = keys.length > 1 && keys.every((k) => k === keys[0]);
       if (keys.length > 1) { agree[fi][1]++; if (same) agree[fi][0]++; }
       body += `<tr><td class="fl">${label}</td>${vs.map((v) => `<td class="${!v ? "nc" : keys.length < 2 ? "" : same ? "ok" : "no"}">${v ? show(v) : '<span class="muted">not coded</span>'}</td>`).join("")}
-        <td class="agcell">${av ? show(av) : '<span class="muted">—</span>'}</td></tr>`;
+        <td class="agcell">${av ? show(av) : '<span class="muted">—</span>'}${keepBtns(vs.map((v) => !!v), `data-keep="${fi}" data-key="${esc(t.key)}"`)}</td></tr>`;
     });
   }
   // final decision (once per session): status decides the colour; choice and note are shown alongside
@@ -2403,13 +2408,22 @@ function renderV2Table(b, turns) {
   if (decs.some((d) => d.status || d.choice)) {
     const st = decs.filter((d) => d.status).map((d) => d.status), same = st.length > 1 && st.every((x) => x === st[0]);
     body += `<tr class="tturn"><th colspan="${coders.length + 2}">Final decision</th></tr><tr><td class="fl">Decision</td>${decs.map((d) => `<td class="${!d.status ? "nc" : st.length < 2 ? "" : same ? "ok" : "no"}">${decTxt(d) || '<span class="muted">not coded</span>'}</td>`).join("")}
-      <td class="agcell">${decTxt(ad) || '<span class="muted">—</span>'}</td></tr>`;
+      <td class="agcell">${decTxt(ad) || '<span class="muted">—</span>'}${keepBtns(decs.map((d) => !!(d.status || d.choice)), 'data-keep="dec"')}</td></tr>`;
   }
   const pairs = coders.flatMap(([c1, o1], i) => coders.slice(i + 1).map(([c2, o2]) => agreeHtml(`${esc(c1)} vs ${esc(c2)}`, v2Agreement(o1, o2, turns)))).join("");
   b.innerHTML = `${pairs}${pairs ? AGREE_NOTE : ""}${agreeAllHtml()}
     <div class="muted" style="font-size:11px;margin:-4px 0 8px">Row colours: green = every coder's cell is identical. Greyed = coded “no” / ignored. Secondary actions (italic) don't count toward agreement.</div>
-    <table class="v2cmp"><thead><tr><th></th>${coders.map(([c]) => `<th>${esc(c)}${c === state.coder ? " (you)" : ""}</th>`).join("")}<th class="agh">Agreed <span class="muted" style="font-weight:400">(shared · coded separately via ✎ edit agreed)</span></th></tr></thead><tbody>${body}</tbody></table>`;
+    <table class="v2cmp"><thead><tr><th></th>${coders.map(([c]) => `<th>${esc(c)}${c === state.coder ? " (you)" : ""}</th>`).join("")}<th class="agh">Agreed <span class="muted" style="font-weight:400">(shared · ✎ edit agreed, or keep a coder's answer)</span></th></tr></thead><tbody>${body}</tbody></table>`;
 }
+// what each "keep <coder>" copies, in the order of the comparison table's rows
+const KEEP_FIELDS = [
+  (from, to) => { to.intent.stage = from.intent.stage; to.intent.up = [...from.intent.up]; },
+  (from, to) => { to.intent.inspired = from.intent.inspired; },
+  (from, to) => { to.nodes = JSON.parse(JSON.stringify(from.nodes)); },
+  (from, to) => { to.eng = JSON.parse(JSON.stringify(from.eng)); },
+  (from, to) => { to.up = [...from.up]; },
+  (from, to) => { to.hyps = JSON.parse(JSON.stringify(from.hyps)); },
+];
 const v2LayoutBar = () => `<div class="v2lay">${state.compare ? `compare as: ${[["cards", "cards"], ["table", "side by side"]].map(([k, l]) => `<button class="b${v2Layout === k ? " on" : ""}" data-v2lay="${k}">${l}</button>`).join("")}` : ""}
   <button class="b${editAgreed ? " on agon" : ""}" data-editagreed style="margin-left:auto" title="Edit the shared agreed codes for this session (coding meeting)">✎ edit agreed</button></div>`;
 function renderV2() {
@@ -2491,6 +2505,21 @@ $("v2board").addEventListener("click", (e) => {
   const lay = e.target.closest("[data-v2lay]");
   if (lay) { v2Layout = lay.dataset.v2lay; lsSet("pr-v2cmp", v2Layout); renderV2(); return; }
   if (e.target.closest("[data-editagreed]")) { editAgreed = !editAgreed; v2Layout = editAgreed ? "cards" : state.compare ? "table" : v2Layout; lsSet("pr-v2cmp", v2Layout); renderV2(); renderSegPane(); return; }
+  const kp = e.target.closest("[data-keep]");
+  if (kp) {
+    if (!state.coder) return alert("Enter your coder name first.");
+    const src = CODES[`${state.pid}|${state.task}`]?.[kp.dataset.from], ag = agreedRec(true);
+    if (!src) return;
+    if (kp.dataset.keep === "dec") ag.decision = { ...decOf(src) };
+    else {
+      ag.v2 ||= {};
+      const to = v2Norm(ag.v2[kp.dataset.key] || { intent: {}, nodes: [], hyps: [] }); delete to.auto;
+      KEEP_FIELDS[+kp.dataset.keep](v2Of(src, kp.dataset.key), to);
+      ag.v2[kp.dataset.key] = to;
+    }
+    saveAgreed(); renderV2();
+    return;
+  }
   const pl = e.target.closest(".play");
   if (pl) { if (pl.classList.contains("on")) { vid.pause(); clipEnd = null; renderTurnsPlaying(); } else playClip(+pl.dataset.a, +pl.dataset.b); return; }
   const pt = e.target.closest(".pr-text");
