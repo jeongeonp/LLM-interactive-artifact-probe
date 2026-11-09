@@ -2490,7 +2490,7 @@ $("v2board").addEventListener("toggle", (e) => { if (e.target.matches("details.a
 $("v2board").addEventListener("click", (e) => {
   const lay = e.target.closest("[data-v2lay]");
   if (lay) { v2Layout = lay.dataset.v2lay; lsSet("pr-v2cmp", v2Layout); renderV2(); return; }
-  if (e.target.closest("[data-editagreed]")) { editAgreed = !editAgreed; if (editAgreed) { v2Layout = "cards"; lsSet("pr-v2cmp", v2Layout); } renderV2(); renderSegPane(); return; }
+  if (e.target.closest("[data-editagreed]")) { editAgreed = !editAgreed; v2Layout = editAgreed ? "cards" : state.compare ? "table" : v2Layout; lsSet("pr-v2cmp", v2Layout); renderV2(); renderSegPane(); return; }
   const pl = e.target.closest(".play");
   if (pl) { if (pl.classList.contains("on")) { vid.pause(); clipEnd = null; renderTurnsPlaying(); } else playClip(+pl.dataset.a, +pl.dataset.b); return; }
   const pt = e.target.closest(".pr-text");
