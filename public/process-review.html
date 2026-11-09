@@ -328,6 +328,7 @@
   .secl { display:inline-flex; align-items:center; gap:3px; text-transform:none; letter-spacing:0; font-weight:400; font-size:10.5px; color:#5a564e; cursor:pointer; }
   .hrow > div.off { opacity:.45; }
   .chips button:disabled { cursor:not-allowed; }
+  .v2eng .chips button.on { background:#2a2725; border-color:#2a2725; color:#fff; }   /* engagement isn't compared: no per-level colours */
   .upl { font-size:10.5px; color:#3f6b4a; margin-top:2px; }
   .v2cmp th.agh { background:#e3eedf; }
   .v2cmp td.agcell { background:#f6faf3; border-left:2px solid #9cc79f; }
@@ -2286,6 +2287,8 @@ function v2Tuples(recs, turns, P = { turns: 0, intent: [], nodes: [], arrows: []
     for (const u of V2_UP) P.arrows.push(V.map((v) => v2Arrows(v).includes(u.n)));
     P.acts.push(V.map((v) => v.hyps.filter((x) => !x.secondary).length));
   }
+  const ds = recs.map((r) => decOf(r).status);
+  if (ds.every(Boolean)) (P.dec ||= []).push(ds);   // final decision: once per session, when every coder set it
   return P;
 }
 const v2Pairs = (r, o, turns, P) => v2Tuples([r, o], turns, P);
@@ -2305,13 +2308,14 @@ function fleiss(items) {
   const Pe = Object.values(tot).reduce((a, b) => a + (b / (N * m)) ** 2, 0);
   return { po: items.filter((it) => it.every((x) => x === it[0])).length / N, k: Pe < 1 ? (Pbar - Pe) / (1 - Pe) : null, n: N };
 }
-function v2Stats({ turns, intent, nodes, arrows, acts }) {
+function v2Stats({ turns, intent, nodes, arrows, acts, dec = [] }) {
   const K = (x) => (x[0]?.length > 2 ? fleiss(x) : kappa(x));
   return { turns, k3: acts[0]?.length > 2, stats: [
     { label: "intent edge", unit: "turns", ...K(intent) },
     { label: "nodes", unit: "stage × turn", ...K(nodes) },
     { label: "↑ arrow", unit: "arrow × turn", ...K(arrows) },
     { label: "# actions", unit: "turns", ...K(acts) },
+    { label: "final decision", unit: "sessions", ...K(dec) },
   ] };
 }
 // IRR sets: sessions all three coded independently before an agreement meeting, reported separately.
@@ -2393,6 +2397,13 @@ function renderV2Table(b, turns) {
       body += `<tr><td class="fl">${label}</td>${vs.map((v) => `<td class="${!v ? "nc" : keys.length < 2 ? "" : same ? "ok" : "no"}">${v ? show(v) : '<span class="muted">not coded</span>'}</td>`).join("")}
         <td class="agcell">${av ? show(av) : '<span class="muted">—</span>'}</td></tr>`;
     });
+  }
+  // final decision (once per session): status decides the colour; choice and note are shown alongside
+  const decs = coders.map(([, o]) => decOf(o)), ad = decOf(ag), decTxt = (d) => d.status || d.choice ? `<b>${esc(DEC_STAT.find(([k]) => k === d.status)?.[1] || "—")}</b>${d.choice ? ` · ${esc(d.choice)}` : ""}${d.note ? `<br><i>${esc(d.note)}</i>` : ""}` : "";
+  if (decs.some((d) => d.status || d.choice)) {
+    const st = decs.filter((d) => d.status).map((d) => d.status), same = st.length > 1 && st.every((x) => x === st[0]);
+    body += `<tr class="tturn"><th colspan="${coders.length + 2}">Final decision</th></tr><tr><td class="fl">Decision</td>${decs.map((d) => `<td class="${!d.status ? "nc" : st.length < 2 ? "" : same ? "ok" : "no"}">${decTxt(d) || '<span class="muted">not coded</span>'}</td>`).join("")}
+      <td class="agcell">${decTxt(ad) || '<span class="muted">—</span>'}</td></tr>`;
   }
   const pairs = coders.flatMap(([c1, o1], i) => coders.slice(i + 1).map(([c2, o2]) => agreeHtml(`${esc(c1)} vs ${esc(c2)}`, v2Agreement(o1, o2, turns)))).join("");
   b.innerHTML = `${pairs}${pairs ? AGREE_NOTE : ""}${agreeAllHtml()}
